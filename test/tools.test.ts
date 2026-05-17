@@ -74,6 +74,63 @@ describe("anchored tools", () => {
     await expect(readFile(file, "utf8")).resolves.toBe("one\ntwo\nthree\n");
   });
 
+  it("applies same-file batch edits even when paths use different spellings", async () => {
+    const cwd = await workspace();
+    const file = join(cwd, "sample.txt");
+    await writeFile(file, "alpha\nbeta\ngamma\ndelta\n", "utf8");
+    const tools = loadTools();
+
+    await tools.get("apply_anchored_edits")!.execute(
+      "1",
+      {
+        edits: [
+          { type: "replace", path: "sample.txt", startAnchor: "Apple", endAnchor: "Apple", replacement: "ALPHA" },
+          { type: "replace", path: "./sample.txt", startAnchor: "Cider", endAnchor: "Cider", replacement: "GAMMA" }
+        ]
+      },
+      undefined,
+      undefined,
+      { cwd }
+    );
+
+    await expect(readFile(file, "utf8")).resolves.toBe("ALPHA\nbeta\nGAMMA\ndelta\n");
+  });
+
+  it("preserves CRLF and final-newline style", async () => {
+    const cwd = await workspace();
+    const file = join(cwd, "sample.txt");
+    await writeFile(file, "one\r\ntwo\r\nthree\r\n", "utf8");
+    const tools = loadTools();
+
+    await tools.get("edit_anchored_range")!.execute(
+      "1",
+      { path: "sample.txt", startAnchor: "Brave", endAnchor: "Brave", replacement: "TWO" },
+      undefined,
+      undefined,
+      { cwd }
+    );
+
+    await expect(readFile(file, "utf8")).resolves.toBe("one\r\nTWO\r\nthree\r\n");
+  });
+
+  it("cancels protected-path edits when no confirmation UI is available", async () => {
+    const cwd = await workspace();
+    const file = join(cwd, "package-lock.json");
+    await writeFile(file, "{\n  \"lockfileVersion\": 3\n}\n", "utf8");
+    const tools = loadTools();
+
+    const result = await tools.get("edit_anchored_range")!.execute(
+      "1",
+      { path: "package-lock.json", startAnchor: "Brave", endAnchor: "Brave", replacement: "  \"lockfileVersion\": 4" },
+      undefined,
+      undefined,
+      { cwd }
+    );
+
+    expect(result.content[0].text).toContain("Edit cancelled");
+    await expect(readFile(file, "utf8")).resolves.toBe("{\n  \"lockfileVersion\": 3\n}\n");
+  });
+
   it("blocks paths outside the workspace", async () => {
     const cwd = await workspace();
     const outside = join(await workspace(), "outside.txt");
@@ -83,5 +140,16 @@ describe("anchored tools", () => {
     await expect(
       tools.get("read_anchored_file")!.execute("1", { path: outside }, undefined, undefined, { cwd })
     ).rejects.toThrow(/outside workspace/);
+  });
+
+  it("rejects likely binary files", async () => {
+    const cwd = await workspace();
+    const file = join(cwd, "binary.dat");
+    await writeFile(file, Buffer.from([0, 1, 2, 3]));
+    const tools = loadTools();
+
+    await expect(
+      tools.get("read_anchored_file")!.execute("1", { path: "binary.dat" }, undefined, undefined, { cwd })
+    ).rejects.toThrow(/binary file/);
   });
 });

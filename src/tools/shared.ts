@@ -53,7 +53,7 @@ export async function confirmIfNeeded(
   if (config.confirmation === "protected-paths" && protectedHits.length === 0) return true;
 
   const ui = (ctx as { ui?: { confirm?: (title: string, body: string) => Promise<boolean> } } | undefined)?.ui;
-  if (!ui?.confirm) return true;
+  if (!ui?.confirm) return false;
 
   const files = absPaths.map((abs) => `- ${relative(cwd, abs).replace(/\\/g, "/")}${protectedHits.includes(abs) ? " (protected)" : ""}`).join("\n");
   const body = `${files}\n\n${preview.slice(0, 6000)}`;

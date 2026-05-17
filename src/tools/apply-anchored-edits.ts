@@ -32,23 +32,26 @@ export function registerApplyAnchoredEdits(pi: ExtensionAPI, session: SessionSta
     async execute(_toolCallId: string, params: any, _signal: any, _onUpdate: any, ctx: any) {
       const cwd = getCwd(ctx);
       const edits = normalizeEdits(params.edits);
-      const byPath = new Map<string, AnchoredEdit[]>();
+      const byAbsPath = new Map<
+        string,
+        { loaded: Awaited<ReturnType<typeof loadStateForPath>>; edits: AnchoredEdit[] }
+      >();
       for (const edit of edits) {
-        const arr = byPath.get(edit.path) ?? [];
-        arr.push(edit);
-        byPath.set(edit.path, arr);
+        const loaded = await loadStateForPath(session, cwd, edit.path);
+        const group = byAbsPath.get(loaded.absPath);
+        if (group) group.edits.push(edit);
+        else byAbsPath.set(loaded.absPath, { loaded, edits: [edit] });
       }
 
       const plansByAbsPath = new Map<string, { relativePath: string; beforeLines: string[]; afterLines: string[]; state: Awaited<ReturnType<typeof loadStateForPath>>["state"] }>();
       const diffs: string[] = [];
-      for (const [path, pathEdits] of byPath) {
-        const loaded = await loadStateForPath(session, cwd, path);
+      for (const [absPath, { loaded, edits: pathEdits }] of byAbsPath) {
         for (const edit of pathEdits) assertExpectedRevision(loaded.relativePath, loaded.state.revisionHash, edit.expectedRevision);
         const plans = pathEdits.map((edit) => planEdit(loaded.state, edit));
         assertNoOverlaps(plans);
         const beforeLines = loaded.state.lines.map((line) => line.text);
         const afterLines = applyPlansToLines(beforeLines, plans);
-        plansByAbsPath.set(loaded.absPath, { relativePath: loaded.relativePath, beforeLines, afterLines, state: loaded.state });
+        plansByAbsPath.set(absPath, { relativePath: loaded.relativePath, beforeLines, afterLines, state: loaded.state });
         diffs.push(unifiedDiff(loaded.relativePath, beforeLines, afterLines));
       }
 
