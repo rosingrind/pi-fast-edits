@@ -1,0 +1,50 @@
+{
+  "name": "pi-fast-edits",
+  "version": "0.1.0",
+  "description": "Dirac-style anchored file editing tools for the Pi coding agent.",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.74.0",
+    "@types/node": "^22.0.0",
+    "typebox": "^1.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^3.0.0"
+  },
+  "pi": {
+    "extensions": [
+      "src/index.ts"
+    ]
+  }, 
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "coding-agent",
+    "file-editing",
+    "anchored-edits",
+    "dirac",
+    "myers-diff"
+  ],
+  "engines": {
+    "node": ">=20"
+  }
+}
