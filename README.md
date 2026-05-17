@@ -2,6 +2,10 @@
 
 Dirac-style fast file editing tools for the Pi coding agent.
 
+## Attribution
+
+All credit for the core idea behind this extension goes to [Max Trivedi](https://www.linkedin.com/in/max-trivedi-49993aab/), creator of the Dirac agent. This package is an independent Pi extension inspired by his post: [Hash anchors + Myers diff + single-token anchors](https://dirac.run/posts/hash-anchors-myers-diff-single-token).
+
 `pi-fast-edits` adds anchored file-reading and editing tools to Pi. Instead of editing by fragile line numbers or large search/replace blocks, the agent reads files with stable word anchors and then edits by referencing those anchors.
 
 ```text
