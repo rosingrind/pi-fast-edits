@@ -1,44 +1,79 @@
-import { myersDiff } from "./myers.js";
+import { myersDiff, type DiffOp } from "./myers.js";
 
-export function unifiedDiff(path: string, before: string[], after: string[], context = 3): string {
-  const ops = myersDiff(before, after);
-  const changed = ops.some((op) => op.type !== "equal");
+/**
+ * Build a display diff in pi's built-in tool format.
+ *
+ * Removed lines are prefixed with `-`, added with `+`, context with a leading
+ * space, and collapsed context is marked with a `...` line. Line numbers are
+ * padded to a consistent width so columns align.
+ *
+ * When `ops` is supplied (already computed for `before`/`after`), it is reused
+ * instead of re-running the Myers diff.
+ */
+export function unifiedDiff(
+  before: string[],
+  after: string[],
+  context = 4,
+  ops?: DiffOp[],
+): string {
+  const diffOps = ops ?? myersDiff(before, after);
+  const changed = diffOps.some((op) => op.type !== "equal");
   if (!changed) return "No changes.";
 
-  const out: string[] = [`--- a/${path}`, `+++ b/${path}`];
-  const beforeShown = new Set<number>();
-  const afterShown = new Set<number>();
+  const width = String(Math.max(before.length, after.length)).length;
+  const out: string[] = [];
+  let oldLine = 1;
+  let newLine = 1;
+  let lastWasChange = false;
 
-  for (const op of ops) {
-    if (op.type === "equal") {
-      const start = Math.max(0, op.oldStart - context);
-      const end = Math.min(before.length, op.oldStart + op.count + context);
-      for (let i = start; i < end; i++) beforeShown.add(i);
-      const newStart = Math.max(0, op.newStart - context);
-      const newEnd = Math.min(after.length, op.newStart + op.count + context);
-      for (let i = newStart; i < newEnd; i++) afterShown.add(i);
-    }
-  }
-
-  let oldLine = 0;
-  let newLine = 0;
-  for (const op of ops) {
-    if (op.type === "equal") {
+  for (let i = 0; i < diffOps.length; i++) {
+    const op = diffOps[i];
+    if (op.type === "insert") {
       for (let k = 0; k < op.count; k++) {
-        const oi = op.oldStart + k;
-        if (beforeShown.has(oi)) out.push(` ${before[oi]}`);
+        out.push(`+${String(newLine).padStart(width, " ")} ${after[op.newStart + k]}`);
+        newLine++;
       }
-      oldLine += op.count;
-      newLine += op.count;
+      lastWasChange = true;
     } else if (op.type === "delete") {
-      for (let k = 0; k < op.count; k++) out.push(`-${before[op.oldStart + k]}`);
-      oldLine += op.count;
+      for (let k = 0; k < op.count; k++) {
+        out.push(`-${String(oldLine).padStart(width, " ")} ${before[op.oldStart + k]}`);
+        oldLine++;
+      }
+      lastWasChange = true;
     } else {
-      for (let k = 0; k < op.count; k++) out.push(`+${after[op.newStart + k]}`);
-      newLine += op.count;
+      const count = op.count;
+      const hasLeading = lastWasChange;
+      const hasTrailing =
+        i + 1 < diffOps.length &&
+        (diffOps[i + 1].type === "insert" || diffOps[i + 1].type === "delete");
+      const emit = (k: number) => {
+        out.push(` ${String(oldLine + k).padStart(width, " ")} ${before[op.oldStart + k]}`);
+      };
+      const collapse = () => {
+        out.push(` ${"".padStart(width, " ")} ...`);
+      };
+      if (hasLeading && hasTrailing) {
+        if (count <= context * 2) {
+          for (let k = 0; k < count; k++) emit(k);
+        } else {
+          for (let k = 0; k < context; k++) emit(k);
+          collapse();
+          for (let k = count - context; k < count; k++) emit(k);
+        }
+      } else if (hasLeading) {
+        const shown = Math.min(count, context);
+        for (let k = 0; k < shown; k++) emit(k);
+        if (count - shown > 0) collapse();
+      } else if (hasTrailing) {
+        const skipped = Math.max(0, count - context);
+        if (skipped > 0) collapse();
+        for (let k = skipped; k < count; k++) emit(k);
+      }
+      // Else: context not adjacent to any change, skip entirely.
+      oldLine += count;
+      newLine += count;
+      lastWasChange = false;
     }
   }
-  void oldLine;
-  void newLine;
   return out.join("\n");
 }

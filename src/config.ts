@@ -3,7 +3,6 @@ import type { ConfirmationMode, PiFastEditsConfig } from "./types.js";
 export const DEFAULT_CONFIG: PiFastEditsConfig = {
   overrideBuiltInEditTools: false,
   confirmation: "protected-paths",
-  largeFileMode: "dirac-like",
   maxFullReadBytes: 80_000,
   maxFullReadLines: 1_500,
   maxRangeReadLines: 400,
@@ -11,15 +10,14 @@ export const DEFAULT_CONFIG: PiFastEditsConfig = {
   protectedPaths: [
     ".env",
     ".env.*",
+    ".git",
     ".git/**",
     ".github/workflows/**",
     "package-lock.json",
     "pnpm-lock.yaml",
     "yarn.lock",
-    "migrations/**"
+    "migrations/**",
   ],
-  returnDiffsAfterEdit: true,
-  returnUpdatedAnchorsAfterEdit: true
 };
 
 export function parseConfirmationMode(value: string): ConfirmationMode | undefined {

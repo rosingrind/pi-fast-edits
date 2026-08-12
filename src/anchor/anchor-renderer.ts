@@ -2,7 +2,7 @@ import type { AnchoredLine } from "../types.js";
 
 export const ANCHOR_DELIMITER = "§";
 
-export function renderAnchoredLine(line: AnchoredLine): string {
+function renderAnchoredLine(line: AnchoredLine): string {
   return `${line.anchor}${ANCHOR_DELIMITER} ${line.text}`;
 }
 

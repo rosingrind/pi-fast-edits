@@ -32,10 +32,3 @@ export class AnchorPool {
     return cycle === 0 ? word : `${word}${cycle + 1}`;
   }
 }
-
-export function buildPoolFromAnchors(existing: Iterable<string>, retired: Iterable<string> = []): AnchorPool {
-  const pool = new AnchorPool();
-  for (const anchor of existing) pool.markUsed(anchor);
-  for (const anchor of retired) pool.retire(anchor);
-  return pool;
-}

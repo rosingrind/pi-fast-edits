@@ -1,6 +1,6 @@
 # pi-fast-edits
 
-Dirac-style fast file editing tools for the Pi coding agent.
+Fast file editing tools with word anchors for the Pi coding agent.
 
 ## Attribution
 
@@ -16,7 +16,13 @@ Delta§   return foo();
 Eagle§ }
 ```
 
-The agent can then replace `Cider§..Eagle§` with new code. The extension validates anchors, writes atomically, and lazily reconciles changed files with a Myers line diff.
+The agent can then replace `Cider§..Eagle` with new code. The extension validates anchors, writes atomically, and lazily reconciles changed files with a Myers line diff.
+
+## Usage notes
+
+- Anchor names (e.g., `Cider`) are used in tool parameters to reference lines
+- The `§` marker shown in file output is internal metadata only — it is NOT part of the actual file content
+- When providing `replacement` or `content`, use raw text only — do NOT include the `§` anchor marker
 
 ## Install
 
@@ -48,7 +54,7 @@ pi -e ./src/index.ts
 
 ### `read_anchored_file`
 
-Reads a text file with Dirac-style word anchors.
+Reads a text file with stable word anchors.
 
 ```json
 {
@@ -125,12 +131,10 @@ Returns a diff for a replacement edit without writing files.
 ```text
 /pi-fast-edits status
 /pi-fast-edits config
-/pi-fast-edits override on
-/pi-fast-edits override off
-/pi-fast-edits confirmations always
-/pi-fast-edits confirmations protected-paths
-/pi-fast-edits confirmations never
 ```
+
+- `status` shows the current runtime state (override flag, confirmation mode, tracked files/anchors).
+- `config` opens an interactive `/settings`-style menu (blue borders, fuzzy-searchable list) to edit the extension's configuration. Changes take effect immediately and are persisted to `~/.pi/agent/pi-fast-edits.json`, surviving restarts.
 
 ## Defaults
 
@@ -138,13 +142,21 @@ Returns a diff for a replacement edit without writing files.
 {
   "overrideBuiltInEditTools": false,
   "confirmation": "protected-paths",
-  "largeFileMode": "dirac-like",
   "maxFullReadBytes": 80000,
   "maxFullReadLines": 1500,
   "maxRangeReadLines": 400,
   "maxSkeletonItems": 120,
-  "returnDiffsAfterEdit": true,
-  "returnUpdatedAnchorsAfterEdit": true
+  "protectedPaths": [
+    ".env",
+    ".env.*",
+    ".git",
+    ".git/**",
+    ".github/workflows/**",
+    "package-lock.json",
+    "pnpm-lock.yaml",
+    "yarn.lock",
+    "migrations/**"
+  ]
 }
 ```
 
@@ -157,11 +169,13 @@ Returns a diff for a replacement edit without writing files.
 - Supports optional `expectedRevision` guards to fail safely if a file changed after reading.
 - Confirms edits to protected paths by default.
 
-Protected paths include `.env`, `.git/**`, `.github/workflows/**`, lockfiles, and `migrations/**`.
+Protected paths include `.env`, `.git`, `.git/**`, `.github/workflows/**`, lockfiles, and `migrations/**`.
 
 ## State model
 
 Anchor state is session-local. If Pi reloads the extension, read files again to refresh anchors.
+
+The session cache is bounded: up to 50 files are held in memory, and the least-recently-used entry is evicted (and re-read from disk on the next touch) when the limit is exceeded.
 
 ## License
 

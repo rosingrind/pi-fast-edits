@@ -3,14 +3,11 @@ export type ConfirmationMode = "always" | "protected-paths" | "never";
 export type PiFastEditsConfig = {
   overrideBuiltInEditTools: boolean;
   confirmation: ConfirmationMode;
-  largeFileMode: "dirac-like";
   maxFullReadBytes: number;
   maxFullReadLines: number;
   maxRangeReadLines: number;
   maxSkeletonItems: number;
   protectedPaths: string[];
-  returnDiffsAfterEdit: boolean;
-  returnUpdatedAnchorsAfterEdit: boolean;
 };
 
 export type LineEnding = "\n" | "\r\n";
@@ -19,7 +16,6 @@ export type AnchoredLine = {
   anchor: string;
   text: string;
   lineNo: number;
-  lineHash: string;
 };
 
 export type FileAnchorState = {
@@ -27,22 +23,79 @@ export type FileAnchorState = {
   revisionHash: string;
   lineEnding: LineEnding;
   hadFinalNewline: boolean;
+  hadBom: boolean;
   lines: AnchoredLine[];
   retiredAnchors: Set<string>;
+  /**
+   * Cache of selected skeleton items keyed by `revisionHash`, so repeated
+   * skeleton reads of an unchanged file skip re-scanning every line.
+   */
+  skeletonCache: Map<string, AnchoredLine[]>;
 };
 
+/**
+ * A Map bounded to `maxSize` entries that evicts the least-recently-used key
+ * when full. `loadStateForPath` rebuilds evicted entries from disk on the next
+ * touch, so eviction is safe and keeps the session cache from growing unbounded.
+ */
+export class LRUMap<K, V> extends Map<K, V> {
+  private readonly maxSize: number;
+  private readonly order: K[] = [];
+
+  constructor(maxSize = 50) {
+    super();
+    this.maxSize = maxSize;
+  }
+
+  override get(key: K): V | undefined {
+    const value = super.get(key);
+    if (value !== undefined) {
+      const idx = this.order.indexOf(key);
+      if (idx >= 0) {
+        this.order.splice(idx, 1);
+        this.order.push(key);
+      }
+    }
+    return value;
+  }
+
+  override set(key: K, value: V): this {
+    const existing = this.order.indexOf(key);
+    if (existing >= 0) {
+      this.order.splice(existing, 1);
+    } else if (this.order.length >= this.maxSize) {
+      const evicted = this.order.shift();
+      if (evicted !== undefined) super.delete(evicted);
+    }
+    super.set(key, value);
+    this.order.push(key);
+    return this;
+  }
+
+  override delete(key: K): boolean {
+    const idx = this.order.indexOf(key);
+    if (idx >= 0) this.order.splice(idx, 1);
+    return super.delete(key);
+  }
+
+  override clear(): void {
+    this.order.length = 0;
+    super.clear();
+  }
+}
+
 export type SessionState = {
-  files: Map<string, FileAnchorState>;
+  files: LRUMap<string, FileAnchorState>;
 };
 
 export type ReadMode = "auto" | "full" | "range" | "skeleton";
 
-export type RevisionGuard = {
+type RevisionGuard = {
   /** Optional read_anchored_file revision hash. If provided, edits fail when the file changed since the read. */
   expectedRevision?: string;
 };
 
-export type ReplaceEdit = RevisionGuard & {
+type ReplaceEdit = RevisionGuard & {
   type: "replace";
   path: string;
   startAnchor: string;
@@ -52,7 +105,7 @@ export type ReplaceEdit = RevisionGuard & {
   includeEnd?: boolean;
 };
 
-export type InsertEdit = RevisionGuard & {
+type InsertEdit = RevisionGuard & {
   type: "insert";
   path: string;
   anchor: string;
@@ -60,7 +113,7 @@ export type InsertEdit = RevisionGuard & {
   content: string;
 };
 
-export type DeleteEdit = RevisionGuard & {
+type DeleteEdit = RevisionGuard & {
   type: "delete";
   path: string;
   startAnchor: string;
@@ -68,8 +121,3 @@ export type DeleteEdit = RevisionGuard & {
 };
 
 export type AnchoredEdit = ReplaceEdit | InsertEdit | DeleteEdit;
-
-export type ToolTextResult = {
-  content: Array<{ type: "text"; text: string }>;
-  details?: unknown;
-};

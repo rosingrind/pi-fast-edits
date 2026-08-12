@@ -11,7 +11,7 @@ export async function resolveWorkspacePath(cwd: string, requestedPath: string): 
   });
   const rel = relative(workspaceReal, parentReal);
   if (rel.startsWith("..") || rel === ".." || rel.includes(`..${sep}`) || isAbsolute(rel)) {
-    throw new Error(`Refusing to access path outside workspace: ${requestedPath}`);
+    throw new Error(`Refusing to access path outside workspace: ${requestedPath}.`);
   }
   return abs;
 }
@@ -20,10 +20,11 @@ export async function assertRegularFile(path: string): Promise<void> {
   const lst = await lstat(path);
   if (lst.isSymbolicLink()) {
     const real = await realpath(path);
-    await stat(real);
+    const target = await stat(real);
+    if (!target.isFile()) throw new Error(`Path is not a regular file: ${path}.`);
     return;
   }
-  if (!lst.isFile()) throw new Error(`Path is not a regular file: ${path}`);
+  if (!lst.isFile()) throw new Error(`Path is not a regular file: ${path}.`);
 }
 
 export function toWorkspaceRelative(cwd: string, abs: string): string {
@@ -32,5 +33,7 @@ export function toWorkspaceRelative(cwd: string, abs: string): string {
 
 export function isProtectedPath(relativePath: string, protectedPaths: string[]): boolean {
   const normalized = relativePath.replace(/\\/g, "/");
-  return protectedPaths.some((pattern) => normalized === pattern || matchesGlob(normalized, pattern));
+  return protectedPaths.some(
+    (pattern) => normalized === pattern || matchesGlob(normalized, pattern),
+  );
 }

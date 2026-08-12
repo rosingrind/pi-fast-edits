@@ -7,6 +7,7 @@ export type TextFileSnapshot = {
   lines: string[];
   lineEnding: LineEnding;
   hadFinalNewline: boolean;
+  hadBom: boolean;
   revisionHash: string;
   byteLength: number;
 };
@@ -15,17 +16,17 @@ export function hashText(text: string): string {
   return createHash("sha256").update(text).digest("hex").slice(0, 16);
 }
 
-export function hashLine(text: string): string {
-  return hashText(text);
-}
-
-export function detectLineEnding(text: string): LineEnding {
+function detectLineEnding(text: string): LineEnding {
   const crlf = (text.match(/\r\n/g) ?? []).length;
   const lf = (text.match(/(?<!\r)\n/g) ?? []).length;
   return crlf > lf ? "\r\n" : "\n";
 }
 
-export function splitTextPreserveFinal(text: string): { lines: string[]; hadFinalNewline: boolean; lineEnding: LineEnding } {
+export function splitTextPreserveFinal(text: string): {
+  lines: string[];
+  hadFinalNewline: boolean;
+  lineEnding: LineEnding;
+} {
   const lineEnding = detectLineEnding(text);
   const normalized = text.replace(/\r\n/g, "\n");
   const hadFinalNewline = normalized.endsWith("\n");
@@ -34,15 +35,20 @@ export function splitTextPreserveFinal(text: string): { lines: string[]; hadFina
   return { lines, hadFinalNewline, lineEnding };
 }
 
-export function joinLines(lines: string[], lineEnding: LineEnding, hadFinalNewline: boolean): string {
+export function joinLines(
+  lines: string[],
+  lineEnding: LineEnding,
+  hadFinalNewline: boolean,
+): string {
   const joined = lines.join(lineEnding);
   return hadFinalNewline ? `${joined}${lineEnding}` : joined;
 }
 
-export function looksBinary(buffer: Buffer): boolean {
+function looksBinary(buffer: Buffer): boolean {
   if (buffer.includes(0)) return true;
-  const sample = buffer.subarray(0, Math.min(buffer.length, 8192));
-  const decoded = sample.toString("utf8");
+  // Scan the whole buffer, not just a sample, so binary content beyond the
+  // first 8KB (e.g. trailing invalid UTF-8) is still detected.
+  const decoded = buffer.toString("utf8");
   return decoded.includes("\uFFFD");
 }
 
@@ -51,14 +57,22 @@ export async function readTextFile(filePath: string): Promise<TextFileSnapshot> 
   if (looksBinary(buffer)) {
     throw new Error(`Cannot edit ${filePath} because it appears to be a binary file.`);
   }
-  const text = buffer.toString("utf8");
+  let hadBom = false;
+  let text = buffer.toString("utf8");
+  // Strip a UTF-8 BOM from the working text so it does not get glued to the
+  // first line and lost when that line is edited; re-added on write.
+  if (text.charCodeAt(0) === 0xfeff) {
+    hadBom = true;
+    text = text.slice(1);
+  }
   const { lines, hadFinalNewline, lineEnding } = splitTextPreserveFinal(text);
   return {
     text,
     lines,
     hadFinalNewline,
+    hadBom,
     lineEnding,
     revisionHash: hashText(text),
-    byteLength: buffer.byteLength
+    byteLength: buffer.byteLength,
   };
 }
