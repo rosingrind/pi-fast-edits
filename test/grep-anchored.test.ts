@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import piFastEdits from "../src/index.js";
 import type { PiFastEditsConfig } from "../src/types.js";
 
@@ -228,18 +228,63 @@ describe("grep_anchored_files (rg-backed)", () => {
     expect(text).toMatch(/Delta§ +line 4/); // context line above
   });
 
-  it("falls back to the JS scanner when rg is unavailable", async () => {
-    const cwd = await sampleWorkspace();
-    const tools = await loadTools({/* no override needed */});
-    // Force the fallback by stubbing the resolver through module cache reset is
-    // heavy; instead assert JS results still work after rg failure by passing a
-    // pattern that exercises the same code path — JS fallback is covered by the
-    // pre-existing tests in this file, which must keep passing unchanged.
+  it("never reports 'No matches' when the byte budget truncates the first file", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "pi-fast-edits-grep-"));
+    // One file whose single rendered section exceeds MAX_OUTPUT_BYTES: 500
+    // long match lines (~320 bytes each after MAX_LINE_LENGTH truncation)
+    // render to well over 100KB, so the budget cuts the very first section.
+    const lines: string[] = [];
+    for (let i = 1; i <= 500; i++) {
+      lines.push(`${"x".repeat(400)} target ${i}`);
+    }
+    await writeFile(join(cwd, "big.ts"), `${lines.join("\n")}\n`, "utf8");
+    const tools = await loadTools();
     const result = await tools
       .get("grep_anchored_files")!
-      .execute("1", { pattern: "zzz_not_found" }, undefined, undefined, {
+      .execute("1", { pattern: "target", path: "big.ts", maxMatches: 500 }, undefined, undefined, {
         cwd,
       });
-    expect(result.content[0].text).toContain("No matches");
+    const text = result.content[0].text as string;
+    expect(text).toContain("1 file matched, 500 lines shown.");
+    expect(text).toContain("truncated at 100KB");
+    expect(text).not.toContain("No matches");
+  });
+
+  it("falls back to the JS scanner when rg is unavailable", async () => {
+    // Force resolveRg to report no binary, then re-import the tool chain
+    // fresh: the static import at the top of this file still references the
+    // real resolver, so the mock only affects this test's module graph.
+    vi.resetModules();
+    vi.doMock("../src/fs/rg-resolver.js", () => ({
+      resolveRg: async () => null,
+    }));
+    const { default: piFastEditsMocked } = await import("../src/index.js");
+
+    const cwd = await sampleWorkspace();
+    const tools = new Map<string, ToolDef>();
+    const pi = {
+      registerTool(tool: ToolDef) {
+        tools.set(tool.name, tool);
+      },
+      registerCommand() {},
+      on() {},
+    };
+    await piFastEditsMocked(pi as any, undefined);
+
+    // context is accepted but ignored by the JS scanner (no context lines),
+    // while matches and anchors must render. Eagle only appears via rg
+    // context, so its absence proves the JS path actually ran.
+    const result = await tools
+      .get("grep_anchored_files")!
+      .execute("1", { pattern: "alpha", path: "src/a.ts", context: 1 }, undefined, undefined, {
+        cwd,
+      });
+    const text = result.content[0].text as string;
+    expect(text).toContain("File: src/a.ts");
+    expect(text).toMatch(/Apple§ export function alpha\(\)/);
+    expect(text).toMatch(/Forest§ {3}return alpha\(\);/);
+    expect(text).not.toContain("Eagle");
+
+    vi.doUnmock("../src/fs/rg-resolver.js");
   });
 });

@@ -308,6 +308,16 @@ async function grepWithRg(
   }
 
   if (sections.length === 0) {
+    // Real hits existed but the byte budget cut the very first file's section.
+    // Report the truncation (with hit counts) instead of a bogus "No matches".
+    if (truncatedByBudget) {
+      const header = `${filesWithMatches} file${filesWithMatches === 1 ? "" : "s"} matched, ${totalMatches} line${totalMatches === 1 ? "" : "s"} shown.`;
+      return textResult(`${header}\n\n... results truncated at 100KB — narrow the search.`, {
+        pattern: params.pattern,
+        files: filesWithMatches,
+        matches: totalMatches,
+      });
+    }
     const scope = singleFile ? relative(cwd, rootAbs) : params.path ? params.path : "workspace";
     return textResult(`No matches for /${params.pattern}/ in ${scope}.`, { matches: 0 });
   }
