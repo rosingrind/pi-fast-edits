@@ -21,6 +21,7 @@ The agent can then replace `Cider§..Eagle` with new code. The extension validat
 ## Usage notes
 
 - Anchor names (e.g., `Cider`) are used in tool parameters to reference lines
+- Anchor parameters accept either a bare word (`Cider`) or a full coordinate copied verbatim from tool output (`Cider§ export function run() {`) — full coordinates are verified against the current line before editing
 - The `§` marker shown in file output is internal metadata only — it is NOT part of the actual file content
 - When providing `replacement` or `content`, use raw text only — do NOT include the `§` anchor marker
 
@@ -64,6 +65,30 @@ Reads a text file with stable word anchors.
 ```
 
 For large files, `auto` mode returns a heuristic skeleton instead of dumping the whole file. Use `startLine` and `endLine` for focused range reads.
+
+### `grep_anchored_files`
+
+Searches file contents with a regex and returns matching lines with the same anchors and revision hashes as `read_anchored_file`, ready to feed into the edit tools (pass the per-file `Revision` as `expectedRevision`).
+
+```json
+{
+  "pattern": "TODO",
+  "path": "src",
+  "glob": "**/*.ts",
+  "ignoreCase": true,
+  "context": 2,
+  "maxMatches": 50
+}
+```
+
+- `pattern` — regular expression to search for (required)
+- `path` — file or directory to search, inside the workspace; defaults to the workspace root
+- `glob` — only search files whose workspace-relative path matches, e.g. `**/*.ts`
+- `ignoreCase` — case-insensitive matching
+- `context` — anchored context lines around each match (default 0, max 10)
+- `maxMatches` — maximum matching lines shown per file (default 50)
+
+Searches skip `.git`, `node_modules`, protected paths, and binary files. Results are capped at 100KB with an explicit truncation note, and files that change during the search are omitted with a drift notice instead of returning stale coordinates. When available, the search runs through ripgrep, resolved from pi's tool cache (`~/.pi/agent/bin/rg`) or PATH, with a pure-JS fallback if ripgrep is missing or fails.
 
 ### `edit_anchored_range`
 
@@ -173,7 +198,7 @@ Protected paths include `.env`, `.git`, `.git/**`, `.github/workflows/**`, lockf
 
 ## State model
 
-Anchor state is session-local. If Pi reloads the extension, read files again to refresh anchors.
+Anchor state is persisted to `~/.pi/agent/pi-fast-edits/anchor-state.json` on session shutdown and restored at session start, so anchors survive extension reloads.
 
 The session cache is bounded: up to 50 files are held in memory, and the least-recently-used entry is evicted (and re-read from disk on the next touch) when the limit is exceeded.
 
