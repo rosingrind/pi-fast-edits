@@ -65,7 +65,7 @@ type GrepParams = Static<typeof grepSchema>;
 export function registerGrepAnchoredFiles(
   pi: ExtensionAPI,
   session: SessionState,
-  _config: PiFastEditsConfig,
+  config: PiFastEditsConfig,
 ): void {
   pi.registerTool({
     name: "grep_anchored_files",
@@ -128,7 +128,17 @@ export function registerGrepAnchoredFiles(
       // zero hits is authoritative.
       const rgPath = await resolveRg();
       if (!rgPath) throw new Error(RG_MISSING_ERROR);
-      return grepWithRg(session, cwd, rgPath, params, singleFile, rootAbs, perFileCap, signal);
+      return grepWithRg(
+        session,
+        cwd,
+        rgPath,
+        params,
+        singleFile,
+        rootAbs,
+        perFileCap,
+        signal,
+        config.protectedPaths,
+      );
     },
   });
 }
@@ -150,6 +160,7 @@ async function grepWithRg(
   rootAbs: string,
   perFileCap: number,
   signal: AbortSignal | undefined,
+  protectedPaths: string[],
 ): Promise<ReturnType<typeof textResult>> {
   const context = Math.max(0, Math.min(10, Math.floor(params.context ?? 0)));
   const args = ["--json", "-e", params.pattern];
@@ -208,7 +219,7 @@ async function grepWithRg(
     // and protected files, so re-apply our own filters.
     if (!singleFile) {
       if (SKIPPED_DIRS.has(relativePath.split("/")[0] ?? "")) continue;
-      if (isProtectedPath(relativePath, PROTECTED_SKIP)) continue;
+      if (isProtectedPath(relativePath, [...PROTECTED_SKIP, ...protectedPaths])) continue;
     }
 
     // Skip files too large to index: same cap as the JS scanner, so the rg

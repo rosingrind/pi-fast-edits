@@ -37,7 +37,10 @@ function normalizeAnchor(anchor: string): string {
 }
 
 export function poolFromState(state: FileAnchorState): AnchorPool {
-  const pool = new AnchorPool();
+  // Seed from the file path so post-edit allocations are reproducible: the
+  // same state (path + used/retired sets) always yields the same words for
+  // newly added lines, keeping multi-session and hydration behavior stable.
+  const pool = new AnchorPool(poolRngForPath(state.path));
   for (const line of state.lines) pool.markUsed(line.anchor);
   for (const anchor of state.retiredAnchors) pool.retire(anchor);
   return pool;

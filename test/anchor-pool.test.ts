@@ -16,7 +16,7 @@ describe("AnchorPool", () => {
   });
 
   it("poolFromState marks existing anchors used so next() returns fresh ones", () => {
-    const state = createFileAnchorState("test.txt", ["a", "b", "c"], "\n", true, "a\nb\nc\n");
+    const state = createFileAnchorState("test.txt", ["a", "b", "c"], "\n", true, false, "a\nb\nc\n");
     const pool = poolFromState(state);
     const existing = new Set(state.lines.map((line) => line.anchor));
     expect(existing.size).toBe(3);
@@ -27,8 +27,30 @@ describe("AnchorPool", () => {
     expect(fresh.every((anchor) => !existing.has(anchor))).toBe(true);
   });
 
+  it("poolFromState is deterministic per path: identical states allocate identical fresh words", () => {
+    const makeState = () =>
+      createFileAnchorState("test.txt", ["a", "b", "c"], "\n", true, false, "a\nb\nc\n");
+    const stateA = makeState();
+    const stateB = makeState();
+    const freshA = [poolFromState(stateA).next(), poolFromState(stateA).next()];
+    const freshB = [poolFromState(stateB).next(), poolFromState(stateB).next()];
+    // Same path + same used/retired sets => the same words for newly added
+    // lines (eviction/re-derivation and hydration round-trips stay stable).
+    expect(freshA).toEqual(freshB);
+    // A different path yields a different seeded shuffle.
+    const other = createFileAnchorState(
+      "other.txt",
+      ["a", "b", "c"],
+      "\n",
+      true,
+      false,
+      "a\nb\nc\n",
+    );
+    expect(poolFromState(other).next()).not.toBe(freshA[0]);
+  });
+
   it("poolFromState retires deleted anchors so they're skipped", () => {
-    const state = createFileAnchorState("test.txt", ["a", "b", "c"], "\n", true, "a\nb\nc\n");
+    const state = createFileAnchorState("test.txt", ["a", "b", "c"], "\n", true, false, "a\nb\nc\n");
     const originalBAnchor = state.lines[1].anchor;
 
     // Delete "b"
