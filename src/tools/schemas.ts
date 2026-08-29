@@ -8,8 +8,14 @@ import { Type } from "typebox";
 
 export const replaceEditSchema = Type.Object({
   path: Type.String({ description: "Path to the file to edit." }),
-  startAnchor: Type.String({ description: "Start anchor of the range to replace." }),
-  endAnchor: Type.String({ description: "End anchor of the range to replace." }),
+  startAnchor: Type.String({
+    description:
+      "Start anchor of the range to replace. May be a full ANCHOR§current-line coordinate copied verbatim from read output.",
+  }),
+  endAnchor: Type.String({
+    description:
+      "End anchor of the range to replace. May be a full ANCHOR§current-line coordinate copied verbatim from read output.",
+  }),
   replacement: Type.String({
     description:
       "New content to replace the anchor range. Use raw text only — do NOT include the § anchor marker.",
@@ -23,7 +29,10 @@ export const replaceEditSchema = Type.Object({
 
 export const insertEditSchema = Type.Object({
   path: Type.String({ description: "Path to the file to edit." }),
-  anchor: Type.String({ description: "Anchor to insert before or after." }),
+  anchor: Type.String({
+    description:
+      "Anchor to insert before or after. May be a full ANCHOR§current-line coordinate copied verbatim from read output.",
+  }),
   position: Type.Union([Type.Literal("before"), Type.Literal("after")], {
     description: "Insert before or after the anchor.",
   }),
@@ -37,8 +46,14 @@ export const insertEditSchema = Type.Object({
 
 export const deleteEditSchema = Type.Object({
   path: Type.String({ description: "Path to the file to edit." }),
-  startAnchor: Type.String({ description: "Start anchor of the range to delete." }),
-  endAnchor: Type.String({ description: "End anchor of the range to delete." }),
+  startAnchor: Type.String({
+    description:
+      "Start anchor of the range to delete. May be a full ANCHOR§current-line coordinate copied verbatim from read output.",
+  }),
+  endAnchor: Type.String({
+    description:
+      "End anchor of the range to delete. May be a full ANCHOR§current-line coordinate copied verbatim from read output.",
+  }),
   expectedRevision: Type.Optional(
     Type.String({ description: "Revision hash from read_anchored_file to prevent stale edits." }),
   ),

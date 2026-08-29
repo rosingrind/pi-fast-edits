@@ -1,7 +1,7 @@
 import type { AnchoredEdit, FileAnchorState } from "../types.js";
 import { findAnchorIndex } from "../anchor/anchor-state.js";
 import { splitTextPreserveFinal } from "../fs/text-file.js";
-import { ANCHOR_DELIMITER } from "../anchor/anchor-renderer.js";
+import { ANCHOR_DELIMITER, parseAnchoredCoordinate } from "../anchor/anchor-renderer.js";
 
 export type PlannedEdit = {
   edit: AnchoredEdit;
@@ -10,7 +10,39 @@ export type PlannedEdit = {
   replacementLines: string[];
 };
 
+/**
+ * Verify that every full `ANCHOR§content` coordinate in the edit matches the
+ * line currently at that anchor. Bare anchors carry no content and are never
+ * checked, so legacy callers behave exactly as before. Called by planEdit
+ * before any planning; throws a corrective message on mismatch.
+ */
+function assertCoordinateContent(state: FileAnchorState, edit: AnchoredEdit): void {
+  const coordinates: Array<{ anchor: string; content?: string } | null> =
+    edit.type === "insert"
+      ? [parseAnchoredCoordinate(edit.anchor)]
+      : [parseAnchoredCoordinate(edit.startAnchor), parseAnchoredCoordinate(edit.endAnchor)];
+  for (const coord of coordinates) {
+    if (coord?.content === undefined) continue;
+    // A trailing ANCHOR§ with no content is the legacy bare-anchor form
+    // (normalizeAnchor strips the trailing delimiter) — nothing to verify. One
+    // leading space is also tolerated so full coordinates copied verbatim from
+    // rendered read output (`Anchor§ text`) match the line text in details.
+    const expected = coord.content.replace(/^ /, "");
+    if (expected === "") continue;
+    const index = findAnchorIndex(state, coord.anchor);
+    if (index === -1) continue; // planEdit reports the missing anchor itself
+    const actual = state.lines[index]?.text;
+    if (actual !== expected) {
+      throw new Error(
+        `Anchor content mismatch for ${coord.anchor}${ANCHOR_DELIMITER}${coord.content}: the line is currently ${JSON.stringify(actual)}. Re-read the file with read_anchored_file and copy the anchored line verbatim.`,
+      );
+    }
+  }
+}
+
 export function planEdit(state: FileAnchorState, edit: AnchoredEdit): PlannedEdit {
+  assertCoordinateContent(state, edit);
+
   // Empty files have no anchors — any edit creates the file content from scratch.
   if (state.lines.length === 0) {
     if (edit.type === "delete") return { edit, start: 0, end: -1, replacementLines: [] };
@@ -24,8 +56,10 @@ export function planEdit(state: FileAnchorState, edit: AnchoredEdit): PlannedEdi
   }
 
   if (edit.type === "replace") {
-    const startAnchor = findAnchorIndex(state, edit.startAnchor);
-    const endAnchor = findAnchorIndex(state, edit.endAnchor);
+    const startCoord = parseAnchoredCoordinate(edit.startAnchor) ?? { anchor: edit.startAnchor };
+    const endCoord = parseAnchoredCoordinate(edit.endAnchor) ?? { anchor: edit.endAnchor };
+    const startAnchor = findAnchorIndex(state, startCoord.anchor);
+    const endAnchor = findAnchorIndex(state, endCoord.anchor);
     if (startAnchor === -1)
       throw new Error(
         `Could not find start anchor ${edit.startAnchor}${ANCHOR_DELIMITER} in ${state.path}.`,
@@ -54,7 +88,8 @@ export function planEdit(state: FileAnchorState, edit: AnchoredEdit): PlannedEdi
   }
 
   if (edit.type === "insert") {
-    const index = findAnchorIndex(state, edit.anchor);
+    const coord = parseAnchoredCoordinate(edit.anchor) ?? { anchor: edit.anchor };
+    const index = findAnchorIndex(state, coord.anchor);
     if (index === -1)
       throw new Error(`Could not find anchor ${edit.anchor}${ANCHOR_DELIMITER} in ${state.path}.`);
     const start = edit.position === "before" ? index : index + 1;
@@ -66,8 +101,10 @@ export function planEdit(state: FileAnchorState, edit: AnchoredEdit): PlannedEdi
     };
   }
 
-  const start = findAnchorIndex(state, edit.startAnchor);
-  const end = findAnchorIndex(state, edit.endAnchor);
+  const startCoord = parseAnchoredCoordinate(edit.startAnchor) ?? { anchor: edit.startAnchor };
+  const endCoord = parseAnchoredCoordinate(edit.endAnchor) ?? { anchor: edit.endAnchor };
+  const start = findAnchorIndex(state, startCoord.anchor);
+  const end = findAnchorIndex(state, endCoord.anchor);
   if (start === -1)
     throw new Error(
       `Could not find start anchor ${edit.startAnchor}${ANCHOR_DELIMITER} in ${state.path}.`,

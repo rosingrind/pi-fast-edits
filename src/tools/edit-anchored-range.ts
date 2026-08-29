@@ -19,6 +19,7 @@ export function registerEditAnchoredRange(
     description: "Replace a range of lines between two word anchors.",
     promptSnippet: "Replace a range between two word anchors",
     promptGuidelines: [
+      "Anchors may be passed as complete ANCHOR§current-line coordinates copied verbatim from read/grep output — content is verified before editing",
       "Reference anchors from a prior read_anchored_file result",
       "Use includeStart/includeEnd to fine-tune which anchor lines are replaced",
       "Pass the revision hash from read_anchored_file as expectedRevision",

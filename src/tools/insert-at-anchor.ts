@@ -19,6 +19,7 @@ export function registerInsertAtAnchor(
     description: "Insert content before or after a word anchor.",
     promptSnippet: "Insert content before or after a word anchor",
     promptGuidelines: [
+      "Anchors may be passed as complete ANCHOR§current-line coordinates copied verbatim from read/grep output — content is verified before editing",
       "Reference an anchor from a prior read_anchored_file result",
       "Position must be 'before' or 'after' the anchor line",
       "Pass the revision hash from read_anchored_file as expectedRevision",

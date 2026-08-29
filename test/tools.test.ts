@@ -568,6 +568,90 @@ describe("anchored tools", () => {
     await expect(readFile(file1, "utf8")).resolves.toBe("ALPHA\nbeta\n");
     await expect(readFile(file2, "utf8")).resolves.toBe("GAMMA_NEW\ndelta\n");
   });
+
+  it("verifies echoed content on a full coordinate and rejects mismatches", async () => {
+    const cwd = await workspace();
+    const file = join(cwd, "sample.ts");
+    const source = "export function run() {\n  return 1;\n}\n";
+    await writeFile(file, source, "utf8");
+    const tools = await loadTools();
+    const read = await tools
+      .get("read_anchored_file")!
+      .execute("1", { path: "sample.ts" }, undefined, undefined, { cwd });
+    const line1 = (read.details.lines as Array<{ anchor: string; text: string }>)[0];
+    // Full coordinate with correct content succeeds:
+    await expect(
+      tools.get("edit_anchored_range")!.execute(
+        "2",
+        {
+          path: "sample.ts",
+          startAnchor: `${line1.anchor}§${line1.text}`,
+          endAnchor: `${line1.anchor}§${line1.text}`,
+          replacement: "export function run() {\n  return 2;\n}",
+        },
+        undefined,
+        undefined,
+        { cwd },
+      ),
+    ).resolves.toBeTruthy();
+    // Full coordinate with WRONG content is rejected with a corrective message:
+    await expect(
+      tools.get("edit_anchored_range")!.execute(
+        "3",
+        {
+          path: "sample.ts",
+          startAnchor: `${line1.anchor}§totally different`,
+          endAnchor: `${line1.anchor}§totally different`,
+          replacement: "x",
+        },
+        undefined,
+        undefined,
+        { cwd },
+      ),
+    ).rejects.toThrow(/Anchor content mismatch/);
+  });
+
+  it("applies batch edits using full anchor coordinates", async () => {
+    const cwd = await workspace();
+    const file = join(cwd, "sample.txt");
+    await writeFile(file, "alpha\nbeta\ngamma\n", "utf8");
+    const tools = await loadTools();
+
+    const { lines } = await readAnchored(tools, cwd, "sample.txt");
+
+    await tools.get("apply_anchored_edits")!.execute(
+      "1",
+      {
+        edits: [
+          {
+            type: "replace",
+            path: "sample.txt",
+            startAnchor: `${lines[0].anchor}§${lines[0].text}`,
+            endAnchor: `${lines[0].anchor}§${lines[0].text}`,
+            replacement: "ALPHA",
+          },
+          {
+            type: "insert",
+            path: "sample.txt",
+            anchor: `${lines[1].anchor}§${lines[1].text}`,
+            position: "before",
+            content: "INSERTED",
+          },
+          {
+            type: "delete",
+            path: "sample.txt",
+            startAnchor: `${lines[2].anchor}§${lines[2].text}`,
+            endAnchor: `${lines[2].anchor}§${lines[2].text}`,
+          },
+        ],
+      },
+      undefined,
+      undefined,
+      { cwd },
+    );
+
+    await expect(readFile(file, "utf8")).resolves.toBe("ALPHA\nINSERTED\nbeta\n");
+  });
 });
 
 describe("error paths", () => {
@@ -955,6 +1039,122 @@ describe("error paths", () => {
     expect(result.content[0].text).toMatch(/^[+-]/m);
     const content = await readFile(file, "utf8");
     expect(content).toBe("hello\n");
+  });
+
+  it("insert_at_anchor rejects a mismatched full coordinate", async () => {
+    const cwd = await workspace();
+    const file = join(cwd, "insert-coord.txt");
+    await writeFile(file, "alpha\nbeta\n", "utf8");
+    const tools = await loadTools();
+
+    const { lines } = await readAnchored(tools, cwd, "insert-coord.txt");
+
+    await expect(
+      tools.get("insert_at_anchor")!.execute(
+        "1",
+        {
+          path: "insert-coord.txt",
+          anchor: `${lines[0].anchor}§wrong text`,
+          content: "X\n",
+          position: "before",
+        },
+        undefined,
+        undefined,
+        { cwd },
+      ),
+    ).rejects.toThrow(/Anchor content mismatch/);
+
+    await expect(readFile(file, "utf8")).resolves.toBe("alpha\nbeta\n");
+  });
+
+  it("delete_anchor_range rejects a mismatched full coordinate", async () => {
+    const cwd = await workspace();
+    const file = join(cwd, "delete-coord.txt");
+    await writeFile(file, "alpha\nbeta\n", "utf8");
+    const tools = await loadTools();
+
+    const { lines } = await readAnchored(tools, cwd, "delete-coord.txt");
+
+    await expect(
+      tools.get("delete_anchor_range")!.execute(
+        "1",
+        {
+          path: "delete-coord.txt",
+          startAnchor: `${lines[0].anchor}§wrong text`,
+          endAnchor: `${lines[1].anchor}§${lines[1].text}`,
+        },
+        undefined,
+        undefined,
+        { cwd },
+      ),
+    ).rejects.toThrow(/Anchor content mismatch/);
+
+    await expect(readFile(file, "utf8")).resolves.toBe("alpha\nbeta\n");
+  });
+
+  it("preview_anchored_edit rejects a mismatched full coordinate", async () => {
+    const cwd = await workspace();
+    const file = join(cwd, "preview-coord.txt");
+    await writeFile(file, "alpha\nbeta\n", "utf8");
+    const tools = await loadTools();
+
+    const { lines } = await readAnchored(tools, cwd, "preview-coord.txt");
+
+    await expect(
+      tools.get("preview_anchored_edit")!.execute(
+        "1",
+        {
+          path: "preview-coord.txt",
+          startAnchor: `${lines[0].anchor}§wrong text`,
+          endAnchor: `${lines[1].anchor}§${lines[1].text}`,
+          replacement: "X",
+        },
+        undefined,
+        undefined,
+        { cwd },
+      ),
+    ).rejects.toThrow(/Anchor content mismatch/);
+
+    await expect(readFile(file, "utf8")).resolves.toBe("alpha\nbeta\n");
+  });
+
+  it("apply_anchored_edits rejects a mismatched full coordinate before writing", async () => {
+    const cwd = await workspace();
+    const file = join(cwd, "batch-coord.txt");
+    await writeFile(file, "alpha\nbeta\n", "utf8");
+    const tools = await loadTools();
+
+    const { lines } = await readAnchored(tools, cwd, "batch-coord.txt");
+
+    await expect(
+      tools.get("apply_anchored_edits")!.execute(
+        "1",
+        {
+          edits: [
+            {
+              type: "replace" as const,
+              path: "batch-coord.txt",
+              startAnchor: `${lines[0].anchor}§${lines[0].text}`,
+              endAnchor: `${lines[0].anchor}§${lines[0].text}`,
+              replacement: "ALPHA",
+            },
+            {
+              type: "replace" as const,
+              path: "batch-coord.txt",
+              startAnchor: `${lines[1].anchor}§wrong text`,
+              endAnchor: `${lines[1].anchor}§wrong text`,
+              replacement: "BETA",
+            },
+          ],
+        },
+        undefined,
+        undefined,
+        { cwd },
+      ),
+    ).rejects.toThrow(/Anchor content mismatch/);
+
+    // The batch must not write anything when a coordinate mismatches.
+    await expect(readFile(file, "utf8")).resolves.toBe("alpha\nbeta\n");
   });
 });
 
@@ -1841,20 +2041,18 @@ describe("anchor range validation", () => {
     const tools = await loadTools();
     const { lines } = await readAnchored(tools, cwd, "reversed.txt");
     await expect(
-      tools
-        .get("edit_anchored_range")!
-        .execute(
-          "1",
-          {
-            path: "reversed.txt",
-            startAnchor: lines[2].anchor,
-            endAnchor: lines[0].anchor,
-            replacement: "X",
-          },
-          undefined,
-          undefined,
-          { cwd },
-        ),
+      tools.get("edit_anchored_range")!.execute(
+        "1",
+        {
+          path: "reversed.txt",
+          startAnchor: lines[2].anchor,
+          endAnchor: lines[0].anchor,
+          replacement: "X",
+        },
+        undefined,
+        undefined,
+        { cwd },
+      ),
     ).rejects.toThrow("Invalid anchor range");
   });
 

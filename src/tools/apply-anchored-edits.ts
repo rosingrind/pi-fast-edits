@@ -43,6 +43,7 @@ export function registerApplyAnchoredEdits(
       "Apply multiple anchored edits in a single batch, validating all anchors before writing and reconciling lazily with Myers diff.",
     promptSnippet: "Apply multiple anchored edits in a single batch operation",
     promptGuidelines: [
+      "Anchors may be passed as complete ANCHOR§current-line coordinates copied verbatim from read/grep output — content is verified before editing",
       "Each edit references anchors from a prior read_anchored_file result",
       "Edits are validated for overlaps before any writes occur",
       "Pass revision hashes from read_anchored_file as expectedRevision per edit",

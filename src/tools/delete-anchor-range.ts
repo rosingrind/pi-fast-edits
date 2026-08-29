@@ -19,6 +19,7 @@ export function registerDeleteAnchorRange(
     description: "Delete a range of lines from start anchor through end anchor.",
     promptSnippet: "Delete a range of lines between two word anchors",
     promptGuidelines: [
+      "Anchors may be passed as complete ANCHOR§current-line coordinates copied verbatim from read/grep output — content is verified before editing",
       "Reference anchors from a prior read_anchored_file result",
       "The range includes both the start and end anchor lines",
       "Pass the revision hash from read_anchored_file as expectedRevision",

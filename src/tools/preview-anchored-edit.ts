@@ -28,6 +28,7 @@ export function registerPreviewAnchoredEdit(
     description: "Preview a replacement edit between two anchors without writing files.",
     promptSnippet: "Preview a replacement edit between two anchors without writing",
     promptGuidelines: [
+      "Anchors may be passed as complete ANCHOR§current-line coordinates copied verbatim from read/grep output — content is verified before editing",
       "Returns a diff showing what the edit would produce",
       "Does not modify the file — use edit_anchored_range to apply",
       "Pass the revision hash from read_anchored_file as expectedRevision",
