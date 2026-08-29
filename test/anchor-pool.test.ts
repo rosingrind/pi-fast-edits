@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AnchorPool } from "../src/anchor/anchor-pool.js";
+import { AnchorPool, poolRngForPath } from "../src/anchor/anchor-pool.js";
 import { createFileAnchorState, poolFromState } from "../src/anchor/anchor-state.js";
 import { reconcileState } from "../src/anchor/reconcile.js";
 import { WORD_ANCHORS } from "../src/anchor/word-list.js";
@@ -79,5 +79,44 @@ describe("AnchorPool randomization", () => {
     for (let i = 0; i < WORD_ANCHORS.length; i++) firstRound.add(pool.next());
     const again = pool.next();
     expect(again).toMatch(/\d+$/); // suffixed cycle word
+  });
+});
+
+describe("path-seeded rng (eviction durability)", () => {
+  it("two pools seeded from the same path issue the same first word", () => {
+    const a = new AnchorPool(poolRngForPath("/work/proj/src/main.ts")).next();
+    const b = new AnchorPool(poolRngForPath("/work/proj/src/main.ts")).next();
+    expect(a).toBe(b);
+  });
+
+  it("different paths issue different first words", () => {
+    // Pair verified empirically (FNV-1a + mulberry32 over these two paths
+    // produces "Reef" vs "Joyful"); pick new paths if this ever collides.
+    const a = new AnchorPool(poolRngForPath("/work/proj/src/main.ts")).next();
+    const b = new AnchorPool(poolRngForPath("/work/proj/src/other.ts")).next();
+    expect(a).not.toBe(b);
+  });
+
+  it("createFileAnchorState re-derives identical anchors for the same path after eviction", () => {
+    const lines = ["a", "b", "c"];
+    const first = createFileAnchorState(
+      "/work/proj/src/main.ts",
+      lines,
+      "\n",
+      true,
+      false,
+      "a\nb\nc\n",
+    );
+    // A second state for the same path (as rebuilt after an LRU eviction)
+    // must issue the exact same anchors as the first.
+    const rederived = createFileAnchorState(
+      "/work/proj/src/main.ts",
+      lines,
+      "\n",
+      true,
+      false,
+      "a\nb\nc\n",
+    );
+    expect(rederived.lines.map((l) => l.anchor)).toEqual(first.lines.map((l) => l.anchor));
   });
 });

@@ -219,11 +219,11 @@ describe("concurrency: empty-file and session-map stress scenarios", () => {
   describe("E4 — Concurrent edits to distinct files stress the session map", () => {
     it("all concurrent single-file edits succeed with correct per-file content", async () => {
       const cwd = await workspace();
-      // Keep the file count within the session cache's capacity (LRUMap
-      // default maxSize 50): with per-file randomized anchors, an evicted
-      // state re-derives new anchors on the next load, so an anchor from an
-      // earlier read is no longer valid once its state leaves the cache.
-      const count = 40;
+      // 100 files deliberately exceeds the session cache's capacity (LRUMap
+      // default maxSize 50): an evicted state is rebuilt from disk on the next
+      // access, and since pools are seeded per file path, the re-derived
+      // anchors are identical to the ones from the earlier read.
+      const count = 100;
       const files = Array.from({ length: count }, (_, i) => ({
         rel: `file-${i}.txt`,
         abs: join(cwd, `file-${i}.txt`),

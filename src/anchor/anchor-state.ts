@@ -1,6 +1,6 @@
 import type { AnchoredLine, FileAnchorState, LineEnding } from "../types.js";
 import { hashText } from "../fs/text-file.js";
-import { AnchorPool } from "./anchor-pool.js";
+import { AnchorPool, poolRngForPath } from "./anchor-pool.js";
 
 export function createFileAnchorState(
   path: string,
@@ -10,7 +10,7 @@ export function createFileAnchorState(
   hadBom: boolean,
   fullText?: string,
 ): FileAnchorState {
-  const pool = new AnchorPool();
+  const pool = new AnchorPool(poolRngForPath(path));
   const anchored: AnchoredLine[] = lines.map((text, index) => ({
     anchor: pool.next(),
     text,
