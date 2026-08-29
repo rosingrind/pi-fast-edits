@@ -45,6 +45,7 @@ describe("parseRgLine", () => {
     expect(parseRgLine(begin)).toBeNull();
     expect(parseRgLine("not json")).toBeNull();
     expect(parseRgLine("")).toBeNull();
+    expect(parseRgLine("null")).toBeNull();
   });
 });
 

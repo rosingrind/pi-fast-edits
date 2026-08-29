@@ -1,5 +1,5 @@
 import { readdir, readFile, stat } from "node:fs/promises";
-import { basename, join, relative } from "node:path";
+import { basename, isAbsolute, join, relative, resolve } from "node:path";
 import { Text, type Component } from "@earendil-works/pi-tui";
 import type { PiFastEditsConfig, SessionState } from "../types.js";
 import { Type, type Static } from "typebox";
@@ -7,6 +7,8 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { ANCHOR_DELIMITER } from "../anchor/anchor-renderer.js";
 import { globToRegExp } from "../fs/glob-match.js";
 import { isProtectedPath } from "../fs/path-safety.js";
+import { resolveRg } from "../fs/rg-resolver.js";
+import { runRg, type RgHit } from "../fs/rg-search.js";
 import {
   renderToolCall,
   type ToolResult,
@@ -20,6 +22,10 @@ const DEFAULT_MAX_MATCHES_PER_FILE = 50;
 const MAX_TOTAL_MATCHES = 500;
 const MAX_FILE_BYTES = 1024 * 1024;
 const MAX_FILES_SCANNED = 2000;
+/** Hard cap on rendered output; sections beyond it are dropped. */
+const MAX_OUTPUT_BYTES = 100_000;
+/** Rendered match lines longer than this are truncated with an ellipsis. */
+const MAX_LINE_LENGTH = 300;
 
 /** Directories never searched — VCS internals and dependency trees. */
 const SKIPPED_DIRS = new Set([".git", "node_modules"]);
@@ -41,6 +47,11 @@ const grepSchema = Type.Object({
     }),
   ),
   ignoreCase: Type.Optional(Type.Boolean({ description: "Case-insensitive matching." })),
+  context: Type.Optional(
+    Type.Number({
+      description: "Anchored context lines around each match (default 0, max 10).",
+    }),
+  ),
   maxMatches: Type.Optional(
     Type.Number({
       description: `Maximum matching lines shown per file (default ${DEFAULT_MAX_MATCHES_PER_FILE}).`,
@@ -108,47 +119,35 @@ export function registerGrepAnchoredFiles(
       const singleFile = rootStat.isFile();
 
       const perFileCap = Math.max(1, Math.floor(params.maxMatches ?? DEFAULT_MAX_MATCHES_PER_FILE));
-      const files = singleFile ? [rootAbs] : await listFiles(rootAbs, cwd, params.glob);
 
-      const sections: string[] = [];
-      let totalMatches = 0;
-      let filesWithMatches = 0;
-      for (const absPath of files) {
-        if (totalMatches >= MAX_TOTAL_MATCHES) break;
-        if (signal?.aborted) break;
-
-        // Only take a session slot for files that actually match: a cheap raw
-        // read first avoids churning the LRU with every scanned file, and
-        // loadStateForPath rejects binary files outright so filter them here.
-        const fileStat = await stat(absPath).catch(() => undefined);
-        if (!fileStat || !fileStat.isFile() || fileStat.size > MAX_FILE_BYTES) continue;
-        const bytes = await readFile(absPath).catch(() => undefined);
-        if (!bytes || bytes.includes(0)) continue; // binary or unreadable
-
-        const { relativePath, state } = await loadStateForPath(session, cwd, absPath);
-
-        const matches = state.lines.filter((line) => regex.test(line.text));
-        if (matches.length === 0) continue;
-        filesWithMatches++;
-
-        const shown = matches.slice(0, perFileCap);
-        totalMatches += shown.length;
-        const lines = shown.map(
-          (line) => `${line.anchor}${ANCHOR_DELIMITER} ${line.text}    line ${line.lineNo}`,
+      // Primary path: ripgrep. The JS scanner below only runs when rg is
+      // missing or fails to spawn/parse — rg reporting zero hits is
+      // authoritative and never triggers a JS re-run.
+      const rgPath = await resolveRg();
+      if (rgPath) {
+        const rgResult = await grepWithRg(
+          session,
+          cwd,
+          rgPath,
+          params,
+          singleFile,
+          rootAbs,
+          perFileCap,
+          signal,
         );
-        const truncated =
-          matches.length > shown.length
-            ? `\n... showing ${shown.length} of ${matches.length} matches`
-            : "";
-        sections.push(
-          `File: ${relativePath}\nRevision: ${state.revisionHash}\n${lines.join("\n")}${truncated}`,
-        );
-
-        if (totalMatches >= MAX_TOTAL_MATCHES) {
-          sections.push(`... stopped at ${MAX_TOTAL_MATCHES} total matches.`);
-          break;
-        }
+        if (rgResult !== null) return rgResult;
       }
+
+      // JS fallback (rg unavailable or failed): previous scan loop, unchanged.
+      const files = singleFile ? [rootAbs] : await listFiles(rootAbs, cwd, params.glob);
+      const { sections, totalMatches, filesWithMatches } = await jsGrep(
+        session,
+        cwd,
+        files,
+        regex,
+        perFileCap,
+        signal,
+      );
 
       if (sections.length === 0) {
         const scope = singleFile ? relative(cwd, rootAbs) : params.path ? params.path : "workspace";
@@ -163,6 +162,253 @@ export function registerGrepAnchoredFiles(
       });
     },
   });
+}
+
+/** Message used when a hit file no longer matches its freshly re-read state. */
+const DRIFT_MESSAGE = "[file changed during search — rerun for current coordinates.]";
+
+/**
+ * Run the search through ripgrep and render anchored results. Returns null when
+ * rg failed (spawn/parse error) so the caller can fall back to the JS scanner;
+ * a successful rg run with zero hits is authoritative and returns the
+ * no-match result directly.
+ */
+async function grepWithRg(
+  session: SessionState,
+  cwd: string,
+  rgPath: string,
+  params: GrepParams,
+  singleFile: boolean,
+  rootAbs: string,
+  perFileCap: number,
+  signal: AbortSignal | undefined,
+): Promise<ReturnType<typeof textResult> | null> {
+  const context = Math.max(0, Math.min(10, Math.floor(params.context ?? 0)));
+  const args = ["--json", "-e", params.pattern];
+  if (params.ignoreCase) args.push("-i");
+  if (params.glob) args.push("--glob", params.glob);
+  if (context > 0) args.push("--context", String(context));
+  // Always pass the absolute root so rg searches the right directory even when
+  // the host process cwd differs from the workspace being searched.
+  args.push(rootAbs);
+
+  let hits: RgHit[];
+  try {
+    hits = await runRg(rgPath, args, signal);
+  } catch {
+    if (signal?.aborted) return textResult("Search cancelled (aborted).");
+    return null; // fall through to the JS scanner
+  }
+
+  if (hits.length === 0) {
+    const scope = singleFile ? relative(cwd, rootAbs) : params.path ? params.path : "workspace";
+    return textResult(`No matches for /${params.pattern}/ in ${scope}.`, { matches: 0 });
+  }
+
+  // Group hits by file so each file is validated and rendered once.
+  const byFile = new Map<string, RgHit[]>();
+  for (const hit of hits) {
+    let group = byFile.get(hit.file);
+    if (!group) {
+      group = [];
+      byFile.set(hit.file, group);
+    }
+    group.push(hit);
+  }
+
+  const sections: string[] = [];
+  let outputLength = 0;
+  let totalMatches = 0;
+  let filesWithMatches = 0;
+  let omittedFiles = 0;
+  let truncatedByBudget = false;
+
+  for (const file of [...byFile.keys()].sort()) {
+    if (totalMatches >= MAX_TOTAL_MATCHES) break;
+    if (signal?.aborted) break;
+
+    const absPath = isAbsolute(file) ? file : resolve(cwd, file);
+    let relativePath = relative(cwd, absPath).replace(/\\/g, "/");
+
+    // Directory searches skip the same trees as the JS walker. rg honors
+    // gitignore natively, but non-git workspaces still surface dependency
+    // and protected files, so re-apply our own filters.
+    if (!singleFile) {
+      if (SKIPPED_DIRS.has(relativePath.split("/")[0] ?? "")) continue;
+      if (isProtectedPath(relativePath, PROTECTED_SKIP)) continue;
+    }
+
+    let loaded: Awaited<ReturnType<typeof loadStateForPath>>;
+    try {
+      loaded = await loadStateForPath(session, cwd, absPath);
+    } catch {
+      // Deleted or unreadable mid-search — treat as drifted.
+      omittedFiles++;
+      sections.push(`${relativePath}\n${DRIFT_MESSAGE}`);
+      outputLength += relativePath.length;
+      continue;
+    }
+    ({ relativePath, state: loaded.state } = loaded);
+    const state = loaded.state;
+
+    const { kept, drifted } = filterDrifted(byFile.get(file)!, state.lines);
+    if (drifted) {
+      omittedFiles++;
+      sections.push(`${relativePath}\n${DRIFT_MESSAGE}`);
+      outputLength += relativePath.length;
+      continue;
+    }
+
+    // Context events can duplicate line numbers (overlapping match windows);
+    // render each line once, preferring match hits over context.
+    const deduped = new Map<number, RgHit>();
+    for (const hit of kept) {
+      const existing = deduped.get(hit.lineNo);
+      if (existing === undefined || (!existing.isMatch && hit.isMatch)) {
+        deduped.set(hit.lineNo, hit);
+      }
+    }
+    const ordered = [...deduped.values()].sort((a, b) => a.lineNo - b.lineNo);
+    const matchCount = ordered.filter((hit) => hit.isMatch).length;
+    if (matchCount === 0) continue;
+
+    // Per-file cap applies to matches; context of truncated matches is dropped.
+    const shownMatches: RgHit[] = [];
+    const lines: string[] = [];
+    for (const hit of ordered) {
+      if (hit.isMatch) {
+        if (shownMatches.length >= perFileCap) break;
+        shownMatches.push(hit);
+      }
+      const line = state.lines[hit.lineNo - 1];
+      if (!line) continue;
+      lines.push(renderHitLine(line, hit.lineNo));
+    }
+    if (lines.length === 0) continue;
+
+    filesWithMatches++;
+    totalMatches += shownMatches.length;
+    const truncated =
+      matchCount > shownMatches.length
+        ? `\n... showing ${shownMatches.length} of ${matchCount} matches`
+        : "";
+    const section = `File: ${relativePath}\nRevision: ${state.revisionHash}\n${lines.join("\n")}${truncated}`;
+
+    if (outputLength + section.length > MAX_OUTPUT_BYTES) {
+      truncatedByBudget = true;
+      break;
+    }
+    sections.push(section);
+    outputLength += section.length;
+
+    if (totalMatches >= MAX_TOTAL_MATCHES) {
+      sections.push(`... stopped at ${MAX_TOTAL_MATCHES} total matches.`);
+      break;
+    }
+  }
+
+  if (sections.length === 0) {
+    const scope = singleFile ? relative(cwd, rootAbs) : params.path ? params.path : "workspace";
+    return textResult(`No matches for /${params.pattern}/ in ${scope}.`, { matches: 0 });
+  }
+
+  const omittedNote =
+    omittedFiles > 0
+      ? `\n... ${omittedFiles} file(s) omitted because they changed during search.`
+      : "";
+  const budgetNote = truncatedByBudget
+    ? `\n... results truncated at 100KB — narrow the search.`
+    : "";
+  const header = `${filesWithMatches} file${filesWithMatches === 1 ? "" : "s"} matched, ${totalMatches} line${totalMatches === 1 ? "" : "s"} shown.`;
+  return textResult(`${header}\n\n${sections.join("\n\n")}${omittedNote}${budgetNote}`, {
+    pattern: params.pattern,
+    files: filesWithMatches,
+    matches: totalMatches,
+  });
+}
+
+/**
+ * Drop hits whose content no longer matches the freshly re-read file. A file
+ * is reported as drifted when any of its hits disagree with the current state;
+ * the caller omits the whole file in that case.
+ */
+export function filterDrifted(
+  hits: RgHit[],
+  lines: Array<{ text: string }>,
+): { kept: RgHit[]; drifted: boolean } {
+  const kept: RgHit[] = [];
+  let drifted = false;
+  for (const hit of hits) {
+    const line = lines[hit.lineNo - 1];
+    if (line === undefined || line.text !== hit.content.replace(/\r?\n$/, "")) {
+      drifted = true;
+      continue;
+    }
+    kept.push(hit);
+  }
+  return { kept, drifted };
+}
+
+/** Render one anchored line, truncating overlong content but keeping the anchor prefix. */
+function renderHitLine(line: { anchor: string; text: string }, lineNo: number): string {
+  const text =
+    line.text.length > MAX_LINE_LENGTH ? `${line.text.slice(0, MAX_LINE_LENGTH)}...` : line.text;
+  return `${line.anchor}${ANCHOR_DELIMITER} ${text}    line ${lineNo}`;
+}
+
+/**
+ * JS-only fallback scan: the previous directory walk + per-file match loop,
+ * kept verbatim. Only reached when ripgrep is unavailable or fails to run.
+ */
+async function jsGrep(
+  session: SessionState,
+  cwd: string,
+  files: string[],
+  regex: RegExp,
+  perFileCap: number,
+  signal: AbortSignal | undefined,
+): Promise<{ sections: string[]; totalMatches: number; filesWithMatches: number }> {
+  const sections: string[] = [];
+  let totalMatches = 0;
+  let filesWithMatches = 0;
+  for (const absPath of files) {
+    if (totalMatches >= MAX_TOTAL_MATCHES) break;
+    if (signal?.aborted) break;
+
+    // Only take a session slot for files that actually match: a cheap raw
+    // read first avoids churning the LRU with every scanned file, and
+    // loadStateForPath rejects binary files outright so filter them here.
+    const fileStat = await stat(absPath).catch(() => undefined);
+    if (!fileStat || !fileStat.isFile() || fileStat.size > MAX_FILE_BYTES) continue;
+    const bytes = await readFile(absPath).catch(() => undefined);
+    if (!bytes || bytes.includes(0)) continue; // binary or unreadable
+
+    const { relativePath, state } = await loadStateForPath(session, cwd, absPath);
+
+    const matches = state.lines.filter((line) => regex.test(line.text));
+    if (matches.length === 0) continue;
+    filesWithMatches++;
+
+    const shown = matches.slice(0, perFileCap);
+    totalMatches += shown.length;
+    const lines = shown.map(
+      (line) => `${line.anchor}${ANCHOR_DELIMITER} ${line.text}    line ${line.lineNo}`,
+    );
+    const truncated =
+      matches.length > shown.length
+        ? `\n... showing ${shown.length} of ${matches.length} matches`
+        : "";
+    sections.push(
+      `File: ${relativePath}\nRevision: ${state.revisionHash}\n${lines.join("\n")}${truncated}`,
+    );
+
+    if (totalMatches >= MAX_TOTAL_MATCHES) {
+      sections.push(`... stopped at ${MAX_TOTAL_MATCHES} total matches.`);
+      break;
+    }
+  }
+
+  return { sections, totalMatches, filesWithMatches };
 }
 
 /**

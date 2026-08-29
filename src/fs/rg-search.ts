@@ -26,6 +26,7 @@ export function parseRgLine(line: string): RgHit | null {
   } catch {
     return null;
   }
+  if (!parsed || typeof parsed !== "object") return null;
   if (
     (parsed.type !== "match" && parsed.type !== "context") ||
     typeof parsed.data?.path?.text !== "string" ||
