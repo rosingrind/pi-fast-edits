@@ -125,9 +125,21 @@ export function checkOverrideCompatibility(builtins: ToolDef[], ours: ToolDef[])
  * only when the override safety check fails — the override is requested but
  * cannot claim the names, so a blocked call with a teaching message is the
  * visible fallback tier (spec behavior matrix, row 3).
+ *
+ * The handler is installed at most once per pi runtime (WeakSet guard):
+ * `applyOverrideMode` re-runs on every session_start and config change, so
+ * without the guard repeated fail-path runs would stack duplicate handlers.
+ * It reads the live `config` at call time: toggling the override OFF from the
+ * menu un-blocks `write`/`edit` immediately (and re-blocks on re-enable)
+ * without needing to uninstall/reinstall the handler.
  */
-export function installInterceptionFallback(pi: ExtensionAPI): void {
+const interceptionInstalled = new WeakSet<ExtensionAPI>();
+
+export function installInterceptionFallback(pi: ExtensionAPI, config: PiFastEditsConfig): void {
+  if (interceptionInstalled.has(pi)) return;
+  interceptionInstalled.add(pi);
   pi.on("tool_call", (event, _ctx) => {
+    if (!config.overrideBuiltInEditTools) return undefined;
     const name = event.toolName ?? "";
     if (name === "write" || name === "edit") {
       return {
@@ -146,7 +158,7 @@ export type OverrideDeps = {
   registerEdit: typeof applyAnchoredEditsModule.registerApplyAnchoredEdits;
   registerGrep: typeof grepAnchoredModule.registerGrepAnchoredFiles;
   registerWrite: typeof writeAnchoredModule.registerWriteAnchored;
-  installInterception: (pi: ExtensionAPI) => void;
+  installInterception: (pi: ExtensionAPI, config: PiFastEditsConfig) => void;
 };
 
 /** The subset of pi's ExtensionContext that the warning path reads. */
@@ -210,7 +222,7 @@ export function applyOverrideMode(
   const ours: ToolDef[] = [readDef, editDef, grepDef, writeDef];
 
   const fail = (reasons: string[]) => {
-    deps.installInterception(pi);
+    deps.installInterception(pi, config);
     ctx?.ui?.notify?.(
       `pi-fast-edits: built-in read/edit/write/grep override could not be enabled ` +
         `(safety check failed: ${reasons.join("; ")}). Falling back to interception — ` +

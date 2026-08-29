@@ -167,6 +167,7 @@ async function loadOverride(
 ) {
   const registered = new Map<string, RegisteredTool>();
   const handlers: Record<string, Handler> = {};
+  let toolCallInstallCount = 0;
   const setActiveToolsCalls: string[][] = [];
   // Mirrors pi's real default active set: grep is registered-but-inactive.
   let activeTools = ["read", "bash", "edit", "write", ...SUFFIXED_TOOL_NAMES];
@@ -182,11 +183,18 @@ async function loadOverride(
       activeTools = [...names];
     },
     on(event: string, handler: Handler) {
+      if (event === "tool_call") toolCallInstallCount += 1;
       handlers[event] = handler;
     },
   };
   await piFastEdits(pi as any, overrides);
-  return { registered, handlers, setActiveToolsCalls, activeTools: () => [...activeTools] };
+  return {
+    registered,
+    handlers,
+    setActiveToolsCalls,
+    toolCallInstallCount: () => toolCallInstallCount,
+    activeTools: () => [...activeTools],
+  };
 }
 
 describe("applyOverrideMode wiring", () => {
@@ -261,6 +269,27 @@ describe("applyOverrideMode wiring", () => {
     expect(notifications).toHaveLength(1);
     expect(notifications[0].type).toBe("warning");
     expect(notifications[0].message).toContain("read");
+  });
+
+  it("installed-once guard: repeated fail-path runs install a single interception handler", async () => {
+    const builtins = withBuiltin(fullBuiltins(), "write", (def) => ({
+      ...def,
+      parameters: { properties: { path: {} } }, // missing content → check fails
+    }));
+    const { handlers, toolCallInstallCount } = await loadOverride(
+      { overrideBuiltInEditTools: true },
+      builtins,
+    );
+    // Three fail-path runs (session_start re-runs applyOverrideMode each time)
+    // must not stack duplicate tool_call handlers.
+    await handlers.session_start!({}, {});
+    await handlers.session_start!({}, {});
+    await handlers.session_start!({}, {});
+
+    expect(toolCallInstallCount()).toBe(1);
+    // The single handler still blocks write in fail mode.
+    const write = await handlers.tool_call!({ toolName: "write" }, {});
+    expect(write?.block).toBe(true);
   });
 
   it("disabled (default): no interception, no override names, no setActiveTools call", async () => {

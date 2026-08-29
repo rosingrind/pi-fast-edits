@@ -133,6 +133,23 @@ describe("write_anchored", () => {
     await expect(readFile(join(cwd, "over.txt"), "utf8")).resolves.toBe("second content\n");
   });
 
+  it("result guidance does not name tools deactivated in override mode", async () => {
+    const cwd = await workspace();
+    const tools = await loadTools();
+
+    const result = await writeAnchored(tools, cwd, "neutral.txt", "hello\n");
+    const text = result.content[0].text;
+
+    // The write result is also produced by the override `write` tool, where
+    // the suffixed anchored names are deactivated — the guidance must be
+    // mode-neutral and not steer the model toward deactivated tools.
+    expect(text).toContain("Anchors are ready");
+    expect(text).not.toContain("edit_anchored_range");
+    expect(text).not.toContain("insert_at_anchor");
+    expect(text).not.toContain("read_anchored_file");
+    expect(text).toContain("the anchored edit tools can edit this file now");
+  });
+
   it("strips a leading @ from the path like other tools", async () => {
     const cwd = await workspace();
     const tools = await loadTools();

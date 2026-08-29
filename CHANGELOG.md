@@ -34,6 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Interception fallback respects the live override toggle** — The fail-path `tool_call` interception now reads `config.overrideBuiltInEditTools` at call time: toggling override off from the menu un-blocks `write`/`edit` immediately (re-blocking on re-enable), and the handler is installed at most once per runtime, so repeated `applyOverrideMode` runs no longer stack duplicate `tool_call` handlers
+- **Overridden tools refresh schemas on any config change** — While override mode is active, `onConfigChanged` re-runs the override wiring for every config-menu change (not just the override toggle), so the overridden `read`/`edit`/`write`/`grep` definitions are rebuilt with fresh schemas (e.g. a `requireAnchorLines` toggle is picked up immediately)
+- **Write guidance is mode-neutral** — The `write`/`write_anchored` result text and description no longer name the suffixed anchored tools (`edit_anchored_range`/`insert_at_anchor`/`read_anchored_file`), which are deactivated in override mode; the copy now says “the anchored edit tools” / “the anchored read tool”
 - **Teaching error for copied `line N` suffixes** — When a `startAnchorLine`/`endAnchorLine`/`anchorLine` value differs from the current line only by the rendered positional `line N`/`lines N` suffix (grep/read output), the mismatch error now tells the model to drop it — the value is still rejected, the model must correct itself. Tool guidelines and README now document that the suffix is positional metadata, not part of the line
 
 ## [0.2.0] - 2026-08-12

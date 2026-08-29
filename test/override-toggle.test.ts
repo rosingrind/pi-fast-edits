@@ -134,6 +134,36 @@ describe("before_agent_start wiring (index.ts)", () => {
   });
 });
 
+describe("interception fallback reads the live config flag", () => {
+  it("un-blocks write/edit once override is toggled off, re-blocks on re-enable", async () => {
+    const config = makeConfig(true);
+    const handlers: Record<string, (event?: { toolName?: string }, ctx?: unknown) => unknown> = {};
+    const pi = {
+      on(event: string, handler: (event?: { toolName?: string }, ctx?: unknown) => unknown) {
+        handlers[event] = handler;
+      },
+    };
+    installInterceptionFallback(pi as any, config);
+
+    // Fail mode: write/edit are blocked.
+    const write = (await handlers.tool_call!({ toolName: "write" }, {})) as any;
+    expect(write?.block).toBe(true);
+    const edit = (await handlers.tool_call!({ toolName: "edit" }, {})) as any;
+    expect(edit?.block).toBe(true);
+
+    // Menu toggle-off mutates the live config object; the handler must
+    // un-block without being re-installed.
+    config.overrideBuiltInEditTools = false;
+    expect(await handlers.tool_call!({ toolName: "write" }, {})).toBeUndefined();
+    expect(await handlers.tool_call!({ toolName: "edit" }, {})).toBeUndefined();
+
+    // Toggling back on re-blocks through the same handler.
+    config.overrideBuiltInEditTools = true;
+    const reblocked = (await handlers.tool_call!({ toolName: "write" }, {})) as any;
+    expect(reblocked?.block).toBe(true);
+  });
+});
+
 describe("applyOverrideMode disable path (menu toggle-off)", () => {
   const deps: OverrideDeps = {
     registerRead: registerReadAnchoredFile,

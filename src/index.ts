@@ -67,12 +67,14 @@ export default async function piFastEdits(
   };
 
   // Config-menu changes re-register the anchored edit tools (schemas follow
-  // the live settings); when `overrideBuiltInEditTools` itself was toggled,
-  // also re-run the override wiring so the model sees the new surface
-  // immediately (spec D8) instead of waiting for the next session_start.
+  // the live settings). When the override toggle itself changed, or while
+  // override mode is active on ANY config change, also re-run the override
+  // wiring: the overridden definitions embed schema choices (e.g.
+  // requireAnchorLines) that must follow the live settings, so rebuilding
+  // them on every change keeps the built-in-name surface fresh (spec D8).
   const onConfigChanged = (id: string, ctx?: ExtensionCommandContext) => {
     registerAnchoredEditTools();
-    if (id === "override") {
+    if (id === "override" || config.overrideBuiltInEditTools) {
       applyOverrideMode(pi, session, config, overrideDeps, ctx);
     }
   };

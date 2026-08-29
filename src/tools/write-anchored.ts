@@ -43,7 +43,7 @@ export function registerWriteAnchored(
     name: "write_anchored",
     label: "Write Anchored File",
     description:
-      "Write a full file and seed its anchor state, returning the revision hash and an anchored preview so subsequent edits need no read_anchored_file call.",
+      "Write a full file and seed its anchor state, returning the revision hash and an anchored preview so subsequent edits need no separate read to obtain anchors.",
     renderCall: renderToolCall("write_anchored"),
     renderResult: renderWriteResult,
     promptSnippet: "Write a file and get anchors for immediate edits",
@@ -92,7 +92,7 @@ export function registerWriteAnchored(
       const previewBlock = preview.length > 0 ? `\n\n${preview}` : "";
       return textResult(
         `Wrote ${relativePath} (revision ${state.revisionHash}).` +
-          `${previewBlock}\n\nAnchors are ready — edit_anchored_range/insert_at_anchor can edit this file now; use read_anchored_file for the full map.`,
+          `${previewBlock}\n\nAnchors are ready — the anchored edit tools can edit this file now; use the anchored read tool for the full map.`,
         {
           path: relativePath,
           revision: state.revisionHash,
