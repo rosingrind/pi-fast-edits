@@ -43,9 +43,18 @@ function verifyAnchorLines(
     }
     const actual = state.lines[anchorIndex]?.text;
     if (actual !== expected) {
-      throw new Error(
-        `${label}Line mismatch for ${anchor}: the line is currently ${JSON.stringify(actual)}. Re-read the file and copy the line verbatim.`,
-      );
+      // The rendered grep/read output appends a positional `    line N` /
+      // `    lines N` marker after each line. Models copying that text
+      // verbatim will carry the marker into *Line values; teach them to drop
+      // it instead of silently accepting (dirac-grade strictness).
+      const suffixStripped = expected.replace(/\s+lines? \d+$/, "");
+      const suffixOnly = suffixStripped !== expected && suffixStripped === actual;
+      let message = `${label}Line mismatch for ${anchor}: the line is currently ${JSON.stringify(actual)}. Re-read the file and copy the line verbatim.`;
+      if (suffixOnly) {
+        message +=
+          " (if you copied the rendered `    line N` suffix from grep/read output, drop it — it is positional metadata, not part of the line)";
+      }
+      throw new Error(message);
     }
   }
 }

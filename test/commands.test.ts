@@ -21,7 +21,7 @@ describe("command handlers", () => {
       protectedPaths: [...DEFAULT_CONFIG.protectedPaths],
     };
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-    registerCommands(pi as any, session, config);
+    registerCommands(pi as any, session, config, () => {});
 
     return {
       handler,

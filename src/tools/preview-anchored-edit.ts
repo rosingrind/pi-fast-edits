@@ -26,6 +26,7 @@ export function registerPreviewAnchoredEdit(
     promptGuidelines: [
       "Copy anchor words verbatim from a prior read_anchored_file or grep_anchored_files result",
       "Pass the exact current source line at each anchor as startAnchorLine/endAnchorLine, copied verbatim from read/grep output — the line content is verified before editing",
+      "The `    line N` suffix after each rendered line is positional metadata, not part of the line — do NOT include it in startAnchorLine/endAnchorLine values",
       "Returns a diff showing what the edit would produce",
       "Does not modify the file — use edit_anchored_range to apply",
       "Pass the revision hash from read_anchored_file as expectedRevision",

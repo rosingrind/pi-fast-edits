@@ -44,6 +44,7 @@ export function registerApplyAnchoredEdits(
     promptGuidelines: [
       "Copy anchor words verbatim from a prior read_anchored_file or grep_anchored_files result",
       "Pass the exact current source line at each anchor as startAnchorLine/endAnchorLine/anchorLine, copied verbatim from read/grep output — the line content is verified before editing",
+      "The `    line N` suffix after each rendered line is positional metadata, not part of the line — do NOT include it in startAnchorLine/endAnchorLine/anchorLine values",
       "Each edit references anchors from a prior read_anchored_file result",
       "Edits are validated for overlaps before any writes occur",
       "Pass revision hashes from read_anchored_file as expectedRevision per edit",

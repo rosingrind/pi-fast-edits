@@ -18,6 +18,7 @@ export function registerInsertAtAnchor(
     promptGuidelines: [
       "Copy the anchor word verbatim from a prior read_anchored_file or grep_anchored_files result",
       "Pass the exact current source line at the anchor as anchorLine, copied verbatim from read/grep output — the line content is verified before editing",
+      "The `    line N` suffix after each rendered line is positional metadata, not part of the line — do NOT include it in anchorLine values",
       "Position must be 'before' or 'after' the anchor line",
       "Pass the revision hash from read_anchored_file as expectedRevision",
       "Use raw text only in content — do NOT include the § anchor marker",

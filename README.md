@@ -23,6 +23,7 @@ The agent can then replace the `Cider..Eagle` range with new code. The extension
 - Anchor names (e.g., `Cider`) are used in tool parameters to reference lines
 - Anchor parameters take the bare anchor word copied from `read_anchored_file`/`grep_anchored_files` output
 - With `requireAnchorLines` on (the default), every edit must also pass the exact current source line at each anchor — `startAnchorLine`/`endAnchorLine` (or `anchorLine` for inserts) — copied verbatim from read/grep output. The line is verified against the file before editing; a mismatch rejects the edit with a corrective message
+- Rendered lines end with a `line N` (grep) or `lines N` (skeleton) positional suffix — it is metadata, not part of the line, and must NOT be copied into `startAnchorLine`/`endAnchorLine`/`anchorLine` values
 - When `requireAnchorLines` is off, the line args are optional but still verified whenever they are provided
 - The `§` marker shown in file output is internal metadata only — it is NOT part of the actual file content
 - When providing `replacement` or `content`, use raw text only — do NOT include the `§` anchor marker
@@ -70,7 +71,7 @@ For large files, `auto` mode returns a heuristic skeleton instead of dumping the
 
 ### `grep_anchored_files`
 
-Searches file contents with a regex and returns matching lines with the same anchors and revision hashes as `read_anchored_file`, ready to feed into the edit tools: pass the per-file `Revision` as `expectedRevision`, and copy the matching line text verbatim into `startAnchorLine`/`endAnchorLine`/`anchorLine`.
+Searches file contents with a regex and returns matching lines with the same anchors and revision hashes as `read_anchored_file`, ready to feed into the edit tools: pass the per-file `Revision` as `expectedRevision`, and copy the matching line text verbatim into `startAnchorLine`/`endAnchorLine`/`anchorLine` — dropping the trailing `line N` suffix, which is positional metadata and not part of the line.
 
 ```json
 {

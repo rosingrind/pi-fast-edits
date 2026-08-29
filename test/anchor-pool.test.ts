@@ -38,7 +38,7 @@ describe("AnchorPool", () => {
       startAnchor: originalBAnchor,
       endAnchor: originalBAnchor,
     };
-    const plan = planEdit(state, edit);
+    const plan = planEdit(state, edit, false);
     const newLines = applyPlansToLines(
       state.lines.map((line) => line.text),
       [plan],

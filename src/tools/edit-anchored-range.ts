@@ -18,6 +18,7 @@ export function registerEditAnchoredRange(
     promptGuidelines: [
       "Copy anchor words verbatim from a prior read_anchored_file or grep_anchored_files result",
       "Pass the exact current source line at each anchor as startAnchorLine/endAnchorLine, copied verbatim from read/grep output — the line content is verified before editing",
+      "The `    line N` suffix after each rendered line is positional metadata, not part of the line — do NOT include it in startAnchorLine/endAnchorLine values",
       "Use includeStart/includeEnd to fine-tune which anchor lines are replaced",
       "Pass the revision hash from read_anchored_file as expectedRevision",
       "Use raw text only in replacement — do NOT include the § anchor marker",

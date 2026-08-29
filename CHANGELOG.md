@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`ANCHOR§content` echo coordinates** — Passing the echoed line content embedded in the anchor string (`Sunny§export function run()`) is no longer supported; pass the anchor word plus the matching `*Line` arg instead
 
+### Fixed
+
+- **Teaching error for copied `    line N` suffixes** — When a `startAnchorLine`/`endAnchorLine`/`anchorLine` value differs from the current line only by the rendered positional `    line N`/`    lines N` suffix (grep/read output), the mismatch error now tells the model to drop it — the value is still rejected, the model must correct itself. Tool guidelines and README now document that the suffix is positional metadata, not part of the line
+
 ## [0.2.0] - 2026-08-12
 
 ### Added

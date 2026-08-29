@@ -88,6 +88,7 @@ export function registerGrepAnchoredFiles(
       "Results carry the same anchors and revision hashes as read_anchored_file",
       "Pass the per-file Revision header as expectedRevision when editing matches",
       "Use glob to narrow file types, e.g. '**/*.ts'",
+      "The `    line N` suffix after each rendered line is positional metadata, not part of the line — do NOT include it in startAnchorLine/endAnchorLine/anchorLine values",
     ],
     renderShell: "default",
     executionMode: "parallel",

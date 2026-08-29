@@ -163,6 +163,53 @@ describe("anchor line args", () => {
     await expect(readFile(file, "utf8")).resolves.toBe("ONE\ngamma\n");
   });
 
+  it("strict: a *Line value carrying the rendered `    line N` / `    lines N` suffix gets a teaching mismatch error", async () => {
+    const cwd = await workspace();
+    const file = join(cwd, "sample.txt");
+    await writeFile(file, "alpha\nbeta\n", "utf8");
+    const tools = await loadTools();
+    const { lines } = await readAnchored(tools, cwd, "sample.txt");
+
+    // grep-style singular suffix (`    line N`).
+    await expect(
+      tools.get("edit_anchored_range")!.execute(
+        "1",
+        {
+          path: "sample.txt",
+          startAnchor: lines[0].anchor,
+          endAnchor: lines[1].anchor,
+          startAnchorLine: `${lines[0].text}    line 1`,
+          endAnchorLine: `${lines[1].text}    line 2`,
+          replacement: "ALPHA",
+        },
+        undefined,
+        undefined,
+        { cwd },
+      ),
+    ).rejects.toThrow(
+      /startAnchorLine mismatch for .+: the line is currently "alpha"\. Re-read the file and copy the line verbatim\. \(if you copied the rendered ` {4}line N` suffix from grep\/read output, drop it — it is positional metadata, not part of the line\)/,
+    );
+
+    // skeleton-style plural suffix (`    lines N`).
+    await expect(
+      tools.get("insert_at_anchor")!.execute(
+        "2",
+        {
+          path: "sample.txt",
+          anchor: lines[1].anchor,
+          anchorLine: `${lines[1].text}    lines 2`,
+          position: "after",
+          content: "NEW",
+        },
+        undefined,
+        undefined,
+        { cwd },
+      ),
+    ).rejects.toThrow(/drop it — it is positional metadata, not part of the line/);
+
+    await expect(readFile(file, "utf8")).resolves.toBe("alpha\nbeta\n");
+  });
+
   it("strict: wrong line content rejects with a mismatch message and leaves the file untouched", async () => {
     const cwd = await workspace();
     const file = join(cwd, "sample.txt");

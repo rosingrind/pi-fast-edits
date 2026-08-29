@@ -51,7 +51,7 @@ export function registerReadAnchoredFile(
       const endLine = args.endLine as number | undefined;
       if (startLine === undefined && endLine === undefined) return "";
       const s = startLine ?? 1;
-      const e = endLine !== undefined ? `-${endLine}` : "";
+      const e = endLine === undefined ? "" : `-${endLine}`;
       return theme.fg("warning", `:${s}${e}`);
     }),
     renderResult: renderReadAnchoredResult,
@@ -60,6 +60,7 @@ export function registerReadAnchoredFile(
       "Use the returned anchors to reference specific lines in subsequent edits",
       "For large files, use mode:'skeleton' or mode:'range' to focus on specific sections",
       "Pass the revision hash from this result as expectedRevision in edit tools",
+      "The `    line N` / `    lines N` suffix after each rendered line is positional metadata, not part of the line — do NOT include it in startAnchorLine/endAnchorLine/anchorLine values",
     ],
     renderShell: "default",
     executionMode: "parallel",
