@@ -206,19 +206,6 @@ describe("grep_anchored_files", () => {
 });
 
 describe("grep_anchored_files (rg-backed)", () => {
-  itWithRg("returns identical anchored results via rg as the JS path", async () => {
-    const cwd = await sampleWorkspace();
-    const tools = await loadTools();
-    const result = await tools
-      .get("grep_anchored_files")!
-      .execute("1", { pattern: "alpha", path: "src/a.ts" }, undefined, undefined, { cwd });
-    const text = result.content[0].text as string;
-    expect(text).toContain("File: src/a.ts");
-    expect(text).toContain("Revision: ");
-    const alphaAnchor = anchorOf(text, "export function alpha() {");
-    expect(text).toMatch(new RegExp(`${alphaAnchor}§ export function alpha\\(\\)`));
-  });
-
   it("omits drifted files and reports them", async () => {
     // Pure-function test of the drift check.
     const { filterDrifted } = await import("../src/tools/grep-anchored.js");

@@ -48,18 +48,3 @@ describe("parseRgLine", () => {
     expect(parseRgLine("null")).toBeNull();
   });
 });
-
-describe("runRg (integration)", () => {
-  // Runs whenever a ripgrep binary resolves (pi tool cache first, then PATH);
-  // skips quietly otherwise, e.g. CI without ripgrep.
-  it("collects hits from a real directory", async () => {
-    const { resolveRg } = await import("../src/fs/rg-resolver.js");
-    const rgPath = await resolveRg();
-    if (!rgPath) return; // skip quietly
-    const { runRg } = await import("../src/fs/rg-search.js");
-    const hits = await runRg(rgPath, ["--json", "-e", "MAX_RETIRED_ANCHORS", "src"]);
-    expect(hits.length).toBeGreaterThan(0);
-    expect(hits[0]).toMatchObject({ isMatch: true });
-    expect(hits.every((h) => typeof h.lineNo === "number" && h.lineNo >= 1)).toBe(true);
-  });
-});

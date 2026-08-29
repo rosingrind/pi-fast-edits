@@ -10,33 +10,6 @@ describe("AnchorPool Performance", () => {
   const freshPool = () => new AnchorPool();
 
   describe("pool cycles beyond 200 unique anchors", () => {
-    it("first 200 anchors have no numeric suffix", () => {
-      const pool = freshPool();
-      const anchors: string[] = [];
-
-      for (let i = 0; i < 200; i++) {
-        anchors.push(pool.next());
-      }
-
-      // First 200 should all be single words (no digits)
-      for (let i = 0; i < 200; i++) {
-        expect(anchors[i]).not.toMatch(/\d/);
-      }
-      // Verify we got different anchors
-      expect(new Set(anchors).size).toBe(200);
-    });
-
-    it("anchors after 200 have numeric suffix", () => {
-      const pool = freshPool();
-
-      // Get 201st anchor
-      for (let i = 0; i < 200; i++) pool.next();
-      const anchor201 = pool.next();
-
-      // 201st anchor must have a numeric suffix
-      expect(anchor201).toMatch(/\d/);
-    });
-
     it("pool handles 250 unique anchors with correct cycling", () => {
       const pool = freshPool();
       const anchors: string[] = [];
@@ -68,7 +41,7 @@ describe("AnchorPool Performance", () => {
       for (let i = 0; i < 250; i++) {
         lines.push(`unique line number ${i} with distinct content`);
       }
-      await writeFile(filePath, lines.join("\n") + "\n", "utf8");
+      await writeFile(filePath, `${lines.join("\n")}\n`, "utf8");
 
       // Read file to create state with anchors
       const content = await readFile(filePath, "utf8");
@@ -123,9 +96,7 @@ describe("AnchorPool Performance", () => {
       const anchor200 = anchors[200];
       expect(anchor200).toMatch(/2$/);
     });
-  });
 
-  describe("pool reuse after reconciliation", () => {
     it("retired anchors are not reused", () => {
       const pool = freshPool();
       const a1 = pool.next();

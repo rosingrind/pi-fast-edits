@@ -459,4 +459,38 @@ describe("anchor line args", () => {
     expect(lineTextFrom(output, "  return 1;")).toBe("  return 1;");
     expect(() => lineTextFrom(output, "missing")).toThrow(/No anchored line found/);
   });
+
+  it("blank source lines accept an empty anchorLine value", async () => {
+    // A blank line is a valid edit target; its verbatim content is the empty
+    // string (dirac's blank-coordinate case). The schema requires the arg but
+    // an empty string must pass verification, not be treated as missing.
+    const cwd = await workspace();
+    const file = join(cwd, "blank.ts");
+    await writeFile(file, "first\n\nlast\n", "utf8");
+    const tools = await loadTools();
+    const read = await tools
+      .get("read_anchored_file")!
+      .execute("1", { path: "blank.ts" }, undefined, undefined, { cwd });
+    const lines = read.details.lines as Array<{ anchor: string; text: string }>;
+    const blank = lines.find((l) => l.text === "")!;
+    expect(blank).toBeDefined();
+
+    // Insert after the blank line — empty anchorLine verifies against "".
+    const result = await tools.get("insert_at_anchor")!.execute(
+      "2",
+      {
+        path: "blank.ts",
+        anchor: blank.anchor,
+        position: "after",
+        content: "inserted",
+        anchorLine: "",
+      },
+      undefined,
+      undefined,
+      { cwd },
+    );
+    expect(result.content[0].text).toBeTruthy();
+    const after = await readFile(file, "utf8");
+    expect(after).toBe("first\n\ninserted\nlast\n");
+  });
 });

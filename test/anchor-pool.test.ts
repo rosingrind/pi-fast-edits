@@ -16,7 +16,14 @@ describe("AnchorPool", () => {
   });
 
   it("poolFromState marks existing anchors used so next() returns fresh ones", () => {
-    const state = createFileAnchorState("test.txt", ["a", "b", "c"], "\n", true, false, "a\nb\nc\n");
+    const state = createFileAnchorState(
+      "test.txt",
+      ["a", "b", "c"],
+      "\n",
+      true,
+      false,
+      "a\nb\nc\n",
+    );
     const pool = poolFromState(state);
     const existing = new Set(state.lines.map((line) => line.anchor));
     expect(existing.size).toBe(3);
@@ -50,7 +57,14 @@ describe("AnchorPool", () => {
   });
 
   it("poolFromState retires deleted anchors so they're skipped", () => {
-    const state = createFileAnchorState("test.txt", ["a", "b", "c"], "\n", true, false, "a\nb\nc\n");
+    const state = createFileAnchorState(
+      "test.txt",
+      ["a", "b", "c"],
+      "\n",
+      true,
+      false,
+      "a\nb\nc\n",
+    );
     const originalBAnchor = state.lines[1].anchor;
 
     // Delete "b"

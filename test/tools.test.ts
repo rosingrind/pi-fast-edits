@@ -102,6 +102,71 @@ describe("anchored tools", () => {
     await expect(readFile(file, "utf8")).resolves.toBe("one\ntwo\nthree\n");
   });
 
+  it("a failed stale edit does not poison the next attempt with fresh anchors", async () => {
+    // dirac-parity: a rejected edit (file changed underneath) must leave the
+    // session able to recover — the next read yields fresh anchors + revision
+    // and the same logical edit then succeeds.
+    const cwd = await workspace();
+    const file = join(cwd, "sample.ts");
+    await writeFile(file, "one\ntwo\nthree\n", "utf8");
+    const tools = await loadTools();
+
+    const read1 = await tools
+      .get("read_anchored_file")!
+      .execute("1", { path: "sample.ts" }, undefined, undefined, { cwd });
+    const details1 = read1.details as {
+      lines: Array<{ anchor: string; text: string }>;
+      revision: string;
+    };
+
+    // External modification invalidates everything the model holds.
+    await writeFile(file, "one\ntwo changed\nthree\nfour\n", "utf8");
+
+    await expect(
+      tools.get("edit_anchored_range")!.execute(
+        "2",
+        {
+          path: "sample.ts",
+          startAnchor: details1.lines[1].anchor,
+          endAnchor: details1.lines[1].anchor,
+          replacement: "two edited",
+          startAnchorLine: details1.lines[1].text,
+          endAnchorLine: details1.lines[1].text,
+          expectedRevision: details1.revision,
+        },
+        undefined,
+        undefined,
+        { cwd },
+      ),
+    ).rejects.toThrow(/Revision mismatch/);
+
+    // Recovery: re-read gives a fresh mapping and the edit goes through.
+    const read2 = await tools
+      .get("read_anchored_file")!
+      .execute("3", { path: "sample.ts" }, undefined, undefined, { cwd });
+    const details2 = read2.details as {
+      lines: Array<{ anchor: string; text: string }>;
+      revision: string;
+    };
+    const target = details2.lines.find((l) => l.text === "two changed")!;
+    await tools.get("edit_anchored_range")!.execute(
+      "4",
+      {
+        path: "sample.ts",
+        startAnchor: target.anchor,
+        endAnchor: target.anchor,
+        replacement: "two edited",
+        startAnchorLine: target.text,
+        endAnchorLine: target.text,
+        expectedRevision: details2.revision,
+      },
+      undefined,
+      undefined,
+      { cwd },
+    );
+    await expect(readFile(file, "utf8")).resolves.toBe("one\ntwo edited\nthree\nfour\n");
+  });
+
   it("applies same-file batch edits even when paths use different spellings", async () => {
     const cwd = await workspace();
     const file = join(cwd, "sample.txt");
