@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { AnchorPool } from "../src/anchor/anchor-pool.js";
 import { createFileAnchorState, poolFromState } from "../src/anchor/anchor-state.js";
 import { reconcileState } from "../src/anchor/reconcile.js";
+import { WORD_ANCHORS } from "../src/anchor/word-list.js";
 import type { AnchoredEdit } from "../src/types.js";
 import { applyPlansToLines, planEdit } from "../src/tools/edit-core.js";
 
@@ -51,5 +52,32 @@ describe("AnchorPool", () => {
     const newPool = poolFromState(newState);
     const newAnchors = [newPool.next(), newPool.next()];
     expect(newAnchors).not.toContain(originalBAnchor);
+  });
+});
+
+describe("AnchorPool randomization", () => {
+  it("pool is a permutation of the word list", () => {
+    const pool = new AnchorPool(() => 0.5); // deterministic rng
+    // Exhaust into the cycle to observe the full base pool ordering.
+    const seen: string[] = [];
+    for (let i = 0; i < WORD_ANCHORS.length; i++) seen.push(pool.next());
+    expect([...seen].sort()).toEqual([...WORD_ANCHORS].sort());
+    expect(new Set(seen).size).toBe(WORD_ANCHORS.length);
+  });
+
+  it("two pools with different rng disagree on the first word (statistically)", () => {
+    // With a fixed non-identity rng, first word must differ from "Apple" for
+    // all but 1/199 of seeds; use two distinct fixed rngs.
+    const a = new AnchorPool(() => 0.1).next();
+    const b = new AnchorPool(() => 0.9).next();
+    expect(a).not.toBe(b);
+  });
+
+  it("numeric cycling still works after exhaustion", () => {
+    const pool = new AnchorPool(() => 0.5);
+    const firstRound = new Set<string>();
+    for (let i = 0; i < WORD_ANCHORS.length; i++) firstRound.add(pool.next());
+    const again = pool.next();
+    expect(again).toMatch(/\d+$/); // suffixed cycle word
   });
 });

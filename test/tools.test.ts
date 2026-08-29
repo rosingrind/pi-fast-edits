@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 import piFastEdits from "../src/index.js";
 import type { PiFastEditsConfig } from "../src/types.js";
+import { anchorOf } from "./anchor-helpers.js";
 
 type ToolDef = {
   name: string;
@@ -27,6 +28,23 @@ async function workspace() {
   return mkdtemp(join(tmpdir(), "pi-fast-edits-"));
 }
 
+/** Read a file with read_anchored_file and return its text, revision, and anchored lines. */
+async function readAnchored(
+  tools: Map<string, ToolDef>,
+  cwd: string,
+  path: string,
+  toolCallId = "1",
+) {
+  const read = await tools
+    .get("read_anchored_file")!
+    .execute(toolCallId, { path }, undefined, undefined, { cwd });
+  const details = (read as any).details as {
+    revision: string;
+    lines: Array<{ anchor: string; text: string }>;
+  };
+  return { text: read.content[0].text as string, revision: details.revision, lines: details.lines };
+}
+
 describe("anchored tools", () => {
   it("reads anchors and applies an expected-revision guarded replacement", async () => {
     const cwd = await workspace();
@@ -38,15 +56,15 @@ describe("anchored tools", () => {
       .get("read_anchored_file")!
       .execute("1", { path: "sample.ts" }, undefined, undefined, { cwd });
     const text = read.content[0].text as string;
-    expect(text).toContain("Apple§ export function run()");
+    expect(text).toContain(`${read.details.lines[0].anchor}§ export function run()`);
     expect(read.details.revision).toMatch(/^[a-f0-9]{16}$/);
 
     await tools.get("edit_anchored_range")!.execute(
       "2",
       {
         path: "sample.ts",
-        startAnchor: "Apple",
-        endAnchor: "Cider",
+        startAnchor: read.details.lines[0].anchor,
+        endAnchor: read.details.lines[2].anchor,
         replacement: "export function run() {\n  return 2;\n}",
         expectedRevision: read.details.revision,
       },
@@ -88,6 +106,8 @@ describe("anchored tools", () => {
     await writeFile(file, "alpha\nbeta\ngamma\ndelta\n", "utf8");
     const tools = await loadTools();
 
+    const { lines } = await readAnchored(tools, cwd, "sample.txt");
+
     await tools.get("apply_anchored_edits")!.execute(
       "1",
       {
@@ -95,15 +115,15 @@ describe("anchored tools", () => {
           {
             type: "replace",
             path: "sample.txt",
-            startAnchor: "Apple",
-            endAnchor: "Apple",
+            startAnchor: lines[0].anchor,
+            endAnchor: lines[0].anchor,
             replacement: "ALPHA",
           },
           {
             type: "replace",
             path: "./sample.txt",
-            startAnchor: "Cider",
-            endAnchor: "Cider",
+            startAnchor: lines[2].anchor,
+            endAnchor: lines[2].anchor,
             replacement: "GAMMA",
           },
         ],
@@ -122,12 +142,14 @@ describe("anchored tools", () => {
     await writeFile(file, "one\r\ntwo\r\nthree\r\n", "utf8");
     const tools = await loadTools();
 
+    const { lines } = await readAnchored(tools, cwd, "sample.txt");
+
     await tools.get("edit_anchored_range")!.execute(
       "1",
       {
         path: "sample.txt",
-        startAnchor: "Brave",
-        endAnchor: "Brave",
+        startAnchor: lines[1].anchor,
+        endAnchor: lines[1].anchor,
         replacement: "TWO",
       },
       undefined,
@@ -144,12 +166,14 @@ describe("anchored tools", () => {
     await writeFile(file, '{\n  "lockfileVersion": 3\n}\n', "utf8");
     const tools = await loadTools();
 
+    const { lines } = await readAnchored(tools, cwd, "package-lock.json");
+
     const result = await tools.get("edit_anchored_range")!.execute(
       "1",
       {
         path: "package-lock.json",
-        startAnchor: "Brave",
-        endAnchor: "Brave",
+        startAnchor: lines[1].anchor,
+        endAnchor: lines[1].anchor,
         replacement: '  "lockfileVersion": 4',
       },
       undefined,
@@ -193,11 +217,13 @@ describe("anchored tools", () => {
     await writeFile(file, "alpha\nbeta\ngamma\n", "utf8");
     const tools = await loadTools();
 
+    const { lines } = await readAnchored(tools, cwd, "sample.txt");
+
     await tools.get("insert_at_anchor")!.execute(
       "1",
       {
         path: "sample.txt",
-        anchor: "Apple",
+        anchor: lines[0].anchor,
         position: "after",
         content: "ALPHA_INSERTED",
       },
@@ -215,11 +241,13 @@ describe("anchored tools", () => {
     await writeFile(file, "alpha\nbeta\ngamma\ndelta\n", "utf8");
     const tools = await loadTools();
 
+    const { lines } = await readAnchored(tools, cwd, "sample.txt");
+
     await tools
       .get("delete_anchor_range")!
       .execute(
         "1",
-        { path: "sample.txt", startAnchor: "Apple", endAnchor: "Cider" },
+        { path: "sample.txt", startAnchor: lines[0].anchor, endAnchor: lines[2].anchor },
         undefined,
         undefined,
         { cwd },
@@ -234,12 +262,14 @@ describe("anchored tools", () => {
     await writeFile(file, "alpha\nbeta\ngamma\n", "utf8");
     const tools = await loadTools();
 
+    const { lines } = await readAnchored(tools, cwd, "sample.txt");
+
     const result = await tools.get("preview_anchored_edit")!.execute(
       "1",
       {
         path: "sample.txt",
-        startAnchor: "Apple",
-        endAnchor: "Brave",
+        startAnchor: lines[0].anchor,
+        endAnchor: lines[1].anchor,
         replacement: "ALPHA_NEW",
       },
       undefined,
@@ -266,7 +296,7 @@ describe("anchored tools", () => {
 
     const text = result.content[0].text as string;
     expect(text).toContain("Mode: skeleton");
-    expect(text).toContain("Apple§ line 1");
+    expect(text).toContain(`${anchorOf(text, "line 1")}§ line 1`);
   });
 
   it("auto mode selects skeleton for large files (by byte threshold)", async () => {
@@ -297,8 +327,8 @@ describe("anchored tools", () => {
 
     const text = result.content[0].text as string;
     expect(text).toContain("Lines: 1-2");
-    expect(text).toContain("Apple§ alpha");
-    expect(text).toContain("Brave§ beta");
+    expect(text).toContain(`${anchorOf(text, "alpha")}§ alpha`);
+    expect(text).toContain(`${anchorOf(text, "beta")}§ beta`);
   });
 
   it("applies mixed insert, delete, and replace edits", async () => {
@@ -307,6 +337,8 @@ describe("anchored tools", () => {
     await writeFile(file, "alpha\nbeta\ngamma\ndelta\n", "utf8");
     const tools = await loadTools();
 
+    const { lines } = await readAnchored(tools, cwd, "sample.txt");
+
     await tools.get("apply_anchored_edits")!.execute(
       "1",
       {
@@ -314,22 +346,22 @@ describe("anchored tools", () => {
           {
             type: "replace",
             path: "sample.txt",
-            startAnchor: "Apple",
-            endAnchor: "Apple",
+            startAnchor: lines[0].anchor,
+            endAnchor: lines[0].anchor,
             replacement: "ALPHA",
           },
           {
             type: "insert",
             path: "sample.txt",
-            anchor: "Delta",
+            anchor: lines[3].anchor,
             position: "before",
             content: "NEW_LINE",
           },
           {
             type: "delete",
             path: "sample.txt",
-            startAnchor: "Brave",
-            endAnchor: "Cider",
+            startAnchor: lines[1].anchor,
+            endAnchor: lines[2].anchor,
           },
         ],
       },
@@ -353,8 +385,8 @@ describe("anchored tools", () => {
       .execute("1", { path: "large.txt" }, undefined, undefined, { cwd });
 
     const text = result.content[0].text as string;
-    expect(text).toContain("Apple§ line 1");
-    expect(text).toContain("Apple2§ line 201");
+    expect(text).toContain(`${anchorOf(text, "line 1")}§ line 1`);
+    expect(text).toContain(`${anchorOf(text, "line 201")}§ line 201`);
   });
 
   it("insert_at_anchor preserves CRLF line endings", async () => {
@@ -363,11 +395,13 @@ describe("anchored tools", () => {
     await writeFile(file, "one\r\ntwo\r\nthree\r\n", "utf8");
     const tools = await loadTools();
 
+    const { lines } = await readAnchored(tools, cwd, "sample.txt");
+
     await tools.get("insert_at_anchor")!.execute(
       "1",
       {
         path: "sample.txt",
-        anchor: "Apple",
+        anchor: lines[0].anchor,
         position: "after",
         content: "INSERTED",
       },
@@ -387,6 +421,8 @@ describe("anchored tools", () => {
     await writeFile(file, "alpha\nbeta\ngamma\ndelta\n", "utf8");
     const tools = await loadTools();
 
+    const { lines } = await readAnchored(tools, cwd, "sample.txt");
+
     await expect(
       tools.get("apply_anchored_edits")!.execute(
         "1",
@@ -395,15 +431,15 @@ describe("anchored tools", () => {
             {
               type: "replace",
               path: "sample.txt",
-              startAnchor: "Apple",
-              endAnchor: "Cider",
+              startAnchor: lines[0].anchor,
+              endAnchor: lines[2].anchor,
               replacement: "X",
             },
             {
               type: "replace",
               path: "sample.txt",
-              startAnchor: "Brave",
-              endAnchor: "Delta",
+              startAnchor: lines[1].anchor,
+              endAnchor: lines[3].anchor,
               replacement: "Y",
             },
           ],
@@ -428,9 +464,10 @@ describe("anchored tools", () => {
       .get("read_anchored_file")!
       .execute("1", { path: "overlap.txt" }, undefined, undefined, { cwd });
     const revision = (readResult.details as any)?.revision;
+    const lines = (readResult.details as any)?.lines as any[];
 
-    // Word-pool anchors: line 0 = Apple, line 1 = Brave
-    // Insert before INS (Apple) + replace INS..REP (Apple..Brave)
+    // Anchored lines: 0 = INS, 1 = REP
+    // Insert before INS + replace INS..REP
     // Order: insert first
     await expect(
       tools.get("apply_anchored_edits")!.execute(
@@ -440,7 +477,7 @@ describe("anchored tools", () => {
             {
               type: "insert" as const,
               path: "overlap.txt",
-              anchor: "Apple",
+              anchor: lines[0].anchor,
               position: "before",
               content: "NEW\n",
               expectedRevision: revision,
@@ -448,8 +485,8 @@ describe("anchored tools", () => {
             {
               type: "replace" as const,
               path: "overlap.txt",
-              startAnchor: "Apple",
-              endAnchor: "Brave",
+              startAnchor: lines[0].anchor,
+              endAnchor: lines[1].anchor,
               replacement: "REPLACED\n",
               expectedRevision: revision,
             },
@@ -470,15 +507,15 @@ describe("anchored tools", () => {
             {
               type: "replace" as const,
               path: "overlap.txt",
-              startAnchor: "Apple",
-              endAnchor: "Brave",
+              startAnchor: lines[0].anchor,
+              endAnchor: lines[1].anchor,
               replacement: "REPLACED\n",
               expectedRevision: revision,
             },
             {
               type: "insert" as const,
               path: "overlap.txt",
-              anchor: "Apple",
+              anchor: lines[0].anchor,
               position: "before",
               content: "NEW\n",
               expectedRevision: revision,
@@ -500,6 +537,9 @@ describe("anchored tools", () => {
     await writeFile(file2, "gamma\ndelta\n", "utf8");
     const tools = await loadTools();
 
+    const { lines: linesA } = await readAnchored(tools, cwd, "a.txt");
+    const { lines: linesB } = await readAnchored(tools, cwd, "b.txt", "2");
+
     await tools.get("apply_anchored_edits")!.execute(
       "1",
       {
@@ -507,15 +547,15 @@ describe("anchored tools", () => {
           {
             type: "replace",
             path: "a.txt",
-            startAnchor: "Apple",
-            endAnchor: "Apple",
+            startAnchor: linesA[0].anchor,
+            endAnchor: linesA[0].anchor,
             replacement: "ALPHA",
           },
           {
             type: "replace",
             path: "b.txt",
-            startAnchor: "Apple",
-            endAnchor: "Apple",
+            startAnchor: linesB[0].anchor,
+            endAnchor: linesB[0].anchor,
             replacement: "GAMMA_NEW",
           },
         ],
@@ -807,8 +847,8 @@ describe("error paths", () => {
           {
             type: "replace" as const,
             path: ".env",
-            startAnchor: "Apple",
-            endAnchor: "Apple",
+            startAnchor: (readResult.details as any)?.lines[0].anchor,
+            endAnchor: (readResult.details as any)?.lines[0].anchor,
             replacement: "SECRET=2\n",
             expectedRevision: revision,
           },
@@ -987,14 +1027,15 @@ describe("edge cases", () => {
       .get("read_anchored_file")!
       .execute("1", { path: "pipe-del.txt" }, undefined, undefined, { cwd });
     const revision = (readResult.details as any)?.revision;
+    const line1Anchor = (readResult.details as any)?.lines[0].anchor as string;
 
     // Use anchor with trailing | — should work (normalizeAnchor strips it).
     const result = await tools.get("edit_anchored_range")!.execute(
       "2",
       {
         path: "pipe-del.txt",
-        startAnchor: "Apple|",
-        endAnchor: "Apple|",
+        startAnchor: `${line1Anchor}|`,
+        endAnchor: `${line1Anchor}|`,
         replacement: "ALPHA\n",
         expectedRevision: revision,
       },
@@ -1033,13 +1074,14 @@ describe("edge cases", () => {
       .get("read_anchored_file")!
       .execute("1", { path: "sample.txt" }, undefined, undefined, { cwd });
     const revision = (read as any).details.revision as string;
+    const lines = (read as any).details.lines as any[];
 
     const result = await tools.get("delete_anchor_range")!.execute(
       "1",
       {
         path: "sample.txt",
-        startAnchor: "Apple",
-        endAnchor: "Cider",
+        startAnchor: lines[0].anchor,
+        endAnchor: lines[2].anchor,
         expectedRevision: revision,
       },
       undefined,
@@ -1059,13 +1101,14 @@ describe("edge cases", () => {
       .get("read_anchored_file")!
       .execute("1", { path: "sample.txt" }, undefined, undefined, { cwd });
     const revision = (read as any).details.revision as string;
+    const lines = (read as any).details.lines as any[];
 
     const result = await tools.get("edit_anchored_range")!.execute(
       "1",
       {
         path: "sample.txt",
-        startAnchor: "Apple",
-        endAnchor: "Brave",
+        startAnchor: lines[0].anchor,
+        endAnchor: lines[1].anchor,
         includeStart: false,
         includeEnd: false,
         replacement: "X",
@@ -1088,6 +1131,7 @@ describe("edge cases", () => {
       .get("read_anchored_file")!
       .execute("1", { path: "single-asym.txt" }, undefined, undefined, { cwd });
     const revision = (read as any).details.revision as string;
+    const lines = (read as any).details.lines as any[];
 
     // start === end with includeStart=true + includeEnd=false yields start = end - 1,
     // a zero-width splice at the anchor index: content is inserted immediately
@@ -1096,8 +1140,8 @@ describe("edge cases", () => {
       "2",
       {
         path: "single-asym.txt",
-        startAnchor: "Apple",
-        endAnchor: "Apple",
+        startAnchor: lines[0].anchor,
+        endAnchor: lines[0].anchor,
         includeStart: true,
         includeEnd: false,
         replacement: "X",
@@ -1120,13 +1164,14 @@ describe("edge cases", () => {
       .get("read_anchored_file")!
       .execute("1", { path: "single.txt" }, undefined, undefined, { cwd });
     const revision = (read as any).details.revision as string;
+    const lines = (read as any).details.lines as any[];
 
     const result = await tools.get("edit_anchored_range")!.execute(
       "1",
       {
         path: "single.txt",
-        startAnchor: "Apple",
-        endAnchor: "Apple",
+        startAnchor: lines[0].anchor,
+        endAnchor: lines[0].anchor,
         replacement: "changed",
         expectedRevision: revision,
       },
@@ -1163,12 +1208,13 @@ describe("edge cases", () => {
     expect(anchored).toHaveLength(3);
 
     const revision = (read as any).details.revision as string;
+    const lines = (read as any).details.lines as any[];
     const result = await tools.get("edit_anchored_range")!.execute(
       "1",
       {
         path: "unicode.txt",
-        startAnchor: "Apple",
-        endAnchor: "Apple",
+        startAnchor: lines[0].anchor,
+        endAnchor: lines[0].anchor,
         replacement: "café",
         expectedRevision: revision,
       },
@@ -1366,14 +1412,15 @@ describe("integration chains", () => {
       .get("read_anchored_file")!
       .execute("1", { path: "chain.txt" }, undefined, undefined, { cwd });
     const revision = (r1 as any).details.revision as string;
+    const lines = (r1 as any).details.lines as any[];
 
-    // Remove the middle line (beta → Brave).
+    // Remove the middle line (beta).
     await tools.get("edit_anchored_range")!.execute(
       "1",
       {
         path: "chain.txt",
-        startAnchor: "Brave",
-        endAnchor: "Brave",
+        startAnchor: lines[1].anchor,
+        endAnchor: lines[1].anchor,
         replacement: "",
         expectedRevision: revision,
       },
@@ -1401,13 +1448,14 @@ describe("integration chains", () => {
       .get("read_anchored_file")!
       .execute("1", { path: "chain2.txt" }, undefined, undefined, { cwd });
     const revision = (r1 as any).details.revision as string;
+    const lines = (r1 as any).details.lines as any[];
 
     await tools.get("edit_anchored_range")!.execute(
       "1",
       {
         path: "chain2.txt",
-        startAnchor: "Apple",
-        endAnchor: "Apple",
+        startAnchor: lines[0].anchor,
+        endAnchor: lines[0].anchor,
         replacement: "X",
         expectedRevision: revision,
       },
@@ -1422,8 +1470,8 @@ describe("integration chains", () => {
         "2",
         {
           path: "chain2.txt",
-          startAnchor: "Cider",
-          endAnchor: "Cider",
+          startAnchor: lines[2].anchor,
+          endAnchor: lines[2].anchor,
           replacement: "Y",
           expectedRevision: revision,
         },
@@ -1443,12 +1491,13 @@ describe("integration chains", () => {
     let r = await tools
       .get("read_anchored_file")!
       .execute("1", { path: "seq.txt" }, undefined, undefined, { cwd });
+    const lines0 = (r as any).details.lines as any[];
     await tools.get("edit_anchored_range")!.execute(
       "1",
       {
         path: "seq.txt",
-        startAnchor: "Apple",
-        endAnchor: "Apple",
+        startAnchor: lines0[0].anchor,
+        endAnchor: lines0[0].anchor,
         replacement: "A",
         expectedRevision: (r as any).details.revision,
       },
@@ -1461,12 +1510,13 @@ describe("integration chains", () => {
     r = await tools
       .get("read_anchored_file")!
       .execute("2", { path: "seq.txt" }, undefined, undefined, { cwd });
+    const lines1 = (r as any).details.lines as any[];
     await tools.get("edit_anchored_range")!.execute(
       "2",
       {
         path: "seq.txt",
-        startAnchor: "Cider",
-        endAnchor: "Cider",
+        startAnchor: lines1[2].anchor,
+        endAnchor: lines1[2].anchor,
         replacement: "C",
         expectedRevision: (r as any).details.revision,
       },
@@ -1541,6 +1591,8 @@ describe("batch integrity", () => {
       .execute("2", { path: "batch-b.txt" }, undefined, undefined, { cwd });
     const revA = (rA as any).details?.revision;
     const revB = (rB as any).details?.revision;
+    const linesA = (rA as any).details?.lines as any[];
+    const linesB = (rB as any).details?.lines as any[];
 
     // Stale the revision of file B by writing to it directly.
     await writeFile(fileB, "beta-changed\n", "utf8");
@@ -1553,16 +1605,16 @@ describe("batch integrity", () => {
             {
               type: "replace" as const,
               path: "batch-a.txt",
-              startAnchor: "Apple",
-              endAnchor: "Apple",
+              startAnchor: linesA[0].anchor,
+              endAnchor: linesA[0].anchor,
               replacement: "ALPHA\n",
               expectedRevision: revA,
             },
             {
               type: "replace" as const,
               path: "batch-b.txt",
-              startAnchor: "Apple",
-              endAnchor: "Apple",
+              startAnchor: linesB[0].anchor,
+              endAnchor: linesB[0].anchor,
               replacement: "BETA\n",
               expectedRevision: revB, // stale
             },
@@ -1594,8 +1646,8 @@ describe("confirmation flow", () => {
       "2",
       {
         path: "confirm-true.txt",
-        startAnchor: "Apple",
-        endAnchor: "Apple",
+        startAnchor: (readResult as any).details.lines[0].anchor,
+        endAnchor: (readResult as any).details.lines[0].anchor,
         replacement: "ALPHA\n",
         expectedRevision: revision,
       },
@@ -1622,8 +1674,8 @@ describe("confirmation flow", () => {
       "2",
       {
         path: "confirm-false.txt",
-        startAnchor: "Apple",
-        endAnchor: "Apple",
+        startAnchor: (readResult as any).details.lines[0].anchor,
+        endAnchor: (readResult as any).details.lines[0].anchor,
         replacement: "ALPHA\n",
         expectedRevision: revision,
       },
@@ -1650,8 +1702,8 @@ describe("confirmation flow", () => {
       "2",
       {
         path: ".env",
-        startAnchor: "Apple",
-        endAnchor: "Apple",
+        startAnchor: (readResult as any).details.lines[0].anchor,
+        endAnchor: (readResult as any).details.lines[0].anchor,
         replacement: "SECRET=2\n",
         expectedRevision: revision,
       },
@@ -1733,8 +1785,8 @@ describe("anchored read range modes", () => {
       .execute("1", { path: "range-start.txt", startLine: 2 }, undefined, undefined, { cwd });
     const text = result.content[0].text as string;
     expect(text).toContain("Lines: 2-5 of 5");
-    expect(text).toContain("Brave§ b");
-    expect(text).toContain("Cider§ c");
+    expect(text).toContain(`${anchorOf(text, "b")}§ b`);
+    expect(text).toContain(`${anchorOf(text, "c")}§ c`);
   });
 
   it("range mode with endLine only uses start=1", async () => {
@@ -1746,8 +1798,8 @@ describe("anchored read range modes", () => {
       .execute("1", { path: "range-end.txt", endLine: 2 }, undefined, undefined, { cwd });
     const text = result.content[0].text as string;
     expect(text).toContain("Lines: 1-2 of 5");
-    expect(text).toContain("Apple§ a");
-    expect(text).toContain("Brave§ b");
+    expect(text).toContain(`${anchorOf(text, "a")}§ a`);
+    expect(text).toContain(`${anchorOf(text, "b")}§ b`);
   });
 
   it("range mode clamps out-of-bounds to an invalid range", async () => {
@@ -1787,12 +1839,18 @@ describe("anchor range validation", () => {
     const cwd = await workspace();
     await writeFile(join(cwd, "reversed.txt"), "alpha\nbeta\ngamma\n", "utf8");
     const tools = await loadTools();
+    const { lines } = await readAnchored(tools, cwd, "reversed.txt");
     await expect(
       tools
         .get("edit_anchored_range")!
         .execute(
           "1",
-          { path: "reversed.txt", startAnchor: "Cider", endAnchor: "Apple", replacement: "X" },
+          {
+            path: "reversed.txt",
+            startAnchor: lines[2].anchor,
+            endAnchor: lines[0].anchor,
+            replacement: "X",
+          },
           undefined,
           undefined,
           { cwd },
@@ -1804,12 +1862,13 @@ describe("anchor range validation", () => {
     const cwd = await workspace();
     await writeFile(join(cwd, "reversed-del.txt"), "alpha\nbeta\ngamma\n", "utf8");
     const tools = await loadTools();
+    const { lines } = await readAnchored(tools, cwd, "reversed-del.txt");
     await expect(
       tools
         .get("delete_anchor_range")!
         .execute(
           "1",
-          { path: "reversed-del.txt", startAnchor: "Cider", endAnchor: "Apple" },
+          { path: "reversed-del.txt", startAnchor: lines[2].anchor, endAnchor: lines[0].anchor },
           undefined,
           undefined,
           { cwd },
@@ -1821,13 +1880,14 @@ describe("anchor range validation", () => {
     const cwd = await workspace();
     await writeFile(join(cwd, "single-exclude.txt"), "alpha\n", "utf8");
     const tools = await loadTools();
+    const { lines } = await readAnchored(tools, cwd, "single-exclude.txt");
     await expect(
       tools.get("edit_anchored_range")!.execute(
         "2",
         {
           path: "single-exclude.txt",
-          startAnchor: "Apple",
-          endAnchor: "Apple",
+          startAnchor: lines[0].anchor,
+          endAnchor: lines[0].anchor,
           includeStart: false,
           includeEnd: false,
           replacement: "X",
@@ -1853,13 +1913,14 @@ describe("additional edge cases", () => {
       .get("read_anchored_file")!
       .execute("1", { path: "link.txt" }, undefined, undefined, { cwd });
     const revision = (readResult as any).details.revision;
+    const line1Anchor = (readResult as any).details.lines[0].anchor as string;
 
     await tools.get("edit_anchored_range")!.execute(
       "2",
       {
         path: "link.txt",
-        startAnchor: "Apple",
-        endAnchor: "Apple",
+        startAnchor: line1Anchor,
+        endAnchor: line1Anchor,
         replacement: "modified\n",
         expectedRevision: revision,
       },
@@ -1882,13 +1943,14 @@ describe("additional edge cases", () => {
       .get("read_anchored_file")!
       .execute("1", { path: "no-eol.txt" }, undefined, undefined, { cwd });
     const revision = (readResult as any).details.revision;
+    const line1Anchor = (readResult as any).details.lines[0].anchor as string;
 
     await tools.get("edit_anchored_range")!.execute(
       "2",
       {
         path: "no-eol.txt",
-        startAnchor: "Apple",
-        endAnchor: "Apple",
+        startAnchor: line1Anchor,
+        endAnchor: line1Anchor,
         replacement: "ALPHA\n",
         expectedRevision: revision,
       },
@@ -1909,13 +1971,14 @@ describe("additional edge cases", () => {
       .get("read_anchored_file")!
       .execute("1", { path: "normalize.txt" }, undefined, undefined, { cwd });
     const revision = (readResult as any).details.revision;
+    const line1Anchor = (readResult as any).details.lines[0].anchor as string;
 
     const result = await tools.get("edit_anchored_range")!.execute(
       "2",
       {
         path: "normalize.txt",
-        startAnchor: "Apple§",
-        endAnchor: "Apple§",
+        startAnchor: `${line1Anchor}§`,
+        endAnchor: `${line1Anchor}§`,
         replacement: "ALPHA\n",
         expectedRevision: revision,
       },
@@ -1949,8 +2012,8 @@ describe("protected-path safety", () => {
       "2",
       {
         path: ".env-alias",
-        startAnchor: "Apple",
-        endAnchor: "Apple",
+        startAnchor: (readResult.details as any)?.lines[0].anchor,
+        endAnchor: (readResult.details as any)?.lines[0].anchor,
         replacement: "SECRET=2\n",
         expectedRevision: revision,
       },
@@ -2032,8 +2095,8 @@ describe("line-ending and BOM preservation", () => {
       "2",
       {
         path: "bom-remove.txt",
-        startAnchor: "Apple",
-        endAnchor: "Apple",
+        startAnchor: (readResult.details as any)?.lines[0].anchor,
+        endAnchor: (readResult.details as any)?.lines[0].anchor,
         replacement: "ALPHA\n",
         expectedRevision: revision,
       },

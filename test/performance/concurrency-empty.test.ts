@@ -170,6 +170,8 @@ describe("concurrency: empty-file and session-map stress scenarios", () => {
           .execute("2", { path: "readonly-dir/b.txt" }, undefined, undefined, { cwd });
         const revA = rA.details.revision as string;
         const revB = rB.details.revision as string;
+        const lineA1 = (rA.details.lines as Array<{ anchor: string }>)[0].anchor;
+        const lineB1 = (rB.details.lines as Array<{ anchor: string }>)[0].anchor;
 
         await chmod(readonlyDir, 0o555);
         try {
@@ -182,16 +184,16 @@ describe("concurrency: empty-file and session-map stress scenarios", () => {
                   {
                     type: "replace" as const,
                     path: "a.txt",
-                    startAnchor: "Apple",
-                    endAnchor: "Apple",
+                    startAnchor: lineA1,
+                    endAnchor: lineA1,
                     replacement: "ALPHA\n",
                     expectedRevision: revA,
                   },
                   {
                     type: "replace" as const,
                     path: "readonly-dir/b.txt",
-                    startAnchor: "Apple",
-                    endAnchor: "Apple",
+                    startAnchor: lineB1,
+                    endAnchor: lineB1,
                     replacement: "ONE\n",
                     expectedRevision: revB,
                   },
@@ -214,10 +216,14 @@ describe("concurrency: empty-file and session-map stress scenarios", () => {
     );
   });
 
-  describe("E4 — 100 concurrent edits to distinct files stress the session map", () => {
-    it("all 100 concurrent single-file edits succeed with correct per-file content", async () => {
+  describe("E4 — Concurrent edits to distinct files stress the session map", () => {
+    it("all concurrent single-file edits succeed with correct per-file content", async () => {
       const cwd = await workspace();
-      const count = 100;
+      // Keep the file count within the session cache's capacity (LRUMap
+      // default maxSize 50): with per-file randomized anchors, an evicted
+      // state re-derives new anchors on the next load, so an anchor from an
+      // earlier read is no longer valid once its state leaves the cache.
+      const count = 40;
       const files = Array.from({ length: count }, (_, i) => ({
         rel: `file-${i}.txt`,
         abs: join(cwd, `file-${i}.txt`),
@@ -228,7 +234,6 @@ describe("concurrency: empty-file and session-map stress scenarios", () => {
 
       const tools = await loadTools();
 
-      // Populate the shared session map for all 100 distinct files.
       const reads = await Promise.all(
         files.map((f, i) =>
           tools
@@ -237,6 +242,9 @@ describe("concurrency: empty-file and session-map stress scenarios", () => {
         ),
       );
       const revisions = reads.map((r) => r.details.revision as string);
+      const anchors = reads.map(
+        (r) => (r.details.lines as Array<{ anchor: string }>)[0].anchor as string,
+      );
 
       // Fire 100 concurrent edits, each targeting a distinct file.
       const results = await Promise.all(
@@ -245,8 +253,8 @@ describe("concurrency: empty-file and session-map stress scenarios", () => {
             String(1000 + i),
             {
               path: f.rel,
-              startAnchor: "Apple",
-              endAnchor: "Apple",
+              startAnchor: anchors[i],
+              endAnchor: anchors[i],
               replacement: `EDITED_${i}\n`,
               expectedRevision: revisions[i],
             },
@@ -259,7 +267,7 @@ describe("concurrency: empty-file and session-map stress scenarios", () => {
 
       results.forEach((r, i) => {
         expect(r.content[0].text).toMatch(/^[+-]/m);
-        expect(r.details.anchorChanges.removed).toContain("Apple");
+        expect(r.details.anchorChanges.removed).toContain(anchors[i]);
       });
 
       // Every file has its own deterministic, correct content.

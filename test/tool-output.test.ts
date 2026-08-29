@@ -32,12 +32,18 @@ describe("structured tool output", () => {
     await writeFile(join(cwd, "sample.ts"), "one\ntwo\nthree\n", "utf8");
     const tools = await loadTools();
 
+    const read = await tools
+      .get("read_anchored_file")!
+      .execute("1", { path: "sample.ts" }, undefined, undefined, { cwd });
+    const lines = (read.details as any).lines as Array<{ anchor: string }>;
+    const removed = [lines[0].anchor, lines[1].anchor];
+
     const result = await tools.get("edit_anchored_range")!.execute(
-      "1",
+      "2",
       {
         path: "sample.ts",
-        startAnchor: "Apple",
-        endAnchor: "Brave",
+        startAnchor: lines[0].anchor,
+        endAnchor: lines[1].anchor,
         replacement: "ONE",
       },
       undefined,
@@ -51,8 +57,9 @@ describe("structured tool output", () => {
     expect(Array.isArray(result.details.anchorChanges.removed)).toBe(true);
     expect(Array.isArray(result.details.anchorChanges.added)).toBe(true);
     expect(Array.isArray(result.details.anchorChanges.preserved)).toBe(true);
-    expect(result.details.anchorChanges.removed).toContain("Apple");
-    expect(result.details.anchorChanges.removed).toContain("Brave");
+    for (const anchor of removed) {
+      expect(result.details.anchorChanges.removed).toContain(anchor);
+    }
   });
 
   it("batch edits return per-edit anchor details", async () => {
@@ -60,22 +67,27 @@ describe("structured tool output", () => {
     await writeFile(join(cwd, "sample.txt"), "alpha\nbeta\ngamma\n", "utf8");
     const tools = await loadTools();
 
+    const read = await tools
+      .get("read_anchored_file")!
+      .execute("1", { path: "sample.txt" }, undefined, undefined, { cwd });
+    const lines = (read.details as any).lines as Array<{ anchor: string }>;
+
     const result = await tools.get("apply_anchored_edits")!.execute(
-      "1",
+      "2",
       {
         edits: [
           {
             type: "replace",
             path: "sample.txt",
-            startAnchor: "Apple",
-            endAnchor: "Apple",
+            startAnchor: lines[0].anchor,
+            endAnchor: lines[0].anchor,
             replacement: "ALPHA",
           },
           {
             type: "replace",
             path: "sample.txt",
-            startAnchor: "Brave",
-            endAnchor: "Brave",
+            startAnchor: lines[1].anchor,
+            endAnchor: lines[1].anchor,
             replacement: "BETA",
           },
         ],
@@ -90,8 +102,8 @@ describe("structured tool output", () => {
     expect(result.details).toHaveLength(1);
     expect(result.details[0].edits).toHaveLength(2);
     expect(result.details[0].edits[0].editType).toBe("replace");
-    expect(result.details[0].edits[0].anchorChanges.removed).toEqual(["Apple"]);
-    expect(result.details[0].edits[1].anchorChanges.removed).toEqual(["Brave"]);
+    expect(result.details[0].edits[0].anchorChanges.removed).toEqual([lines[0].anchor]);
+    expect(result.details[0].edits[1].anchorChanges.removed).toEqual([lines[1].anchor]);
   });
 
   it("out-of-order edits report correct anchor changes", async () => {
@@ -99,22 +111,27 @@ describe("structured tool output", () => {
     await writeFile(join(cwd, "sample.txt"), "alpha\nbeta\ngamma\n", "utf8");
     const tools = await loadTools();
 
+    const read = await tools
+      .get("read_anchored_file")!
+      .execute("1", { path: "sample.txt" }, undefined, undefined, { cwd });
+    const lines = (read.details as any).lines as Array<{ anchor: string }>;
+
     const result = await tools.get("apply_anchored_edits")!.execute(
-      "1",
+      "2",
       {
         edits: [
           {
             type: "replace",
             path: "sample.txt",
-            startAnchor: "Cider",
-            endAnchor: "Cider",
+            startAnchor: lines[2].anchor,
+            endAnchor: lines[2].anchor,
             replacement: "GAMMA",
           },
           {
             type: "replace",
             path: "sample.txt",
-            startAnchor: "Apple",
-            endAnchor: "Apple",
+            startAnchor: lines[0].anchor,
+            endAnchor: lines[0].anchor,
             replacement: "ALPHA",
           },
         ],
@@ -124,8 +141,8 @@ describe("structured tool output", () => {
       { cwd },
     );
 
-    expect(result.details[0].edits[0].anchorChanges.removed).toEqual(["Cider"]);
-    expect(result.details[0].edits[1].anchorChanges.removed).toEqual(["Apple"]);
+    expect(result.details[0].edits[0].anchorChanges.removed).toEqual([lines[2].anchor]);
+    expect(result.details[0].edits[1].anchorChanges.removed).toEqual([lines[0].anchor]);
   });
 
   it("empty batch returns empty result", async () => {
