@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`requireAnchorLines` setting** — New config option (default `on`) that makes the anchor line args required; when `off` they are optional but still verified when provided. The config menu re-registers the edit tools live, so schema strictness follows the setting without a reload
 - **Ripgrep-backed `grep_anchored_files`** — Searches via `rg --json`, resolved from `~/.pi/agent/bin/rg` or PATH (errors out when ripgrep is unavailable — no fallback scanner); `filterDrifted` omits files that changed between scan and read, output is capped at 100KB with an explicit truncation note, and hit lines are capped at 300 characters with 500 total matches
 - **`context` parameter** — `grep_anchored_files` accepts anchored context lines (0–10, default 0) around each match
+- **`anchored` parameter** — `read_anchored_file` accepts `anchored: false` to return plain `lineNo: text` lines without anchor prefixes or the revision header (default: anchored, edit-ready output); `details` still carries `revision` and `lines` in both modes for programmatic consumers
 - **Anchor-state persistence** — Anchor state is exported to `~/.pi/agent/pi-fast-edits/anchor-state.json` on `session_shutdown` and hydrated on `session_start`
 
 ### Changed

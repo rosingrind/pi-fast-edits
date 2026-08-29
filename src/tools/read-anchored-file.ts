@@ -33,6 +33,12 @@ const readSchema = Type.Object({
     ),
   ),
   maxBytes: Type.Optional(Type.Number({ description: "Optional full-read byte cap." })),
+  anchored: Type.Optional(
+    Type.Boolean({
+      description:
+        "Return plain `lineNo: text` lines without anchor prefixes or revision header. Default: anchored (edit-ready) output.",
+    }),
+  ),
 });
 type ReadParams = Static<typeof readSchema>;
 
@@ -45,7 +51,7 @@ export function registerReadAnchoredFile(
     name: "read_anchored_file",
     label: "Read Anchored File",
     description:
-      "Read a text file with stable word anchors for fast subsequent edits. For large files, returns a skeleton unless a range is requested.",
+      "Read a text file with stable word anchors for fast subsequent edits. For large files, returns a skeleton unless a range is requested. Set anchored:false to read plain line-numbered output.",
     renderCall: renderToolCall("read_anchored_file", (args, theme) => {
       const startLine = args.startLine as number | undefined;
       const endLine = args.endLine as number | undefined;
@@ -75,6 +81,7 @@ export function registerReadAnchoredFile(
       if (_signal?.aborted) return textResult("Read cancelled (aborted).");
       const cwd = getCwd(ctx);
       const { relativePath, state, snapshot } = await loadStateForPath(session, cwd, params.path);
+      const anchored = params.anchored ?? true;
       const requestedMode = (params.mode ?? "auto") as ReadMode;
       const hasRange = typeof params.startLine === "number" || typeof params.endLine === "number";
       const maxBytes = params.maxBytes ?? config.maxFullReadBytes;
@@ -99,7 +106,7 @@ export function registerReadAnchoredFile(
         }
         const selected = state.lines.slice(start - 1, end);
         return textResult(
-          `File: ${relativePath}\nLines: ${start}-${end} of ${state.lines.length}\nRevision: ${state.revisionHash}\n\n${renderAnchoredLines(selected)}`,
+          `File: ${relativePath}\nLines: ${start}-${end} of ${state.lines.length}${revisionLine(state, anchored)}\n\n${renderLines(selected, anchored)}`,
           {
             path: relativePath,
             mode,
@@ -121,7 +128,7 @@ export function registerReadAnchoredFile(
           items = selectSkeletonItems(state, config.maxSkeletonItems);
           state.skeletonCache.set(state.revisionHash, items);
         }
-        return textResult(renderSkeleton(relativePath, state, items), {
+        return textResult(renderSkeleton(relativePath, state, items, anchored), {
           path: relativePath,
           mode,
           revision: state.revisionHash,
@@ -134,7 +141,7 @@ export function registerReadAnchoredFile(
       }
 
       return textResult(
-        `File: ${relativePath}\nLines: ${state.lines.length}\nRevision: ${state.revisionHash}\n\n${renderAnchoredLines(state.lines)}`,
+        `File: ${relativePath}\nLines: ${state.lines.length}${revisionLine(state, anchored)}\n\n${renderLines(state.lines, anchored)}`,
         {
           path: relativePath,
           mode: "full",
@@ -218,10 +225,26 @@ function renderSkeleton(
     revisionHash: string;
   },
   items: Array<{ anchor: string; text: string; lineNo: number }>,
+  anchored: boolean,
 ): string {
   const rendered = items.map((line) => {
     const display = line.text.length > 140 ? `${line.text.slice(0, 137)}...` : line.text;
-    return `${line.anchor}${ANCHOR_DELIMITER} ${display}    lines ${line.lineNo}`;
+    return anchored
+      ? `${line.anchor}${ANCHOR_DELIMITER} ${display}    lines ${line.lineNo}`
+      : `${line.lineNo}: ${display}`;
   });
-  return `File: ${relativePath}\nLines: ${state.lines.length}\nMode: skeleton\nRevision: ${state.revisionHash}\n\n${rendered.join("\n")}`;
+  return `File: ${relativePath}\nLines: ${state.lines.length}\nMode: skeleton${revisionLine(state, anchored)}\n\n${rendered.join("\n")}`;
+}
+
+function revisionLine(state: { revisionHash: string }, anchored: boolean): string {
+  return anchored ? `\nRevision: ${state.revisionHash}` : "";
+}
+
+function renderLines(
+  lines: Array<{ anchor: string; text: string; lineNo: number }>,
+  anchored: boolean,
+): string {
+  return anchored
+    ? renderAnchoredLines(lines)
+    : lines.map((l) => `${l.lineNo}: ${l.text}`).join("\n");
 }
