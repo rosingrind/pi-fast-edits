@@ -28,9 +28,9 @@ function makeConfig(overrideBuiltInEditTools: boolean): PiFastEditsConfig {
   };
 }
 
-/** The approved notice copy (task-4 brief); pinned verbatim so copy edits are intentional. */
+/** The approved notice copy (task-4 brief, review-fix); pinned verbatim so copy edits are intentional. */
 const ANCHORED_LIST =
-  "read_anchored_file, edit_anchored_range, insert_at_anchor, delete_anchor_range, preview_anchored_edit, apply_anchored_edits, write_anchored";
+  "read_anchored_file, grep_anchored_files, edit_anchored_range, insert_at_anchor, delete_anchor_range, preview_anchored_edit, apply_anchored_edits, write_anchored";
 
 describe("override toggle notice", () => {
   it("notice copy matches the approved contract exactly", () => {
@@ -38,7 +38,7 @@ describe("override toggle notice", () => {
       `Tool override enabled: read/edit/write/grep now use anchor-line contracts (see each tool's schema). Previous anchored tool names (${ANCHORED_LIST}) are deactivated.`,
     );
     expect(OVERRIDE_DISABLED_NOTICE).toBe(
-      `Tool override disabled: pi's native read/edit/write/grep are restored; the anchored tools (${ANCHORED_LIST}) are active again.`,
+      `Tool override disabled: the anchored tools (${ANCHORED_LIST}) are active again; read/edit/write/grep keep their anchored definitions until pi reloads the extension (fully native restore requires a reload).`,
     );
   });
 

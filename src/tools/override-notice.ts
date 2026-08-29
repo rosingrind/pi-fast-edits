@@ -3,13 +3,14 @@ import type { PiFastEditsConfig } from "../types.js";
 /**
  * The anchored tool names announced in the override transition notices.
  *
- * This list intentionally omits `grep_anchored_files`: the approved notice
- * copy (task-4 brief) lists exactly these seven names, and read/grep are
- * folded into the `read`/`grep` overrides. Keep in sync with that copy — the
- * tests pin it verbatim.
+ * All eight suffixed names, including `grep_anchored_files`: the enabled
+ * notice lists them as deactivated while override is on, and the disabled
+ * notice lists them as re-activated. Keep in sync with that copy — the tests
+ * pin it verbatim.
  */
 export const ANCHORED_TOOL_NAMES = [
   "read_anchored_file",
+  "grep_anchored_files",
   "edit_anchored_range",
   "insert_at_anchor",
   "delete_anchor_range",
@@ -22,7 +23,7 @@ const ANCHORED_LIST = ANCHORED_TOOL_NAMES.join(", ");
 
 export const OVERRIDE_ENABLED_NOTICE = `Tool override enabled: read/edit/write/grep now use anchor-line contracts (see each tool's schema). Previous anchored tool names (${ANCHORED_LIST}) are deactivated.`;
 
-export const OVERRIDE_DISABLED_NOTICE = `Tool override disabled: pi's native read/edit/write/grep are restored; the anchored tools (${ANCHORED_LIST}) are active again.`;
+export const OVERRIDE_DISABLED_NOTICE = `Tool override disabled: the anchored tools (${ANCHORED_LIST}) are active again; read/edit/write/grep keep their anchored definitions until pi reloads the extension (fully native restore requires a reload).`;
 
 export type OverrideToggleNotice = {
   message: {
