@@ -3,6 +3,7 @@ import { LRUMap, type PiFastEditsConfig, type SessionState } from "./types.js";
 import { loadConfig } from "./config-persistence.js";
 import { registerCommands } from "./commands/register.js";
 import { registerReadAnchoredFile } from "./tools/read-anchored-file.js";
+import { registerGrepAnchoredFiles } from "./tools/grep-anchored.js";
 import { registerEditAnchoredRange } from "./tools/edit-anchored-range.js";
 import { registerInsertAtAnchor } from "./tools/insert-at-anchor.js";
 import { registerDeleteAnchorRange } from "./tools/delete-anchor-range.js";
@@ -23,6 +24,7 @@ export default async function piFastEdits(
   const session: SessionState = { files: new LRUMap() };
 
   registerReadAnchoredFile(pi, session, config);
+  registerGrepAnchoredFiles(pi, session, config);
   registerEditAnchoredRange(pi, session, config);
   registerInsertAtAnchor(pi, session, config);
   registerDeleteAnchorRange(pi, session, config);
