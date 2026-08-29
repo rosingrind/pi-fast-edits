@@ -11,6 +11,7 @@ import {
 import { registerCommands } from "./commands/register.js";
 import { registerReadAnchoredFile } from "./tools/read-anchored-file.js";
 import { registerGrepAnchoredFiles } from "./tools/grep-anchored.js";
+import { registerWriteAnchored } from "./tools/write-anchored.js";
 import { registerEditAnchoredRange } from "./tools/edit-anchored-range.js";
 import { registerInsertAtAnchor } from "./tools/insert-at-anchor.js";
 import { registerDeleteAnchorRange } from "./tools/delete-anchor-range.js";
@@ -32,6 +33,7 @@ export default async function piFastEdits(
 
   registerReadAnchoredFile(pi, session, config);
   registerGrepAnchoredFiles(pi, session, config);
+  registerWriteAnchored(pi, session, config);
 
   // The five anchored edit tools re-register whenever the config changes, so
   // their schemas (strict vs. lenient `*Line` args) follow the live

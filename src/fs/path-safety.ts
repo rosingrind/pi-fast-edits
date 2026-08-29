@@ -31,6 +31,19 @@ export function toWorkspaceRelative(cwd: string, abs: string): string {
   return relative(cwd, abs).replace(/\\/g, "/");
 }
 
+/** Protected-path patterns applied by default (secrets, VCS internals, lockfiles).
+ * Kept in sync with the default config's list so searches and writes never
+ * surface the same files the edit tools guard. */
+export const DEFAULT_PROTECTED_SKIP = [
+  ".env",
+  ".env.*",
+  ".git",
+  ".git/**",
+  "package-lock.json",
+  "pnpm-lock.yaml",
+  "yarn.lock",
+];
+
 export function isProtectedPath(relativePath: string, protectedPaths: string[]): boolean {
   const normalized = relativePath.replace(/\\/g, "/");
   return protectedPaths.some(

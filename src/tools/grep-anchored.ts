@@ -5,7 +5,7 @@ import type { PiFastEditsConfig, SessionState } from "../types.js";
 import { Type, type Static } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { ANCHOR_DELIMITER } from "../anchor/anchor-renderer.js";
-import { isProtectedPath } from "../fs/path-safety.js";
+import { DEFAULT_PROTECTED_SKIP, isProtectedPath } from "../fs/path-safety.js";
 import { resolveRg } from "../fs/rg-resolver.js";
 import { runRg, type RgHit } from "../fs/rg-search.js";
 import {
@@ -219,7 +219,7 @@ async function grepWithRg(
     // and protected files, so re-apply our own filters.
     if (!singleFile) {
       if (SKIPPED_DIRS.has(relativePath.split("/")[0] ?? "")) continue;
-      if (isProtectedPath(relativePath, [...PROTECTED_SKIP, ...protectedPaths])) continue;
+      if (isProtectedPath(relativePath, [...DEFAULT_PROTECTED_SKIP, ...protectedPaths])) continue;
     }
 
     // Skip files too large to index: same cap as the JS scanner, so the rg
@@ -354,19 +354,6 @@ function renderHitLine(line: { anchor: string; text: string }, lineNo: number): 
     line.text.length > MAX_LINE_LENGTH ? `${line.text.slice(0, MAX_LINE_LENGTH)}...` : line.text;
   return `${line.anchor}${ANCHOR_DELIMITER} ${text}    line ${lineNo}`;
 }
-
-/** Protected-path patterns to exclude from directory searches. Kept in sync
- * with the default config's list so grep never surfaces secrets (e.g. .env)
- * that the edit tools guard. */
-const PROTECTED_SKIP = [
-  ".env",
-  ".env.*",
-  ".git",
-  ".git/**",
-  "package-lock.json",
-  "pnpm-lock.yaml",
-  "yarn.lock",
-];
 
 export function renderGrepResult(
   result: ToolResult,

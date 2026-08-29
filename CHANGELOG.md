@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Anchor-seeding `write_anchored` tool** — Writes a full file and seeds its anchor state in one call, returning the revision hash plus an anchored preview of the first 5 lines so `edit_anchored_range`/`insert_at_anchor` work immediately without a `read_anchored_file` call. Rejects protected paths (before any write) and paths outside the workspace; accepts a leading `@` on `path` like the other tools; overwriting an existing file replaces content and refreshes the revision. Shared `DEFAULT_PROTECTED_SKIP` extracted to `src/fs/path-safety.ts` (grep reuses it, behavior unchanged)
+
 - **Anchor-marked text rejection with `allowAnchoredLines`** — `replacement`/`content` containing anchor-marked lines (`Word§...`, matching rendered anchored output) is rejected by default with a corrective error; pass `allowAnchoredLines: true` to accept genuine `§` content. Applies across all five edit tools, verified in `planEdit` before any write
 
 - **`startAnchorLine`/`endAnchorLine`/`anchorLine` args** — Edit tools (`edit_anchored_range`, `insert_at_anchor`, `delete_anchor_range`, `preview_anchored_edit`, `apply_anchored_edits`) accept the exact current source line at each anchor, copied verbatim from `read_anchored_file`/`grep_anchored_files` output and verified against the file before editing; mismatch rejects the edit with a corrective message
