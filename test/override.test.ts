@@ -168,7 +168,8 @@ async function loadOverride(
   const registered = new Map<string, RegisteredTool>();
   const handlers: Record<string, Handler> = {};
   const setActiveToolsCalls: string[][] = [];
-  let activeTools = ["bash", "ls", "find", "read", "edit", "write", "grep", ...SUFFIXED_TOOL_NAMES];
+  // Mirrors pi's real default active set: grep is registered-but-inactive.
+  let activeTools = ["read", "bash", "edit", "write", ...SUFFIXED_TOOL_NAMES];
   const pi = {
     registerTool(tool: RegisteredTool) {
       registered.set(tool.name, tool);
@@ -205,14 +206,19 @@ describe("applyOverrideMode wiring", () => {
     expect(registered.get("write")!.description).toContain("Anchored");
     expect(registered.get("grep")!.description).toContain("Anchored");
 
-    // setActiveTools keeps every active tool except our suffixed names.
+    // setActiveTools keeps every active tool except our suffixed names, and
+    // the four override names are forced active even when pi had them
+    // registered-but-inactive (grep is inactive by default in pi).
     const last = setActiveToolsCalls.at(-1)!;
     for (const suffixed of SUFFIXED_TOOL_NAMES) {
       expect(last).not.toContain(suffixed);
     }
-    for (const name of ["read", "edit", "write", "grep", "bash", "ls", "find"]) {
+    for (const name of ["read", "edit", "write", "grep", "bash"]) {
       expect(last).toContain(name);
     }
+    // The fake mirrors pi's real default active set: ls/find stay inactive.
+    expect(last).not.toContain("ls");
+    expect(last).not.toContain("find");
 
     // Override mode replaces interception entirely.
     expect(handlers.tool_call).toBeUndefined();

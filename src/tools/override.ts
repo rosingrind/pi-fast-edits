@@ -241,9 +241,14 @@ export function applyOverrideMode(
   });
 
   // setActiveTools replaces the whole active set: keep everything pi considers
-  // active today except our suffixed names (the four override names were just
-  // registered, so they stay active).
+  // active today except our suffixed names, and always keep the four override
+  // names active. The union matters: pi's default active set is
+  // [read, bash, edit, write] — grep is registered-but-inactive, so without
+  // forcing the override names the model would have no search tool.
   const suffixed = new Set<string>(SUFFIXED_TOOL_NAMES);
-  const keepActive = pi.getActiveTools().filter((name) => !suffixed.has(name));
-  pi.setActiveTools(keepActive);
+  const keepActive = new Set(pi.getActiveTools().filter((name) => !suffixed.has(name)));
+  for (const name of ["read", "edit", "write", "grep"]) {
+    keepActive.add(name);
+  }
+  pi.setActiveTools([...keepActive]);
 }
