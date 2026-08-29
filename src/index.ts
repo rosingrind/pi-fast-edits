@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { LRUMap, type PiFastEditsConfig, type SessionState } from "./types.js";
 import { loadConfig } from "./config-persistence.js";
 import { atomicWriteFile } from "./fs/atomic-write.js";
@@ -22,6 +22,7 @@ import {
   installInterceptionFallback,
   type OverrideDeps,
 } from "./tools/override.js";
+import { createOverrideNoticeHandler } from "./tools/override-notice.js";
 
 export default async function piFastEdits(
   pi: ExtensionAPI,
@@ -52,7 +53,6 @@ export default async function piFastEdits(
     registerApplyAnchoredEdits(pi, session, config);
   };
   registerAnchoredEditTools();
-  registerCommands(pi, session, config, registerAnchoredEditTools);
 
   // Override wiring is applied from session_start, not the factory: pi's
   // runtime actions (getAllTools/getActiveTools/setActiveTools) are only bound
@@ -65,6 +65,24 @@ export default async function piFastEdits(
     registerWrite: registerWriteAnchored,
     installInterception: installInterceptionFallback,
   };
+
+  // Config-menu changes re-register the anchored edit tools (schemas follow
+  // the live settings); when `overrideBuiltInEditTools` itself was toggled,
+  // also re-run the override wiring so the model sees the new surface
+  // immediately (spec D8) instead of waiting for the next session_start.
+  const onConfigChanged = (id: string, ctx?: ExtensionCommandContext) => {
+    registerAnchoredEditTools();
+    if (id === "override") {
+      applyOverrideMode(pi, session, config, overrideDeps, ctx);
+    }
+  };
+  registerCommands(pi, session, config, onConfigChanged);
+
+  // Mid-session toggle notice: compares each turn's override mode to the
+  // previous turn's; fires only on a change (baseline is set on the first
+  // turn, so startup-when-on stays silent). Handler is a single boolean
+  // read + compare per turn.
+  pi.on("before_agent_start", createOverrideNoticeHandler(config));
 
   pi.on("session_start", async (_event, ctx) => {
     try {

@@ -165,18 +165,23 @@ const OVERRIDE_DESCRIPTIONS: Array<{ builtin: string; prefix: string }> = [
 ];
 
 /**
- * Decide override vs. interception for `overrideBuiltInEditTools`:
+ * Apply the override mode matching `config.overrideBuiltInEditTools`:
  *
- * - Safety check passes → re-register our four behaviors under the built-in
- *   names (renamed defs, descriptions prefixed) and deactivate our suffixed
- *   names via `setActiveTools` (design D7).
- * - Safety check fails → install the interception fallback and surface a
- *   warning through `ctx.ui` — never silently do nothing.
+ * - Enabled → safety check first:
+ *   - Pass → re-register our four behaviors under the built-in names (renamed
+ *     defs, descriptions prefixed) and deactivate our suffixed names via
+ *     `setActiveTools` (design D7).
+ *   - Fail → install the interception fallback and surface a warning through
+ *     `ctx.ui` — never silently do nothing.
+ * - Disabled → restore: the suffixed anchored tools remain registered (they
+ *   are re-registered on every config change), so re-activate them via
+ *   `setActiveTools`. The four override names keep our definitions — pi has no
+ *   unregister API, so they stay registered until the extension reloads.
  *
- * Must be invoked from an event handler (e.g. `session_start`), not from the
- * extension factory: pi's runtime actions (`getAllTools`/`setActiveTools`) are
- * only bound after extension loading, and `registerTool` at runtime refreshes
- * the registry in-session.
+ * Must be invoked from an event handler (e.g. `session_start`) or the config
+ * change path, not from the extension factory: pi's runtime actions
+ * (`getAllTools`/`setActiveTools`) are only bound after extension loading, and
+ * `registerTool` at runtime refreshes the registry in-session.
  */
 export function applyOverrideMode(
   pi: ExtensionAPI,
@@ -185,6 +190,17 @@ export function applyOverrideMode(
   deps: OverrideDeps,
   ctx?: OverrideContext,
 ): void {
+  if (!config.overrideBuiltInEditTools) {
+    // Disable path (mid-session toggle-off): the suffixed names are still in
+    // the registry, just deactivated — re-add them to the active set.
+    const keepActive = new Set(pi.getActiveTools());
+    for (const name of SUFFIXED_TOOL_NAMES) {
+      keepActive.add(name);
+    }
+    pi.setActiveTools([...keepActive]);
+    return;
+  }
+
   // Build fresh definitions (re-callable registrations; re-registering a
   // suffixed name under its own name is idempotent replacement in pi).
   const readDef = deps.registerRead(pi, session, config);

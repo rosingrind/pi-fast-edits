@@ -9,7 +9,7 @@ export function registerCommands(
   pi: ExtensionAPI,
   session: SessionState,
   config: PiFastEditsConfig,
-  onConfigChanged: () => void,
+  onConfigChanged: (id: string, ctx: ExtensionCommandContext) => void,
 ): void {
   pi.registerCommand("pi-fast-edits", {
     description: "Configure pi-fast-edits. Usage: /pi-fast-edits status|config",

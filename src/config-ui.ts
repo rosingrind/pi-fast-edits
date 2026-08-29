@@ -305,7 +305,7 @@ function buildItems(
 export async function showConfigMenu(
   config: PiFastEditsConfig,
   ctx: ExtensionCommandContext,
-  onConfigChanged: () => void,
+  onConfigChanged: (id: string, ctx: ExtensionCommandContext) => void,
 ): Promise<void> {
   if (!ctx.hasUI) {
     ctx.ui.notify("The pi-fast-edits config menu requires an interactive terminal.", "warning");
@@ -337,8 +337,10 @@ export async function showConfigMenu(
           break;
         // "protectedPaths" is handled by its own submenu; no main-list change.
       }
-      // Re-register the edit tools so their schemas follow the new setting.
-      onConfigChanged();
+      // Re-register the edit tools so their schemas follow the new setting;
+      // when the setting is overrideBuiltInEditTools itself, the callback
+      // also re-runs the override wiring (both directions).
+      onConfigChanged(id, ctx);
       void saveConfig(config);
     };
     return new ConfigMenuComponent(buildItems(config, theme, onChange), theme, onChange, () =>
