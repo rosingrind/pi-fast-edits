@@ -16,12 +16,14 @@ Delta§   return foo();
 Eagle§ }
 ```
 
-The agent can then replace `Cider§..Eagle` with new code. The extension validates anchors, writes atomically, and lazily reconciles changed files with a Myers line diff.
+The agent can then replace the `Cider..Eagle` range with new code. The extension validates anchors, writes atomically, and lazily reconciles changed files with a Myers line diff.
 
 ## Usage notes
 
 - Anchor names (e.g., `Cider`) are used in tool parameters to reference lines
-- Anchor parameters accept either a bare word (`Cider`) or a full coordinate copied verbatim from tool output (`Cider§ export function run() {`) — full coordinates are verified against the current line before editing
+- Anchor parameters take the bare anchor word copied from `read_anchored_file`/`grep_anchored_files` output
+- With `requireAnchorLines` on (the default), every edit must also pass the exact current source line at each anchor — `startAnchorLine`/`endAnchorLine` (or `anchorLine` for inserts) — copied verbatim from read/grep output. The line is verified against the file before editing; a mismatch rejects the edit with a corrective message
+- When `requireAnchorLines` is off, the line args are optional but still verified whenever they are provided
 - The `§` marker shown in file output is internal metadata only — it is NOT part of the actual file content
 - When providing `replacement` or `content`, use raw text only — do NOT include the `§` anchor marker
 
@@ -68,7 +70,7 @@ For large files, `auto` mode returns a heuristic skeleton instead of dumping the
 
 ### `grep_anchored_files`
 
-Searches file contents with a regex and returns matching lines with the same anchors and revision hashes as `read_anchored_file`, ready to feed into the edit tools (pass the per-file `Revision` as `expectedRevision`).
+Searches file contents with a regex and returns matching lines with the same anchors and revision hashes as `read_anchored_file`, ready to feed into the edit tools: pass the per-file `Revision` as `expectedRevision`, and copy the matching line text verbatim into `startAnchorLine`/`endAnchorLine`/`anchorLine`.
 
 ```json
 {
@@ -98,7 +100,9 @@ Replaces a range between two anchors.
 {
   "path": "src/run.ts",
   "startAnchor": "Cider",
+  "startAnchorLine": "export function run() {",
   "endAnchor": "Eagle",
+  "endAnchorLine": "}",
   "replacement": "export function run() {\n  return foo({ fast: true });\n}",
   "expectedRevision": "optional-revision-from-read_anchored_file"
 }
@@ -112,6 +116,7 @@ Inserts content before or after an anchor.
 {
   "path": "src/run.ts",
   "anchor": "Cider",
+  "anchorLine": "export function run() {",
   "position": "before",
   "content": "// Added by pi-fast-edits"
 }
@@ -125,7 +130,9 @@ Deletes a range from start anchor through end anchor.
 {
   "path": "src/run.ts",
   "startAnchor": "Cider",
-  "endAnchor": "Eagle"
+  "startAnchorLine": "export function run() {",
+  "endAnchor": "Eagle",
+  "endAnchorLine": "}"
 }
 ```
 
@@ -140,7 +147,9 @@ Batches multiple edits. This is the preferred tool for multi-file or multi-regio
       "type": "replace",
       "path": "src/run.ts",
       "startAnchor": "Cider",
+      "startAnchorLine": "export function run() {",
       "endAnchor": "Eagle",
+      "endAnchorLine": "}",
       "replacement": "export function run() {\n  return foo({ fast: true });\n}"
     }
   ]
@@ -159,7 +168,7 @@ Returns a diff for a replacement edit without writing files.
 ```
 
 - `status` shows the current runtime state (override flag, confirmation mode, tracked files/anchors).
-- `config` opens an interactive `/settings`-style menu (blue borders, fuzzy-searchable list) to edit the extension's configuration. Changes take effect immediately and are persisted to `~/.pi/agent/pi-fast-edits.json`, surviving restarts.
+- `config` opens an interactive `/settings`-style menu (blue borders, fuzzy-searchable list) to edit the extension's configuration, including the `requireAnchorLines` toggle (see [Defaults](#defaults)). Changes take effect immediately — edit tools re-register so their schemas follow the new setting — and are persisted to `~/.pi/agent/pi-fast-edits.json`, surviving restarts.
 
 ## Defaults
 
@@ -167,6 +176,7 @@ Returns a diff for a replacement edit without writing files.
 {
   "overrideBuiltInEditTools": false,
   "confirmation": "protected-paths",
+  "requireAnchorLines": true,
   "maxFullReadBytes": 80000,
   "maxFullReadLines": 1500,
   "maxRangeReadLines": 400,
@@ -184,6 +194,8 @@ Returns a diff for a replacement edit without writing files.
   ]
 }
 ```
+
+- `requireAnchorLines` (default `true`) — require the exact anchor line content (`startAnchorLine`/`endAnchorLine`/`anchorLine`) on every edit; set to `false` to make them optional (still verified when provided)
 
 ## Safety
 

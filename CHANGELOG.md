@@ -9,14 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`startAnchorLine`/`endAnchorLine`/`anchorLine` args** — Edit tools (`edit_anchored_range`, `insert_at_anchor`, `delete_anchor_range`, `preview_anchored_edit`, `apply_anchored_edits`) accept the exact current source line at each anchor, copied verbatim from `read_anchored_file`/`grep_anchored_files` output and verified against the file before editing; mismatch rejects the edit with a corrective message
+- **`requireAnchorLines` setting** — New config option (default `on`) that makes the anchor line args required; when `off` they are optional but still verified when provided. The config menu re-registers the edit tools live, so schema strictness follows the setting without a reload
 - **Ripgrep-backed `grep_anchored_files`** — Searches via `rg --json`, resolved from `~/.pi/agent/bin/rg` or PATH (errors out when ripgrep is unavailable — no fallback scanner); `filterDrifted` omits files that changed between scan and read, output is capped at 100KB with an explicit truncation note, and hit lines are capped at 300 characters with 500 total matches
 - **`context` parameter** — `grep_anchored_files` accepts anchored context lines (0–10, default 0) around each match
-- **Verbatim-coordinate verification** — Edit tools accept optional full `ANCHOR§content` coordinates; echoed content is verified against the current line before editing, with a corrective error on mismatch
 - **Anchor-state persistence** — Anchor state is exported to `~/.pi/agent/pi-fast-edits/anchor-state.json` on `session_shutdown` and hydrated on `session_start`
 
 ### Changed
 
+- **Breaking: anchor line args are required when strict** — With `requireAnchorLines` on (the default), every edit must pass `startAnchorLine`/`endAnchorLine` (or `anchorLine` for inserts); omitting them rejects the edit before any write. Tools re-register live when the setting changes
 - **Random per-file anchor allocation** — Anchors are drawn from Fisher–Yates-shuffled pools seeded per file path: stable across LRU eviction, but non-guessable across files
+
+### Removed
+
+- **`ANCHOR§content` echo coordinates** — Passing the echoed line content embedded in the anchor string (`Sunny§export function run()`) is no longer supported; pass the anchor word plus the matching `*Line` arg instead
 
 ## [0.2.0] - 2026-08-12
 
