@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Ripgrep-backed `grep_anchored_files`** — Searches via `rg --json` when ripgrep is available, resolved from `~/.pi/agent/bin/rg` or PATH, falling back to the pure-JS walker when rg is missing or fails; `filterDrifted` omits files that changed between scan and read, output is capped at 100KB with an explicit truncation note, and hit lines are capped at 300 characters with 500 total matches
+- **Ripgrep-backed `grep_anchored_files`** — Searches via `rg --json`, resolved from `~/.pi/agent/bin/rg` or PATH (errors out when ripgrep is unavailable — no fallback scanner); `filterDrifted` omits files that changed between scan and read, output is capped at 100KB with an explicit truncation note, and hit lines are capped at 300 characters with 500 total matches
 - **`context` parameter** — `grep_anchored_files` accepts anchored context lines (0–10, default 0) around each match
 - **Verbatim-coordinate verification** — Edit tools accept optional full `ANCHOR§content` coordinates; echoed content is verified against the current line before editing, with a corrective error on mismatch
 - **Anchor-state persistence** — Anchor state is exported to `~/.pi/agent/pi-fast-edits/anchor-state.json` on `session_shutdown` and hydrated on `session_start`

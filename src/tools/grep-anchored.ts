@@ -1,11 +1,10 @@
-import { readdir, readFile, stat } from "node:fs/promises";
-import { basename, isAbsolute, join, relative, resolve } from "node:path";
+import { stat } from "node:fs/promises";
+import { isAbsolute, relative, resolve } from "node:path";
 import { Text, type Component } from "@earendil-works/pi-tui";
 import type { PiFastEditsConfig, SessionState } from "../types.js";
 import { Type, type Static } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { ANCHOR_DELIMITER } from "../anchor/anchor-renderer.js";
-import { globToRegExp } from "../fs/glob-match.js";
 import { isProtectedPath } from "../fs/path-safety.js";
 import { resolveRg } from "../fs/rg-resolver.js";
 import { runRg, type RgHit } from "../fs/rg-search.js";
@@ -21,11 +20,14 @@ import type { Theme } from "./theme.js";
 const DEFAULT_MAX_MATCHES_PER_FILE = 50;
 const MAX_TOTAL_MATCHES = 500;
 const MAX_FILE_BYTES = 1024 * 1024;
-const MAX_FILES_SCANNED = 2000;
 /** Hard cap on rendered output; sections beyond it are dropped. */
 const MAX_OUTPUT_BYTES = 100_000;
 /** Rendered match lines longer than this are truncated with an ellipsis. */
 const MAX_LINE_LENGTH = 300;
+
+/** Error thrown when the ripgrep binary cannot be resolved. */
+const RG_MISSING_ERROR =
+  "ripgrep (rg) is required for this tool but was not found in ~/.pi/agent/bin or PATH.";
 
 /** Directories never searched — VCS internals and dependency trees. */
 const SKIPPED_DIRS = new Set([".git", "node_modules"]);
@@ -100,9 +102,10 @@ export function registerGrepAnchoredFiles(
       if (signal?.aborted) return textResult("Search cancelled (aborted).");
       const cwd = getCwd(ctx);
 
-      let regex: RegExp;
+      // Validate the pattern up front with a friendly message; the real scan
+      // is done by rg (Rust regex syntax), which re-validates on its own.
       try {
-        regex = new RegExp(params.pattern, params.ignoreCase ? "i" : "");
+        new RegExp(params.pattern, params.ignoreCase ? "i" : "");
       } catch (error) {
         throw new Error(
           `Invalid regex pattern: ${params.pattern}. ${error instanceof Error ? error.message : String(error)}`,
@@ -120,46 +123,11 @@ export function registerGrepAnchoredFiles(
 
       const perFileCap = Math.max(1, Math.floor(params.maxMatches ?? DEFAULT_MAX_MATCHES_PER_FILE));
 
-      // Primary path: ripgrep. The JS scanner below only runs when rg is
-      // missing or fails to spawn/parse — rg reporting zero hits is
-      // authoritative and never triggers a JS re-run.
+      // ripgrep is the only scanner. A missing binary errors out; rg reporting
+      // zero hits is authoritative.
       const rgPath = await resolveRg();
-      if (rgPath) {
-        const rgResult = await grepWithRg(
-          session,
-          cwd,
-          rgPath,
-          params,
-          singleFile,
-          rootAbs,
-          perFileCap,
-          signal,
-        );
-        if (rgResult !== null) return rgResult;
-      }
-
-      // JS fallback (rg unavailable or failed): previous scan loop, unchanged.
-      const files = singleFile ? [rootAbs] : await listFiles(rootAbs, cwd, params.glob);
-      const { sections, totalMatches, filesWithMatches } = await jsGrep(
-        session,
-        cwd,
-        files,
-        regex,
-        perFileCap,
-        signal,
-      );
-
-      if (sections.length === 0) {
-        const scope = singleFile ? relative(cwd, rootAbs) : params.path ? params.path : "workspace";
-        return textResult(`No matches for /${params.pattern}/ in ${scope}.`, { matches: 0 });
-      }
-
-      const header = `${filesWithMatches} file${filesWithMatches === 1 ? "" : "s"} matched, ${totalMatches} line${totalMatches === 1 ? "" : "s"} shown.`;
-      return textResult(`${header}\n\n${sections.join("\n\n")}`, {
-        pattern: params.pattern,
-        files: filesWithMatches,
-        matches: totalMatches,
-      });
+      if (!rgPath) throw new Error(RG_MISSING_ERROR);
+      return grepWithRg(session, cwd, rgPath, params, singleFile, rootAbs, perFileCap, signal);
     },
   });
 }
@@ -168,10 +136,9 @@ export function registerGrepAnchoredFiles(
 const DRIFT_MESSAGE = "[file changed during search — rerun for current coordinates.]";
 
 /**
- * Run the search through ripgrep and render anchored results. Returns null when
- * rg failed (spawn/parse error) so the caller can fall back to the JS scanner;
- * a successful rg run with zero hits is authoritative and returns the
- * no-match result directly.
+ * Run the search through ripgrep and render anchored results. A failed rg run
+ * (spawn/parse/regex error) propagates as a thrown error — there is no JS
+ * fallback; a successful rg run with zero hits is authoritative.
  */
 async function grepWithRg(
   session: SessionState,
@@ -182,7 +149,7 @@ async function grepWithRg(
   rootAbs: string,
   perFileCap: number,
   signal: AbortSignal | undefined,
-): Promise<ReturnType<typeof textResult> | null> {
+): Promise<ReturnType<typeof textResult>> {
   const context = Math.max(0, Math.min(10, Math.floor(params.context ?? 0)));
   const args = ["--json", "-e", params.pattern];
   if (params.ignoreCase) args.push("-i");
@@ -199,9 +166,10 @@ async function grepWithRg(
   let hits: RgHit[];
   try {
     hits = await runRg(rgPath, args, signal);
-  } catch {
+  } catch (error) {
     if (signal?.aborted) return textResult("Search cancelled (aborted).");
-    return null; // fall through to the JS scanner
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`ripgrep search failed: ${message}`);
   }
 
   if (hits.length === 0) {
@@ -373,99 +341,6 @@ function renderHitLine(line: { anchor: string; text: string }, lineNo: number): 
   const text =
     line.text.length > MAX_LINE_LENGTH ? `${line.text.slice(0, MAX_LINE_LENGTH)}...` : line.text;
   return `${line.anchor}${ANCHOR_DELIMITER} ${text}    line ${lineNo}`;
-}
-
-/**
- * JS-only fallback scan: the previous directory walk + per-file match loop,
- * kept verbatim. Only reached when ripgrep is unavailable or fails to run.
- */
-async function jsGrep(
-  session: SessionState,
-  cwd: string,
-  files: string[],
-  regex: RegExp,
-  perFileCap: number,
-  signal: AbortSignal | undefined,
-): Promise<{ sections: string[]; totalMatches: number; filesWithMatches: number }> {
-  const sections: string[] = [];
-  let totalMatches = 0;
-  let filesWithMatches = 0;
-  for (const absPath of files) {
-    if (totalMatches >= MAX_TOTAL_MATCHES) break;
-    if (signal?.aborted) break;
-
-    // Only take a session slot for files that actually match: a cheap raw
-    // read first avoids churning the LRU with every scanned file, and
-    // loadStateForPath rejects binary files outright so filter them here.
-    const fileStat = await stat(absPath).catch(() => undefined);
-    if (!fileStat || !fileStat.isFile() || fileStat.size > MAX_FILE_BYTES) continue;
-    const bytes = await readFile(absPath).catch(() => undefined);
-    if (!bytes || bytes.includes(0)) continue; // binary or unreadable
-
-    const { relativePath, state } = await loadStateForPath(session, cwd, absPath);
-
-    const matches = state.lines.filter((line) => regex.test(line.text));
-    if (matches.length === 0) continue;
-    filesWithMatches++;
-
-    const shown = matches.slice(0, perFileCap);
-    totalMatches += shown.length;
-    const lines = shown.map(
-      (line) => `${line.anchor}${ANCHOR_DELIMITER} ${line.text}    line ${line.lineNo}`,
-    );
-    const truncated =
-      matches.length > shown.length
-        ? `\n... showing ${shown.length} of ${matches.length} matches`
-        : "";
-    sections.push(
-      `File: ${relativePath}\nRevision: ${state.revisionHash}\n${lines.join("\n")}${truncated}`,
-    );
-
-    if (totalMatches >= MAX_TOTAL_MATCHES) {
-      sections.push(`... stopped at ${MAX_TOTAL_MATCHES} total matches.`);
-      break;
-    }
-  }
-
-  return { sections, totalMatches, filesWithMatches };
-}
-
-/**
- * Walk `rootAbs` recursively and return absolute file paths to search.
- * Skips VCS/dependency directories, protected paths, and (when `glob` is set)
- * files whose workspace-relative path does not match.
- */
-async function listFiles(rootAbs: string, cwd: string, glob?: string): Promise<string[]> {
-  const globRe = glob ? globToRegExp(glob) : undefined;
-  const out: string[] = [];
-
-  async function walk(dir: string): Promise<void> {
-    if (out.length >= MAX_FILES_SCANNED) return;
-    let entries;
-    try {
-      entries = await readdir(dir, { withFileTypes: true });
-    } catch {
-      return; // unreadable directory — skip silently
-    }
-    for (const entry of entries) {
-      if (out.length >= MAX_FILES_SCANNED) return;
-      const abs = join(dir, entry.name);
-      if (entry.isDirectory()) {
-        if (SKIPPED_DIRS.has(entry.name)) continue;
-        await walk(abs);
-        continue;
-      }
-      if (!entry.isFile()) continue;
-      const rel = relative(cwd, abs).replace(/\\/g, "/");
-      if (isProtectedPath(rel, PROTECTED_SKIP)) continue;
-      if (globRe && !globRe.test(rel) && !globRe.test(basename(rel))) continue;
-      out.push(abs);
-    }
-  }
-
-  await walk(rootAbs);
-  out.sort();
-  return out;
 }
 
 /** Protected-path patterns to exclude from directory searches. Kept in sync

@@ -51,31 +51,37 @@ async function sampleWorkspace() {
 // against, so they are skipped — the fallback itself is covered by the mocked
 // "falls back to the JS scanner" test below.
 const rgAvailable = (await resolveRg()) !== null;
+// Every test that reaches the rg scan path is gated: the tool errors out
+// (no JS fallback) when rg is missing, so these tests cannot run there.
+const itWithRg = rgAvailable ? it : it.skip;
 
 describe("grep_anchored_files", () => {
-  it("finds matches across a directory with anchors, line numbers, and revision", async () => {
-    const cwd = await sampleWorkspace();
-    const tools = await loadTools();
-    const result = await tools
-      .get("grep_anchored_files")!
-      .execute("1", { pattern: "alpha" }, undefined, undefined, { cwd });
-    const text = result.content[0].text as string;
+  itWithRg(
+    "finds matches across a directory with anchors, line numbers, and revision",
+    async () => {
+      const cwd = await sampleWorkspace();
+      const tools = await loadTools();
+      const result = await tools
+        .get("grep_anchored_files")!
+        .execute("1", { pattern: "alpha" }, undefined, undefined, { cwd });
+      const text = result.content[0].text as string;
 
-    expect(text).toContain("File: src/a.ts");
-    expect(text).toContain("Revision: ");
-    const alphaAnchor = anchorOf(text, "export function alpha() {");
-    expect(text).toMatch(new RegExp(`${alphaAnchor}§ export function alpha\\(\\)`));
-    expect(text).toContain("line 1");
-    const returnAnchor = anchorOf(text, "  return alpha();");
-    expect(text).toContain(`${returnAnchor}§   return alpha();`);
-    // Notes file also matches
-    expect(text).toContain("File: notes.md");
-    // node_modules and binary content are skipped
-    expect(text).not.toContain("noise");
-    expect(text).not.toContain("binary");
-  });
+      expect(text).toContain("File: src/a.ts");
+      expect(text).toContain("Revision: ");
+      const alphaAnchor = anchorOf(text, "export function alpha() {");
+      expect(text).toMatch(new RegExp(`${alphaAnchor}§ export function alpha\\(\\)`));
+      expect(text).toContain("line 1");
+      const returnAnchor = anchorOf(text, "  return alpha();");
+      expect(text).toContain(`${returnAnchor}§   return alpha();`);
+      // Notes file also matches
+      expect(text).toContain("File: notes.md");
+      // node_modules and binary content are skipped
+      expect(text).not.toContain("noise");
+      expect(text).not.toContain("binary");
+    },
+  );
 
-  it("searches a single file when path points at a file", async () => {
+  itWithRg("searches a single file when path points at a file", async () => {
     const cwd = await sampleWorkspace();
     const tools = await loadTools();
     const result = await tools
@@ -88,7 +94,7 @@ describe("grep_anchored_files", () => {
     expect(text).not.toContain("notes.md");
   });
 
-  it("supports case-insensitive search", async () => {
+  itWithRg("supports case-insensitive search", async () => {
     const cwd = await sampleWorkspace();
     const tools = await loadTools();
     const result = await tools
@@ -107,7 +113,7 @@ describe("grep_anchored_files", () => {
     expect(text).toMatch(new RegExp(`${GreetingAnchor}§ const Greeting`));
   });
 
-  it("filters files by glob", async () => {
+  itWithRg("filters files by glob", async () => {
     const cwd = await sampleWorkspace();
     const tools = await loadTools();
     const result = await tools
@@ -118,7 +124,7 @@ describe("grep_anchored_files", () => {
     expect(text).not.toContain("File: src/a.ts");
   });
 
-  it("caps matches per file", async () => {
+  itWithRg("caps matches per file", async () => {
     const cwd = await sampleWorkspace();
     const tools = await loadTools();
     const result = await tools
@@ -136,7 +142,7 @@ describe("grep_anchored_files", () => {
     expect(text).toContain("showing 2 of 3");
   });
 
-  it("returns a no-matches message", async () => {
+  itWithRg("returns a no-matches message", async () => {
     const cwd = await sampleWorkspace();
     const tools = await loadTools();
     const result = await tools
@@ -155,7 +161,7 @@ describe("grep_anchored_files", () => {
     ).rejects.toThrow(/Invalid regex/);
   });
 
-  it("anchors from grep results are valid for subsequent edits", async () => {
+  itWithRg("anchors from grep results are valid for subsequent edits", async () => {
     const cwd = await sampleWorkspace();
     const tools = await loadTools();
     const grep = await tools
@@ -182,7 +188,7 @@ describe("grep_anchored_files", () => {
     expect(edit.content[0].text).toContain("+");
   });
 
-  it("skips protected paths", async () => {
+  itWithRg("skips protected paths", async () => {
     const cwd = await mkdtemp(join(tmpdir(), "pi-fast-edits-grep-"));
     await writeFile(join(cwd, "package-lock.json"), '"locked": "secret-value"\n', "utf8");
     await writeFile(join(cwd, "app.ts"), "const x = 1;\n", "utf8");
@@ -197,7 +203,7 @@ describe("grep_anchored_files", () => {
 });
 
 describe("grep_anchored_files (rg-backed)", () => {
-  it("returns identical anchored results via rg as the JS path", async () => {
+  itWithRg("returns identical anchored results via rg as the JS path", async () => {
     const cwd = await sampleWorkspace();
     const tools = await loadTools();
     const result = await tools
@@ -327,7 +333,7 @@ describe("grep_anchored_files (rg-backed)", () => {
     expect(text).not.toContain("huge.ts");
   });
 
-  it("falls back to the JS scanner when rg is unavailable", async () => {
+  it("errors when rg is unavailable (no JS fallback)", async () => {
     // Force resolveRg to report no binary, then re-import the tool chain
     // fresh: the static import at the top of this file still references the
     // real resolver, so the mock only affects this test's module graph.
@@ -348,24 +354,25 @@ describe("grep_anchored_files (rg-backed)", () => {
     };
     await piFastEditsMocked(pi as any, undefined);
 
-    // context is accepted but ignored by the JS scanner (no context lines),
-    // while matches and anchors must render. Eagle only appears via rg
-    // context, so its absence proves the JS path actually ran.
-    const result = await tools
-      .get("grep_anchored_files")!
-      .execute("1", { pattern: "alpha", path: "src/a.ts", context: 1 }, undefined, undefined, {
-        cwd,
-      });
-    const text = result.content[0].text as string;
-    expect(text).toContain("File: src/a.ts");
-    const alphaAnchor = anchorOf(text, "export function alpha() {");
-    expect(text).toMatch(new RegExp(`${alphaAnchor}§ export function alpha\\(\\)`));
-    const returnAnchor = anchorOf(text, "  return alpha();");
-    expect(text).toContain(`${returnAnchor}§   return alpha();`);
-    // Eagle only appears as an rg context line (line 5), so its absence proves
-    // the JS path actually ran: the JS scanner renders no context lines.
-    expect(text).not.toContain("beta()");
+    await expect(
+      tools
+        .get("grep_anchored_files")!
+        .execute("1", { pattern: "alpha", path: "src/a.ts" }, undefined, undefined, { cwd }),
+    ).rejects.toThrow(/ripgrep \(rg\) is required for this tool but was not found/);
 
     vi.doUnmock("../src/fs/rg-resolver.js");
+  });
+
+  itWithRg("propagates rg failures instead of falling back", async () => {
+    // An invalid-for-rg pattern reaches rg and rg rejects it; the tool must
+    // surface that failure (wrapped), not silently degrade.
+    const cwd = await sampleWorkspace();
+    const tools = await loadTools();
+    // A look-behind is invalid in Rust regex (rg's engine) but valid in JS.
+    await expect(
+      tools
+        .get("grep_anchored_files")!
+        .execute("1", { pattern: "(?<=x)alpha", path: "src/a.ts" }, undefined, undefined, { cwd }),
+    ).rejects.toThrow(/ripgrep search failed/);
   });
 });
