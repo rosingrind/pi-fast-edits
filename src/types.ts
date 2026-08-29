@@ -106,6 +106,8 @@ type ReplaceEdit = RevisionGuard & {
   startAnchorLine?: string;
   /** Expected current source line at endAnchor, verified before editing (strict) or when provided (lenient). */
   endAnchorLine?: string;
+  /** Accept anchor-marked text (`Word§...`) inside the replacement as genuine content. Default false — rejected. */
+  allowAnchoredLines?: boolean;
   replacement: string;
   includeStart?: boolean;
   includeEnd?: boolean;
@@ -119,6 +121,8 @@ type InsertEdit = RevisionGuard & {
   anchorLine?: string;
   position: "before" | "after";
   content: string;
+  /** Accept anchor-marked text (`Word§...`) inside the content as genuine content. Default false — rejected. */
+  allowAnchoredLines?: boolean;
 };
 
 type DeleteEdit = RevisionGuard & {

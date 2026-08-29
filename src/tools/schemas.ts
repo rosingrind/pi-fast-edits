@@ -20,6 +20,7 @@ export type ReplaceEditParams = {
   endAnchorLine?: string;
   includeStart?: boolean;
   includeEnd?: boolean;
+  allowAnchoredLines?: boolean;
   expectedRevision?: string;
 };
 
@@ -29,6 +30,7 @@ export type InsertEditParams = {
   position: "before" | "after";
   content: string;
   anchorLine?: string;
+  allowAnchoredLines?: boolean;
   expectedRevision?: string;
 };
 
@@ -73,7 +75,7 @@ export function replaceEditSchema(requireAnchorLines: boolean) {
     endAnchorLine: anchorLineSchema(requireAnchorLines, "endAnchor"),
     replacement: Type.String({
       description:
-        "New content to replace the anchor range. Use raw text only — do NOT include the § anchor marker.",
+        "New content to replace the anchor range. Use raw text only — anchor-marked text (`Word§...`) is rejected unless allowAnchoredLines is true.",
     }),
     includeStart: Type.Optional(Type.Boolean({ description: "Include the start anchor line." })),
     includeEnd: Type.Optional(Type.Boolean({ description: "Include the end anchor line." })),
@@ -95,8 +97,15 @@ export function insertEditSchema(requireAnchorLines: boolean) {
       description: "Insert before or after the anchor.",
     }),
     content: Type.String({
-      description: "Content to insert. Use raw text only — do NOT include the § anchor marker.",
+      description:
+        "Content to insert. Use raw text only — anchor-marked text (`Word§...`) is rejected unless allowAnchoredLines is true.",
     }),
+    allowAnchoredLines: Type.Optional(
+      Type.Boolean({
+        description:
+          "Accept anchor-marked text (`Word§...`) inside the content as genuine content. Default false (rejected).",
+      }),
+    ),
     expectedRevision: Type.Optional(
       Type.String({ description: "Revision hash from read_anchored_file to prevent stale edits." }),
     ),

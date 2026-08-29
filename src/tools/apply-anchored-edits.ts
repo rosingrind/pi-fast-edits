@@ -48,7 +48,7 @@ export function registerApplyAnchoredEdits(
       "Each edit references anchors from a prior read_anchored_file result",
       "Edits are validated for overlaps before any writes occur",
       "Pass revision hashes from read_anchored_file as expectedRevision per edit",
-      "Use raw text only in replacement/content — do NOT include the § anchor marker",
+      "Use raw text only in replacement/content — anchor-marked text (`Word§...`) is rejected; set allowAnchoredLines: true only if the § is genuine content",
     ],
     renderShell: "default",
     executionMode: "sequential",

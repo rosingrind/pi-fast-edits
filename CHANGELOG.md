@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Anchor-marked text rejection with `allowAnchoredLines`** — `replacement`/`content` containing anchor-marked lines (`Word§...`, matching rendered anchored output) is rejected by default with a corrective error; pass `allowAnchoredLines: true` to accept genuine `§` content. Applies across all five edit tools, verified in `planEdit` before any write
+
 - **`startAnchorLine`/`endAnchorLine`/`anchorLine` args** — Edit tools (`edit_anchored_range`, `insert_at_anchor`, `delete_anchor_range`, `preview_anchored_edit`, `apply_anchored_edits`) accept the exact current source line at each anchor, copied verbatim from `read_anchored_file`/`grep_anchored_files` output and verified against the file before editing; mismatch rejects the edit with a corrective message
 - **`requireAnchorLines` setting** — New config option (default `on`) that makes the anchor line args required; when `off` they are optional but still verified when provided. The config menu re-registers the edit tools live, so schema strictness follows the setting without a reload
 - **Ripgrep-backed `grep_anchored_files`** — Searches via `rg --json`, resolved from `~/.pi/agent/bin/rg` or PATH (errors out when ripgrep is unavailable — no fallback scanner); `filterDrifted` omits files that changed between scan and read, output is capped at 100KB with an explicit truncation note, and hit lines are capped at 300 characters with 500 total matches
@@ -26,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Teaching error for copied `    line N` suffixes** — When a `startAnchorLine`/`endAnchorLine`/`anchorLine` value differs from the current line only by the rendered positional `    line N`/`    lines N` suffix (grep/read output), the mismatch error now tells the model to drop it — the value is still rejected, the model must correct itself. Tool guidelines and README now document that the suffix is positional metadata, not part of the line
+- **Teaching error for copied `line N` suffixes** — When a `startAnchorLine`/`endAnchorLine`/`anchorLine` value differs from the current line only by the rendered positional `line N`/`lines N` suffix (grep/read output), the mismatch error now tells the model to drop it — the value is still rejected, the model must correct itself. Tool guidelines and README now document that the suffix is positional metadata, not part of the line
 
 ## [0.2.0] - 2026-08-12
 

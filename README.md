@@ -26,7 +26,7 @@ The agent can then replace the `Cider..Eagle` range with new code. The extension
 - Rendered lines end with a `line N` (grep) or `lines N` (skeleton) positional suffix — it is metadata, not part of the line, and must NOT be copied into `startAnchorLine`/`endAnchorLine`/`anchorLine` values
 - When `requireAnchorLines` is off, the line args are optional but still verified whenever they are provided
 - The `§` marker shown in file output is internal metadata only — it is NOT part of the actual file content
-- When providing `replacement` or `content`, use raw text only — do NOT include the `§` anchor marker
+- When providing `replacement` or `content`, use raw text only — anchor-marked text (`Word§...`, i.e. a rendered anchored line) is rejected by default; if the `§` is genuine content, pass `allowAnchoredLines: true`
 
 ## Install
 

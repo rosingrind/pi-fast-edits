@@ -59,12 +59,40 @@ function verifyAnchorLines(
   }
 }
 
+/**
+ * Matches one anchor-marked source line: a TitleCase anchor word (optionally
+ * numeric-suffixed, e.g. `Apple2`) immediately followed by the § delimiter.
+ */
+const ANCHOR_MARKED_LINE = /^[A-Z][a-zA-Z]*\d*§/;
+
+/**
+ * Reject anchor-marked text (`Word§...`) in replacement/content: an agent that
+ * echoes rendered anchored output into raw text is making the exact mistake
+ * the tools' guidelines warn about. `allowAnchoredLines: true` opts in when
+ * the § is genuine content.
+ */
+function rejectAnchorMarkedText(edit: AnchoredEdit): void {
+  if (edit.type === "delete" || edit.allowAnchoredLines === true) return;
+  const text = edit.type === "replace" ? edit.replacement : edit.content;
+  const offending = splitTextPreserveFinal(text).lines.find((line) =>
+    ANCHOR_MARKED_LINE.test(line),
+  );
+  if (offending !== undefined) {
+    throw new Error(
+      `Text contains anchor-marked content (${JSON.stringify(offending.slice(0, 60))}). ` +
+        `Pass raw text only — the § delimiter and anchor words are internal metadata. ` +
+        `If the § is genuine content, set allowAnchoredLines: true.`,
+    );
+  }
+}
+
 export function planEdit(
   state: FileAnchorState,
   edit: AnchoredEdit,
   requireAnchorLines: boolean,
 ): PlannedEdit {
   verifyAnchorLines(state, edit, requireAnchorLines);
+  rejectAnchorMarkedText(edit);
 
   // Empty files have no anchors — any edit creates the file content from scratch.
   if (state.lines.length === 0) {

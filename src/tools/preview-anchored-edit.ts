@@ -62,6 +62,7 @@ export function registerPreviewAnchoredEdit(
           startAnchorLine: params.startAnchorLine,
           endAnchorLine: params.endAnchorLine,
           replacement: params.replacement,
+          allowAnchoredLines: params.allowAnchoredLines,
           includeStart: params.includeStart,
           includeEnd: params.includeEnd,
         },

@@ -460,6 +460,143 @@ describe("anchor line args", () => {
     expect(() => lineTextFrom(output, "missing")).toThrow(/No anchored line found/);
   });
 
+  it("rejects anchor-marked text in replacement and content by default", async () => {
+    const cwd = await workspace();
+    const file = join(cwd, "marked.ts");
+    await writeFile(file, "one\ntwo\nthree\n", "utf8");
+    const tools = await loadTools();
+    const read = await tools
+      .get("read_anchored_file")!
+      .execute("1", { path: "marked.ts" }, undefined, undefined, { cwd });
+    const lines = read.details.lines as Array<{ anchor: string; text: string }>;
+    const first = lines[0];
+
+    // Model echoes a rendered anchored line into replacement → rejected.
+    await expect(
+      tools.get("edit_anchored_range")!.execute(
+        "2",
+        {
+          path: "marked.ts",
+          startAnchor: first.anchor,
+          endAnchor: first.anchor,
+          replacement: `Apple§ one\nplain`,
+          startAnchorLine: first.text,
+          endAnchorLine: first.text,
+        },
+        undefined,
+        undefined,
+        { cwd },
+      ),
+    ).rejects.toThrow(/anchor-marked content/);
+    await expect(readFile(file, "utf8")).resolves.toBe("one\ntwo\nthree\n");
+
+    // Insert path: same rejection, same corrective guidance.
+    await expect(
+      tools.get("insert_at_anchor")!.execute(
+        "3",
+        {
+          path: "marked.ts",
+          anchor: first.anchor,
+          position: "before",
+          content: "fine line\nFoxtrot2§ suffixed anchor echo",
+          anchorLine: first.text,
+        },
+        undefined,
+        undefined,
+        { cwd },
+      ),
+    ).rejects.toThrow(/allowAnchoredLines: true/);
+
+    // CRLF-embedded anchored line is caught too.
+    await expect(
+      tools.get("edit_anchored_range")!.execute(
+        "4",
+        {
+          path: "marked.ts",
+          startAnchor: first.anchor,
+          endAnchor: first.anchor,
+          replacement: "ok\r\nBrave§ two",
+          startAnchorLine: first.text,
+          endAnchorLine: first.text,
+        },
+        undefined,
+        undefined,
+        { cwd },
+      ),
+    ).rejects.toThrow(/anchor-marked content/);
+  });
+
+  it("allowAnchoredLines: true accepts genuine § content verbatim", async () => {
+    const cwd = await workspace();
+    const file = join(cwd, "genuine.md");
+    await writeFile(file, "title\n", "utf8");
+    const tools = await loadTools();
+    const read = await tools
+      .get("read_anchored_file")!
+      .execute("1", { path: "genuine.md" }, undefined, undefined, { cwd });
+    const first = (read.details.lines as Array<{ anchor: string; text: string }>)[0];
+
+    const result = await tools.get("edit_anchored_range")!.execute(
+      "2",
+      {
+        path: "genuine.md",
+        startAnchor: first.anchor,
+        endAnchor: first.anchor,
+        replacement: "Apple§ one\nplain",
+        startAnchorLine: first.text,
+        endAnchorLine: first.text,
+        allowAnchoredLines: true,
+      },
+      undefined,
+      undefined,
+      { cwd },
+    );
+    expect(result.content[0].text).toBeTruthy();
+    await expect(readFile(file, "utf8")).resolves.toBe("Apple§ one\nplain\n");
+  });
+
+  it("batch rejects as a whole when one edit carries anchor-marked text", async () => {
+    const cwd = await workspace();
+    const file = join(cwd, "batch.ts");
+    await writeFile(file, "one\ntwo\n", "utf8");
+    const tools = await loadTools();
+    const read = await tools
+      .get("read_anchored_file")!
+      .execute("1", { path: "batch.ts" }, undefined, undefined, { cwd });
+    const lines = read.details.lines as Array<{ anchor: string; text: string }>;
+
+    await expect(
+      tools.get("apply_anchored_edits")!.execute(
+        "2",
+        {
+          edits: [
+            {
+              type: "replace",
+              path: "batch.ts",
+              startAnchor: lines[0].anchor,
+              endAnchor: lines[0].anchor,
+              replacement: "clean",
+              startAnchorLine: lines[0].text,
+              endAnchorLine: lines[0].text,
+            },
+            {
+              type: "insert",
+              path: "batch.ts",
+              anchor: lines[1].anchor,
+              position: "after",
+              content: "Echo§ echoed",
+              anchorLine: lines[1].text,
+            },
+          ],
+        },
+        undefined,
+        undefined,
+        { cwd },
+      ),
+    ).rejects.toThrow(/anchor-marked content/);
+    await expect(readFile(file, "utf8")).resolves.toBe("one\ntwo\n");
+  });
+
   it("blank source lines accept an empty anchorLine value", async () => {
     // A blank line is a valid edit target; its verbatim content is the empty
     // string (dirac's blank-coordinate case). The schema requires the arg but
