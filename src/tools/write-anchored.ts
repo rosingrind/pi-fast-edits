@@ -38,8 +38,8 @@ export function registerWriteAnchored(
   pi: ExtensionAPI,
   session: SessionState,
   config: PiFastEditsConfig,
-): void {
-  pi.registerTool({
+) {
+  const tool = {
     name: "write_anchored",
     label: "Write Anchored File",
     description:
@@ -53,8 +53,8 @@ export function registerWriteAnchored(
       "Pass the revision hash from this result as expectedRevision in edit tools",
       "The `    line N` suffix after each rendered line is positional metadata, not part of the line — do NOT include it in startAnchorLine/endAnchorLine/anchorLine values",
     ],
-    renderShell: "default",
-    executionMode: "sequential",
+    renderShell: "default" as const,
+    executionMode: "sequential" as const,
     parameters: writeSchema,
     async execute(
       _toolCallId: string,
@@ -104,7 +104,9 @@ export function registerWriteAnchored(
         },
       );
     },
-  });
+  };
+  pi.registerTool(tool);
+  return tool;
 }
 
 export function renderWriteResult(

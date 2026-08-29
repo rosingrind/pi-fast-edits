@@ -46,8 +46,8 @@ export function registerReadAnchoredFile(
   pi: ExtensionAPI,
   session: SessionState,
   config: PiFastEditsConfig,
-): void {
-  pi.registerTool({
+) {
+  const tool = {
     name: "read_anchored_file",
     label: "Read Anchored File",
     description:
@@ -68,8 +68,8 @@ export function registerReadAnchoredFile(
       "Pass the revision hash from this result as expectedRevision in edit tools",
       "The `    line N` / `    lines N` suffix after each rendered line is positional metadata, not part of the line — do NOT include it in startAnchorLine/endAnchorLine/anchorLine values",
     ],
-    renderShell: "default",
-    executionMode: "parallel",
+    renderShell: "default" as const,
+    executionMode: "parallel" as const,
     parameters: readSchema,
     async execute(
       _toolCallId: string,
@@ -154,7 +154,9 @@ export function registerReadAnchoredFile(
         },
       );
     },
-  });
+  };
+  pi.registerTool(tool);
+  return tool;
 }
 
 export function renderReadAnchoredResult(

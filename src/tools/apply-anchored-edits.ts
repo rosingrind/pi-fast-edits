@@ -34,8 +34,8 @@ export function registerApplyAnchoredEdits(
   pi: ExtensionAPI,
   session: SessionState,
   config: PiFastEditsConfig,
-): void {
-  pi.registerTool({
+) {
+  const tool = {
     name: "apply_anchored_edits",
     label: "Apply Anchored Edits",
     description:
@@ -50,8 +50,8 @@ export function registerApplyAnchoredEdits(
       "Pass revision hashes from read_anchored_file as expectedRevision per edit",
       "Use raw text only in replacement/content — anchor-marked text (`Word§...`) is rejected; set allowAnchoredLines: true only if the § is genuine content",
     ],
-    renderShell: "default",
-    executionMode: "sequential",
+    renderShell: "default" as const,
+    executionMode: "sequential" as const,
     renderCall: renderToolCall("apply_anchored_edits"),
     renderResult: renderBatchResult,
     parameters: batchEditsSchema(config.requireAnchorLines),
@@ -207,7 +207,9 @@ export function registerApplyAnchoredEdits(
       const full = _summarizeBatch(groups);
       return textResult(full.text, full.details);
     },
-  });
+  };
+  pi.registerTool(tool);
+  return tool;
 }
 
 type BatchGroup = {

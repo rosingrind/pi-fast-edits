@@ -17,6 +17,11 @@ import { registerInsertAtAnchor } from "./tools/insert-at-anchor.js";
 import { registerDeleteAnchorRange } from "./tools/delete-anchor-range.js";
 import { registerPreviewAnchoredEdit } from "./tools/preview-anchored-edit.js";
 import { registerApplyAnchoredEdits } from "./tools/apply-anchored-edits.js";
+import {
+  applyOverrideMode,
+  installInterceptionFallback,
+  type OverrideDeps,
+} from "./tools/override.js";
 
 export default async function piFastEdits(
   pi: ExtensionAPI,
@@ -49,13 +54,28 @@ export default async function piFastEdits(
   registerAnchoredEditTools();
   registerCommands(pi, session, config, registerAnchoredEditTools);
 
-  pi.on("session_start", async () => {
+  // Override wiring is applied from session_start, not the factory: pi's
+  // runtime actions (getAllTools/getActiveTools/setActiveTools) are only bound
+  // after extension loading, and re-registering at runtime refreshes the
+  // registry in-session.
+  const overrideDeps: OverrideDeps = {
+    registerRead: registerReadAnchoredFile,
+    registerEdit: registerApplyAnchoredEdits,
+    registerGrep: registerGrepAnchoredFiles,
+    registerWrite: registerWriteAnchored,
+    installInterception: installInterceptionFallback,
+  };
+
+  pi.on("session_start", async (_event, ctx) => {
     try {
       if (existsSync(stateFilePath())) {
         hydrateAnchorState(session, JSON.parse(readFileSync(stateFilePath(), "utf-8")));
       }
     } catch {
       // Corrupt state — start fresh.
+    }
+    if (config.overrideBuiltInEditTools) {
+      applyOverrideMode(pi, session, config, overrideDeps, ctx);
     }
   });
   pi.on("session_shutdown", async () => {
@@ -64,18 +84,6 @@ export default async function piFastEdits(
       await atomicWriteFile(stateFilePath(), JSON.stringify(exportAnchorState(session)));
     } catch {
       // Best-effort persistence.
-    }
-  });
-
-  pi.on("tool_call", async (event: { toolName?: string }, _ctx: unknown) => {
-    if (!config.overrideBuiltInEditTools) return;
-    const name = event.toolName ?? "";
-    if (["write", "edit"].includes(name)) {
-      return {
-        block: true,
-        reason:
-          "pi-fast-edits override is enabled. Use read_anchored_file plus anchored edit tools instead.",
-      };
     }
   });
 }

@@ -19,6 +19,13 @@ async function harness() {
       tools.set(t.name, t);
     },
     registerCommand() {},
+    getAllTools() {
+      return [];
+    },
+    getActiveTools() {
+      return [];
+    },
+    setActiveTools() {},
     on(event: string, handler: (event?: any, ctx?: any) => Promise<any>) {
       handlers[event] = handler;
     },

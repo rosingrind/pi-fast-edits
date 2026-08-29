@@ -19,6 +19,13 @@ async function loadTools(overrides?: Partial<PiFastEditsConfig>): Promise<Map<st
       tools.set(tool.name, tool);
     },
     registerCommand() {},
+    getAllTools() {
+      return [];
+    },
+    getActiveTools() {
+      return [];
+    },
+    setActiveTools() {},
     on() {},
   };
   await piFastEdits(pi as any, overrides);

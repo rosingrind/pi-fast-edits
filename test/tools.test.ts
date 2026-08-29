@@ -18,6 +18,13 @@ async function loadTools(overrides?: Partial<PiFastEditsConfig>): Promise<Map<st
       tools.set(tool.name, tool);
     },
     registerCommand() {},
+    getAllTools() {
+      return [];
+    },
+    getActiveTools() {
+      return [];
+    },
+    setActiveTools() {},
     on() {},
   };
   await piFastEdits(pi as any, overrides);
@@ -2087,21 +2094,43 @@ describe("confirmation flow", () => {
 });
 
 describe("override", () => {
-  it("blocks built-in write and edit tools when enabled", async () => {
+  it("falls back to interception with a warning when the safety check fails", async () => {
     let toolCallHandler:
       | ((
           event: { toolName?: string },
           ctx: unknown,
-        ) => Promise<{ block?: boolean; reason?: string } | undefined>)
+        ) => Promise<{ block?: boolean; reason?: string } | undefined> | undefined)
       | undefined;
+    let sessionStartHandler:
+      ((event?: unknown, ctx?: any) => Promise<unknown> | undefined) | undefined;
+    const notifications: Array<{ message: string; type?: string }> = [];
     const pi = {
       registerTool() {},
       registerCommand() {},
-      on(event: string, handler: typeof toolCallHandler) {
+      // Built-in write is missing parameters.properties.content, so the
+      // override fingerprint fails and interception installs as fallback.
+      getAllTools: () => [
+        { name: "read", parameters: { properties: { path: {} } } },
+        { name: "edit", parameters: { properties: { edits: {} } } },
+        { name: "write", parameters: { properties: { path: {} } } },
+        { name: "grep", parameters: { properties: { pattern: {} } } },
+      ],
+      getActiveTools: () => [],
+      setActiveTools() {},
+      on(event: string, handler: any) {
         if (event === "tool_call") toolCallHandler = handler;
+        if (event === "session_start") sessionStartHandler = handler;
       },
     };
     await piFastEdits(pi as any, { overrideBuiltInEditTools: true });
+    await sessionStartHandler!(
+      {},
+      {
+        ui: {
+          notify: (message: string, type?: string) => notifications.push({ message, type }),
+        },
+      },
+    );
 
     expect(toolCallHandler).toBeDefined();
     const write = await toolCallHandler!({ toolName: "write" }, {});
@@ -2113,21 +2142,26 @@ describe("override", () => {
 
     const read = await toolCallHandler!({ toolName: "read_anchored_file" }, {});
     expect(read).toBeUndefined();
+
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0].type).toBe("warning");
   });
 
-  it("does not block when override is disabled (default)", async () => {
+  it("installs nothing when override is disabled (default)", async () => {
     let toolCallHandler:
-      ((event: { toolName?: string }, ctx: unknown) => Promise<unknown>) | undefined;
+      ((event: { toolName?: string }, ctx: unknown) => Promise<unknown> | undefined) | undefined;
     const pi = {
       registerTool() {},
       registerCommand() {},
-      on(_event: string, handler: typeof toolCallHandler) {
-        toolCallHandler = handler;
+      getAllTools: () => [],
+      getActiveTools: () => [],
+      setActiveTools() {},
+      on(event: string, handler: typeof toolCallHandler) {
+        if (event === "tool_call") toolCallHandler = handler;
       },
     };
     await piFastEdits(pi as any);
-    const result = await toolCallHandler!({ toolName: "edit" }, {});
-    expect(result).toBeUndefined();
+    expect(toolCallHandler).toBeUndefined();
   });
 });
 

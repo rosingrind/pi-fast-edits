@@ -66,8 +66,8 @@ export function registerGrepAnchoredFiles(
   pi: ExtensionAPI,
   session: SessionState,
   config: PiFastEditsConfig,
-): void {
-  pi.registerTool({
+) {
+  const tool = {
     name: "grep_anchored_files",
     label: "Grep Anchored Files",
     description:
@@ -90,8 +90,8 @@ export function registerGrepAnchoredFiles(
       "Use glob to narrow file types, e.g. '**/*.ts'",
       "The `    line N` suffix after each rendered line is positional metadata, not part of the line — do NOT include it in startAnchorLine/endAnchorLine/anchorLine values",
     ],
-    renderShell: "default",
-    executionMode: "parallel",
+    renderShell: "default" as const,
+    executionMode: "parallel" as const,
     parameters: grepSchema,
     async execute(
       _toolCallId: string,
@@ -140,7 +140,9 @@ export function registerGrepAnchoredFiles(
         config.protectedPaths,
       );
     },
-  });
+  };
+  pi.registerTool(tool);
+  return tool;
 }
 
 /** Message used when a hit file no longer matches its freshly re-read state. */
