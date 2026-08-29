@@ -1,4 +1,3 @@
-import type { Static } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { PiFastEditsConfig, SessionState } from "../types.js";
 import { unifiedDiff } from "../diff/unified-diff.js";
@@ -12,15 +11,12 @@ import {
 import { applyPlansToLines, planEdit } from "./edit-core.js";
 import { renderEditResult } from "./single-edit-runner.js";
 import { renderToolCall } from "./render.js";
-import { replaceEditSchema } from "./schemas.js";
-
-// The preview tool always performs a replace, so it reuses the replace schema.
-type PreviewParams = Static<typeof replaceEditSchema>;
+import { replaceEditSchema, type ReplaceEditParams } from "./schemas.js";
 
 export function registerPreviewAnchoredEdit(
   pi: ExtensionAPI,
   session: SessionState,
-  _config: PiFastEditsConfig,
+  config: PiFastEditsConfig,
 ): void {
   pi.registerTool({
     name: "preview_anchored_edit",
@@ -28,7 +24,8 @@ export function registerPreviewAnchoredEdit(
     description: "Preview a replacement edit between two anchors without writing files.",
     promptSnippet: "Preview a replacement edit between two anchors without writing",
     promptGuidelines: [
-      "Anchors may be passed as complete ANCHOR§current-line coordinates copied verbatim from read/grep output — content is verified before editing",
+      "Copy anchor words verbatim from a prior read_anchored_file or grep_anchored_files result",
+      "Pass the exact current source line at each anchor as startAnchorLine/endAnchorLine, copied verbatim from read/grep output — the line content is verified before editing",
       "Returns a diff showing what the edit would produce",
       "Does not modify the file — use edit_anchored_range to apply",
       "Pass the revision hash from read_anchored_file as expectedRevision",
@@ -37,10 +34,10 @@ export function registerPreviewAnchoredEdit(
     executionMode: "parallel",
     renderCall: renderToolCall("preview_anchored_edit"),
     renderResult: renderEditResult,
-    parameters: replaceEditSchema,
+    parameters: replaceEditSchema(config.requireAnchorLines),
     async execute(
       _toolCallId: string,
-      params: PreviewParams,
+      params: ReplaceEditParams,
       _signal: AbortSignal | undefined,
       _onUpdate: unknown,
       ctx: PiContext,
@@ -54,15 +51,21 @@ export function registerPreviewAnchoredEdit(
         params.expectedRevision,
       );
       const beforeLines = loaded.state.lines.map((line) => line.text);
-      const plan = planEdit(loaded.state, {
-        type: "replace",
-        path: params.path,
-        startAnchor: params.startAnchor,
-        endAnchor: params.endAnchor,
-        replacement: params.replacement,
-        includeStart: params.includeStart,
-        includeEnd: params.includeEnd,
-      });
+      const plan = planEdit(
+        loaded.state,
+        {
+          type: "replace",
+          path: params.path,
+          startAnchor: params.startAnchor,
+          endAnchor: params.endAnchor,
+          startAnchorLine: params.startAnchorLine,
+          endAnchorLine: params.endAnchorLine,
+          replacement: params.replacement,
+          includeStart: params.includeStart,
+          includeEnd: params.includeEnd,
+        },
+        config.requireAnchorLines,
+      );
       const afterLines = applyPlansToLines(beforeLines, [plan]);
       return textResult(unifiedDiff(beforeLines, afterLines), {
         path: loaded.relativePath,

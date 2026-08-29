@@ -42,9 +42,11 @@ describe("Myers diff performance edge cases", () => {
       .get("read_anchored_file")!
       .execute("1", { path: "old.txt", mode: "full" }, undefined, undefined, { cwd });
     const oldRevision = oldResult.details.revision;
-    const oldLinesData = oldResult.details.lines as Array<{ anchor: string }>;
+    const oldLinesData = oldResult.details.lines as Array<{ anchor: string; text: string }>;
     const firstAnchor = oldLinesData[0].anchor;
     const lastAnchor = oldLinesData[oldLinesData.length - 1].anchor;
+    const firstAnchorLine = oldLinesData[0].text;
+    const lastAnchorLine = oldLinesData[oldLinesData.length - 1].text;
 
     const start = Date.now();
     // Replace entire old file content with new file content.
@@ -53,7 +55,9 @@ describe("Myers diff performance edge cases", () => {
       {
         path: "old.txt",
         startAnchor: firstAnchor,
+        startAnchorLine: firstAnchorLine,
         endAnchor: lastAnchor,
+        endAnchorLine: lastAnchorLine,
         replacement: newLines.join("\n"),
         expectedRevision: oldRevision,
       },
@@ -82,9 +86,11 @@ describe("Myers diff performance edge cases", () => {
       .get("read_anchored_file")!
       .execute("1", { path: "rewrite.txt", mode: "full" }, undefined, undefined, { cwd });
     const revision = readResult.details.revision;
-    const linesData = readResult.details.lines as Array<{ anchor: string }>;
+    const linesData = readResult.details.lines as Array<{ anchor: string; text: string }>;
     const firstAnchor = linesData[0].anchor;
     const lastAnchor = linesData[linesData.length - 1].anchor;
+    const firstAnchorLine = linesData[0].text;
+    const lastAnchorLine = linesData[linesData.length - 1].text;
 
     const start = Date.now();
     const editResult = await tools.get("edit_anchored_range")!.execute(
@@ -92,7 +98,9 @@ describe("Myers diff performance edge cases", () => {
       {
         path: "rewrite.txt",
         startAnchor: firstAnchor,
+        startAnchorLine: firstAnchorLine,
         endAnchor: lastAnchor,
+        endAnchorLine: lastAnchorLine,
         replacement: newLines.join("\n"),
         expectedRevision: revision,
       },
@@ -126,9 +134,11 @@ describe("Myers diff performance edge cases", () => {
       .get("read_anchored_file")!
       .execute("1", { path: "same.txt", mode: "full" }, undefined, undefined, { cwd });
     const revision = readResult.details.revision;
-    const linesData = readResult.details.lines as Array<{ anchor: string }>;
+    const linesData = readResult.details.lines as Array<{ anchor: string; text: string }>;
     const firstAnchor = linesData[0].anchor;
     const lastAnchor = linesData[linesData.length - 1].anchor;
+    const firstAnchorLine = linesData[0].text;
+    const lastAnchorLine = linesData[linesData.length - 1].text;
 
     // Replace with identical content — edit succeeds, file unchanged.
     const editResult = await tools.get("edit_anchored_range")!.execute(
@@ -136,7 +146,9 @@ describe("Myers diff performance edge cases", () => {
       {
         path: "same.txt",
         startAnchor: firstAnchor,
+        startAnchorLine: firstAnchorLine,
         endAnchor: lastAnchor,
+        endAnchorLine: lastAnchorLine,
         replacement: lines.join("\n"),
         expectedRevision: revision,
       },
@@ -229,7 +241,7 @@ describe("unicode and emoji in anchors", () => {
       .get("read_anchored_file")!
       .execute("1", { path: "unicode-edit.txt", mode: "full" }, undefined, undefined, { cwd });
     const revision = readResult.details.revision;
-    const lines = readResult.details.lines as Array<{ anchor: string }>;
+    const lines = readResult.details.lines as Array<{ anchor: string; text: string }>;
     const firstAnchor = lines[0].anchor;
 
     const editResult = await tools.get("edit_anchored_range")!.execute(
@@ -237,7 +249,9 @@ describe("unicode and emoji in anchors", () => {
       {
         path: "unicode-edit.txt",
         startAnchor: firstAnchor,
+        startAnchorLine: lines[0].text,
         endAnchor: lines[1].anchor,
+        endAnchorLine: lines[1].text,
         replacement: "const 苹果 = 99;\n",
         expectedRevision: revision,
       },
@@ -276,13 +290,16 @@ describe("anchor churn under rapid edits", () => {
         targetLine = Math.floor(lines.length / 2); // middle
       }
       const anchor = lines[targetLine].anchor;
+      const anchorLineText = lines[targetLine].text;
 
       const result = await tools.get("edit_anchored_range")!.execute(
         String(i * 2 + 1),
         {
           path: "churn.txt",
           startAnchor: anchor,
+          startAnchorLine: anchorLineText,
           endAnchor: anchor,
+          endAnchorLine: anchorLineText,
           replacement: `edited-${i}\n`,
         },
         undefined,
@@ -300,7 +317,10 @@ describe("anchor churn under rapid edits", () => {
     const finalRead = await tools
       .get("read_anchored_file")!
       .execute("100", { path: "churn.txt" }, undefined, undefined, { cwd });
-    const finalLinesData = (finalRead.details as any)?.lines as Array<{ anchor: string }>;
+    const finalLinesData = (finalRead.details as any)?.lines as Array<{
+      anchor: string;
+      text: string;
+    }>;
     const anchorSet = new Set(finalLinesData.map((l: any) => l.anchor));
     expect(anchorSet.size).toBe(finalLinesData.length);
   });
@@ -321,10 +341,12 @@ describe("Myers fallback branch (n + m >= 4000)", () => {
       .get("read_anchored_file")!
       .execute("1", { path: "fallback.txt", mode: "full" }, undefined, undefined, { cwd });
     const revision = readResult.details.revision;
-    const linesData = readResult.details.lines as Array<{ anchor: string }>;
+    const linesData = readResult.details.lines as Array<{ anchor: string; text: string }>;
     expect(linesData).toHaveLength(lineCount);
     const firstAnchor = linesData[0].anchor;
     const lastAnchor = linesData[linesData.length - 1].anchor;
+    const firstAnchorLine = linesData[0].text;
+    const lastAnchorLine = linesData[linesData.length - 1].text;
 
     // Replace the whole file content with the new lines.
     const editResult = await tools.get("edit_anchored_range")!.execute(
@@ -332,7 +354,9 @@ describe("Myers fallback branch (n + m >= 4000)", () => {
       {
         path: "fallback.txt",
         startAnchor: firstAnchor,
+        startAnchorLine: firstAnchorLine,
         endAnchor: lastAnchor,
+        endAnchorLine: lastAnchorLine,
         replacement: newLines.join("\n"),
         expectedRevision: revision,
       },

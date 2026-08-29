@@ -1,7 +1,6 @@
 import type { AnchoredEdit, FileAnchorState } from "../types.js";
 import { findAnchorIndex } from "../anchor/anchor-state.js";
 import { splitTextPreserveFinal } from "../fs/text-file.js";
-import { ANCHOR_DELIMITER, parseAnchoredCoordinate } from "../anchor/anchor-renderer.js";
 
 export type PlannedEdit = {
   edit: AnchoredEdit;
@@ -11,37 +10,52 @@ export type PlannedEdit = {
 };
 
 /**
- * Verify that every full `ANCHOR§content` coordinate in the edit matches the
- * line currently at that anchor. Bare anchors carry no content and are never
- * checked, so legacy callers behave exactly as before. Called by planEdit
- * before any planning; throws a corrective message on mismatch.
+ * Verify that each anchor's `*Line` companion (startAnchorLine/endAnchorLine/
+ * anchorLine) matches the line currently at that anchor. In strict mode
+ * (`requireAnchorLines`) the companions are mandatory; in lenient mode they are
+ * verified only when provided. Each check runs against the anchor's own line
+ * index — never plan.start/plan.end — so includeStart/position offsets cannot
+ * misdirect it. Anchors that cannot be found are skipped; planEdit reports the
+ * missing anchor itself.
  */
-function assertCoordinateContent(state: FileAnchorState, edit: AnchoredEdit): void {
-  const coordinates: Array<{ anchor: string; content?: string } | null> =
+function verifyAnchorLines(
+  state: FileAnchorState,
+  edit: AnchoredEdit,
+  requireAnchorLines: boolean,
+): void {
+  const anchors: Array<{ anchor: string; expected: string | undefined; label: string }> =
     edit.type === "insert"
-      ? [parseAnchoredCoordinate(edit.anchor)]
-      : [parseAnchoredCoordinate(edit.startAnchor), parseAnchoredCoordinate(edit.endAnchor)];
-  for (const coord of coordinates) {
-    if (coord?.content === undefined) continue;
-    // A trailing ANCHOR§ with no content is the legacy bare-anchor form
-    // (normalizeAnchor strips the trailing delimiter) — nothing to verify. One
-    // leading space is also tolerated so full coordinates copied verbatim from
-    // rendered read output (`Anchor§ text`) match the line text in details.
-    const expected = coord.content.replace(/^ /, "");
-    if (expected === "") continue;
-    const index = findAnchorIndex(state, coord.anchor);
-    if (index === -1) continue; // planEdit reports the missing anchor itself
-    const actual = state.lines[index]?.text;
+      ? [{ anchor: edit.anchor, expected: edit.anchorLine, label: "anchor" }]
+      : [
+          { anchor: edit.startAnchor, expected: edit.startAnchorLine, label: "startAnchor" },
+          { anchor: edit.endAnchor, expected: edit.endAnchorLine, label: "endAnchor" },
+        ];
+  for (const { anchor, expected, label } of anchors) {
+    const anchorIndex = findAnchorIndex(state, anchor);
+    if (anchorIndex === -1) continue; // planEdit reports the missing anchor itself
+    if (expected === undefined) {
+      if (requireAnchorLines) {
+        throw new Error(
+          `Missing ${label}Line: pass the exact current source line at ${label}, copied verbatim from read_anchored_file or grep_anchored_files output.`,
+        );
+      }
+      continue;
+    }
+    const actual = state.lines[anchorIndex]?.text;
     if (actual !== expected) {
       throw new Error(
-        `Anchor content mismatch for ${coord.anchor}${ANCHOR_DELIMITER}${coord.content}: the line is currently ${JSON.stringify(actual)}. Re-read the file with read_anchored_file and copy the anchored line verbatim.`,
+        `${label}Line mismatch for ${anchor}: the line is currently ${JSON.stringify(actual)}. Re-read the file and copy the line verbatim.`,
       );
     }
   }
 }
 
-export function planEdit(state: FileAnchorState, edit: AnchoredEdit): PlannedEdit {
-  assertCoordinateContent(state, edit);
+export function planEdit(
+  state: FileAnchorState,
+  edit: AnchoredEdit,
+  requireAnchorLines: boolean,
+): PlannedEdit {
+  verifyAnchorLines(state, edit, requireAnchorLines);
 
   // Empty files have no anchors — any edit creates the file content from scratch.
   if (state.lines.length === 0) {
@@ -56,18 +70,12 @@ export function planEdit(state: FileAnchorState, edit: AnchoredEdit): PlannedEdi
   }
 
   if (edit.type === "replace") {
-    const startCoord = parseAnchoredCoordinate(edit.startAnchor) ?? { anchor: edit.startAnchor };
-    const endCoord = parseAnchoredCoordinate(edit.endAnchor) ?? { anchor: edit.endAnchor };
-    const startAnchor = findAnchorIndex(state, startCoord.anchor);
-    const endAnchor = findAnchorIndex(state, endCoord.anchor);
+    const startAnchor = findAnchorIndex(state, edit.startAnchor);
+    const endAnchor = findAnchorIndex(state, edit.endAnchor);
     if (startAnchor === -1)
-      throw new Error(
-        `Could not find start anchor ${edit.startAnchor}${ANCHOR_DELIMITER} in ${state.path}.`,
-      );
+      throw new Error(`Could not find start anchor ${edit.startAnchor} in ${state.path}.`);
     if (endAnchor === -1)
-      throw new Error(
-        `Could not find end anchor ${edit.endAnchor}${ANCHOR_DELIMITER} in ${state.path}.`,
-      );
+      throw new Error(`Could not find end anchor ${edit.endAnchor} in ${state.path}.`);
     const includeStart = edit.includeStart ?? true;
     const includeEnd = edit.includeEnd ?? true;
     const start = includeStart ? startAnchor : startAnchor + 1;
@@ -76,9 +84,7 @@ export function planEdit(state: FileAnchorState, edit: AnchoredEdit): PlannedEdi
     // zero-width insertion point between them — a valid way to replace a gap
     // without touching either anchor line.
     if (start > end + 1)
-      throw new Error(
-        `Invalid anchor range ${edit.startAnchor}${ANCHOR_DELIMITER}..${edit.endAnchor}${ANCHOR_DELIMITER}.`,
-      );
+      throw new Error(`Invalid anchor range ${edit.startAnchor}..${edit.endAnchor}.`);
     return {
       edit,
       start,
@@ -88,10 +94,8 @@ export function planEdit(state: FileAnchorState, edit: AnchoredEdit): PlannedEdi
   }
 
   if (edit.type === "insert") {
-    const coord = parseAnchoredCoordinate(edit.anchor) ?? { anchor: edit.anchor };
-    const index = findAnchorIndex(state, coord.anchor);
-    if (index === -1)
-      throw new Error(`Could not find anchor ${edit.anchor}${ANCHOR_DELIMITER} in ${state.path}.`);
+    const index = findAnchorIndex(state, edit.anchor);
+    if (index === -1) throw new Error(`Could not find anchor ${edit.anchor} in ${state.path}.`);
     const start = edit.position === "before" ? index : index + 1;
     return {
       edit,
@@ -101,22 +105,12 @@ export function planEdit(state: FileAnchorState, edit: AnchoredEdit): PlannedEdi
     };
   }
 
-  const startCoord = parseAnchoredCoordinate(edit.startAnchor) ?? { anchor: edit.startAnchor };
-  const endCoord = parseAnchoredCoordinate(edit.endAnchor) ?? { anchor: edit.endAnchor };
-  const start = findAnchorIndex(state, startCoord.anchor);
-  const end = findAnchorIndex(state, endCoord.anchor);
+  const start = findAnchorIndex(state, edit.startAnchor);
+  const end = findAnchorIndex(state, edit.endAnchor);
   if (start === -1)
-    throw new Error(
-      `Could not find start anchor ${edit.startAnchor}${ANCHOR_DELIMITER} in ${state.path}.`,
-    );
-  if (end === -1)
-    throw new Error(
-      `Could not find end anchor ${edit.endAnchor}${ANCHOR_DELIMITER} in ${state.path}.`,
-    );
-  if (start > end)
-    throw new Error(
-      `Invalid delete range ${edit.startAnchor}${ANCHOR_DELIMITER}..${edit.endAnchor}${ANCHOR_DELIMITER}.`,
-    );
+    throw new Error(`Could not find start anchor ${edit.startAnchor} in ${state.path}.`);
+  if (end === -1) throw new Error(`Could not find end anchor ${edit.endAnchor} in ${state.path}.`);
+  if (start > end) throw new Error(`Invalid delete range ${edit.startAnchor}..${edit.endAnchor}.`);
   return { edit, start, end, replacementLines: [] };
 }
 

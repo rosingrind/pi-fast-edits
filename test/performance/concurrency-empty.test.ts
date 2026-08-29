@@ -130,13 +130,20 @@ describe("concurrency: empty-file and session-map stress scenarios", () => {
       const read = await tools
         .get("read_anchored_file")!
         .execute("0", { path: "single.txt" }, undefined, undefined, { cwd });
-      const anchor = (read.details.lines as Array<{ anchor: string }>)[0].anchor;
+      const anchor = (read.details.lines as Array<{ anchor: string; text: string }>)[0].anchor;
+      const lineText = (read.details.lines as Array<{ anchor: string; text: string }>)[0].text;
 
       const result = await tools
         .get("delete_anchor_range")!
         .execute(
           "1",
-          { path: "single.txt", startAnchor: anchor, endAnchor: anchor },
+          {
+            path: "single.txt",
+            startAnchor: anchor,
+            startAnchorLine: lineText,
+            endAnchor: anchor,
+            endAnchorLine: lineText,
+          },
           undefined,
           undefined,
           { cwd },
@@ -170,8 +177,10 @@ describe("concurrency: empty-file and session-map stress scenarios", () => {
           .execute("2", { path: "readonly-dir/b.txt" }, undefined, undefined, { cwd });
         const revA = rA.details.revision as string;
         const revB = rB.details.revision as string;
-        const lineA1 = (rA.details.lines as Array<{ anchor: string }>)[0].anchor;
-        const lineB1 = (rB.details.lines as Array<{ anchor: string }>)[0].anchor;
+        const lineA1 = (rA.details.lines as Array<{ anchor: string; text: string }>)[0].anchor;
+        const lineB1 = (rB.details.lines as Array<{ anchor: string; text: string }>)[0].anchor;
+        const lineA1Text = (rA.details.lines as Array<{ anchor: string; text: string }>)[0].text;
+        const lineB1Text = (rB.details.lines as Array<{ anchor: string; text: string }>)[0].text;
 
         await chmod(readonlyDir, 0o555);
         try {
@@ -185,7 +194,9 @@ describe("concurrency: empty-file and session-map stress scenarios", () => {
                     type: "replace" as const,
                     path: "a.txt",
                     startAnchor: lineA1,
+                    startAnchorLine: lineA1Text,
                     endAnchor: lineA1,
+                    endAnchorLine: lineA1Text,
                     replacement: "ALPHA\n",
                     expectedRevision: revA,
                   },
@@ -193,7 +204,9 @@ describe("concurrency: empty-file and session-map stress scenarios", () => {
                     type: "replace" as const,
                     path: "readonly-dir/b.txt",
                     startAnchor: lineB1,
+                    startAnchorLine: lineB1Text,
                     endAnchor: lineB1,
+                    endAnchorLine: lineB1Text,
                     replacement: "ONE\n",
                     expectedRevision: revB,
                   },
@@ -243,7 +256,10 @@ describe("concurrency: empty-file and session-map stress scenarios", () => {
       );
       const revisions = reads.map((r) => r.details.revision as string);
       const anchors = reads.map(
-        (r) => (r.details.lines as Array<{ anchor: string }>)[0].anchor as string,
+        (r) => (r.details.lines as Array<{ anchor: string; text: string }>)[0].anchor as string,
+      );
+      const anchorTexts = reads.map(
+        (r) => (r.details.lines as Array<{ anchor: string; text: string }>)[0].text as string,
       );
 
       // Fire 100 concurrent edits, each targeting a distinct file.
@@ -254,7 +270,9 @@ describe("concurrency: empty-file and session-map stress scenarios", () => {
             {
               path: f.rel,
               startAnchor: anchors[i],
+              startAnchorLine: anchorTexts[i],
               endAnchor: anchors[i],
+              endAnchorLine: anchorTexts[i],
               replacement: `EDITED_${i}\n`,
               expectedRevision: revisions[i],
             },

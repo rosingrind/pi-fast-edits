@@ -1,12 +1,9 @@
-import type { Static } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { PiFastEditsConfig, SessionState } from "../types.js";
 import { renderEditResult, runSingleEdit } from "./single-edit-runner.js";
 import { renderToolCall } from "./render.js";
 import type { PiContext } from "./shared.js";
-import { insertEditSchema } from "./schemas.js";
-
-type InsertParams = Static<typeof insertEditSchema>;
+import { insertEditSchema, type InsertEditParams } from "./schemas.js";
 
 export function registerInsertAtAnchor(
   pi: ExtensionAPI,
@@ -19,8 +16,8 @@ export function registerInsertAtAnchor(
     description: "Insert content before or after a word anchor.",
     promptSnippet: "Insert content before or after a word anchor",
     promptGuidelines: [
-      "Anchors may be passed as complete ANCHOR§current-line coordinates copied verbatim from read/grep output — content is verified before editing",
-      "Reference an anchor from a prior read_anchored_file result",
+      "Copy the anchor word verbatim from a prior read_anchored_file or grep_anchored_files result",
+      "Pass the exact current source line at the anchor as anchorLine, copied verbatim from read/grep output — the line content is verified before editing",
       "Position must be 'before' or 'after' the anchor line",
       "Pass the revision hash from read_anchored_file as expectedRevision",
       "Use raw text only in content — do NOT include the § anchor marker",
@@ -29,10 +26,10 @@ export function registerInsertAtAnchor(
     executionMode: "sequential",
     renderCall: renderToolCall("insert_at_anchor"),
     renderResult: renderEditResult,
-    parameters: insertEditSchema,
+    parameters: insertEditSchema(config.requireAnchorLines),
     async execute(
       _toolCallId: string,
-      params: InsertParams,
+      params: InsertEditParams,
       _signal: AbortSignal | undefined,
       _onUpdate: unknown,
       ctx: PiContext,
@@ -45,6 +42,7 @@ export function registerInsertAtAnchor(
           type: "insert",
           path: params.path,
           anchor: params.anchor,
+          anchorLine: params.anchorLine,
           position: params.position,
           content: params.content,
           expectedRevision: params.expectedRevision,

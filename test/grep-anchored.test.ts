@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import piFastEdits from "../src/index.js";
 import type { PiFastEditsConfig } from "../src/types.js";
 import { resolveRg } from "../src/fs/rg-resolver.js";
-import { anchorOf } from "./anchor-helpers.js";
+import { anchorOf, lineTextFrom } from "./anchor-helpers.js";
 
 type ToolDef = {
   name: string;
@@ -170,6 +170,7 @@ describe("grep_anchored_files", () => {
     const grepText = grep.content[0].text as string;
     const revision = /Revision: ([a-f0-9]+)/.exec(grepText)![1];
     const alphaAnchor = anchorOf(grepText, "export function alpha() {");
+    const alphaLine = lineTextFrom(grepText, "export function alpha() {");
 
     // The grep result's revision must satisfy the edit tool's revision guard.
     const edit = await tools.get("edit_anchored_range")!.execute(
@@ -177,7 +178,9 @@ describe("grep_anchored_files", () => {
       {
         path: "src/a.ts",
         startAnchor: alphaAnchor,
+        startAnchorLine: alphaLine,
         endAnchor: alphaAnchor,
+        endAnchorLine: alphaLine,
         replacement: "export function alpha2() {\n  return 2;\n}",
         expectedRevision: revision,
       },

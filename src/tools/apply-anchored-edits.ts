@@ -1,4 +1,3 @@
-import type { Static } from "typebox";
 import type { AgentToolResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { AnchoredEdit, PiFastEditsConfig, SessionState } from "../types.js";
 import { reconcileState } from "../anchor/reconcile.js";
@@ -27,9 +26,9 @@ import {
 } from "./render.js";
 import { Container, Spacer, Text, type Component } from "@earendil-works/pi-tui";
 import type { Theme } from "./theme.js";
-import { batchEditsSchema } from "./schemas.js";
+import { batchEditsSchema, type BatchEditsParams } from "./schemas.js";
 
-type BatchParams = Static<typeof batchEditsSchema>;
+type BatchParams = BatchEditsParams;
 
 export function registerApplyAnchoredEdits(
   pi: ExtensionAPI,
@@ -43,7 +42,8 @@ export function registerApplyAnchoredEdits(
       "Apply multiple anchored edits in a single batch, validating all anchors before writing and reconciling lazily with Myers diff.",
     promptSnippet: "Apply multiple anchored edits in a single batch operation",
     promptGuidelines: [
-      "Anchors may be passed as complete ANCHOR§current-line coordinates copied verbatim from read/grep output — content is verified before editing",
+      "Copy anchor words verbatim from a prior read_anchored_file or grep_anchored_files result",
+      "Pass the exact current source line at each anchor as startAnchorLine/endAnchorLine/anchorLine, copied verbatim from read/grep output — the line content is verified before editing",
       "Each edit references anchors from a prior read_anchored_file result",
       "Edits are validated for overlaps before any writes occur",
       "Pass revision hashes from read_anchored_file as expectedRevision per edit",
@@ -53,7 +53,7 @@ export function registerApplyAnchoredEdits(
     executionMode: "sequential",
     renderCall: renderToolCall("apply_anchored_edits"),
     renderResult: renderBatchResult,
-    parameters: batchEditsSchema,
+    parameters: batchEditsSchema(config.requireAnchorLines),
     async execute(
       _toolCallId: string,
       params: BatchParams,
@@ -111,7 +111,9 @@ export function registerApplyAnchoredEdits(
             edit.expectedRevision,
           );
         }
-        const plans = pathEdits.map((edit) => planEdit(loaded.state, edit));
+        const plans = pathEdits.map((edit) =>
+          planEdit(loaded.state, edit, config.requireAnchorLines),
+        );
         assertNoOverlaps(plans);
         const beforeLines = loaded.state.lines.map((line) => line.text);
         const beforeAnchors = loaded.state.lines.map((line) => line.anchor);
@@ -290,7 +292,7 @@ function _computePerEditChanges(
 
 export function renderBatchResult(
   result: ToolResult,
-  options: RenderOptions,
+  _options: RenderOptions,
   theme: Theme,
   context: RenderContext,
 ): Component {

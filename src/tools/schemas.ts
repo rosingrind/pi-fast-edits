@@ -1,76 +1,156 @@
 import { Type } from "typebox";
 
 /**
- * Shared edit-payload schemas. Each single-edit tool reuses the schema for its
- * edit kind (its kind is implicit), while the batch tool reuses the same
- * payloads wrapped with an explicit `type` discriminator.
+ * Shared edit-payload schemas, built per registration so strictness follows the
+ * live `requireAnchorLines` setting. Each single-edit tool reuses the schema
+ * for its edit kind (its kind is implicit), while the batch tool reuses the
+ * same payloads wrapped with an explicit `type` discriminator.
+ *
+ * Param types are hand-written (not `Static<typeof schema>`) because the
+ * `*Line` fields are conditionally optional — deriving them from the schema
+ * would require picking the schema variant.
  */
 
-export const replaceEditSchema = Type.Object({
-  path: Type.String({ description: "Path to the file to edit." }),
-  startAnchor: Type.String({
-    description:
-      "Start anchor of the range to replace. May be a full ANCHOR§current-line coordinate copied verbatim from read output.",
-  }),
-  endAnchor: Type.String({
-    description:
-      "End anchor of the range to replace. May be a full ANCHOR§current-line coordinate copied verbatim from read output.",
-  }),
-  replacement: Type.String({
-    description:
-      "New content to replace the anchor range. Use raw text only — do NOT include the § anchor marker.",
-  }),
-  includeStart: Type.Optional(Type.Boolean({ description: "Include the start anchor line." })),
-  includeEnd: Type.Optional(Type.Boolean({ description: "Include the end anchor line." })),
-  expectedRevision: Type.Optional(
-    Type.String({ description: "Revision hash from read_anchored_file to prevent stale edits." }),
-  ),
-});
+export type ReplaceEditParams = {
+  path: string;
+  startAnchor: string;
+  endAnchor: string;
+  replacement: string;
+  startAnchorLine?: string;
+  endAnchorLine?: string;
+  includeStart?: boolean;
+  includeEnd?: boolean;
+  expectedRevision?: string;
+};
 
-export const insertEditSchema = Type.Object({
-  path: Type.String({ description: "Path to the file to edit." }),
-  anchor: Type.String({
-    description:
-      "Anchor to insert before or after. May be a full ANCHOR§current-line coordinate copied verbatim from read output.",
-  }),
-  position: Type.Union([Type.Literal("before"), Type.Literal("after")], {
-    description: "Insert before or after the anchor.",
-  }),
-  content: Type.String({
-    description: "Content to insert. Use raw text only — do NOT include the § anchor marker.",
-  }),
-  expectedRevision: Type.Optional(
-    Type.String({ description: "Revision hash from read_anchored_file to prevent stale edits." }),
-  ),
-});
+export type InsertEditParams = {
+  path: string;
+  anchor: string;
+  position: "before" | "after";
+  content: string;
+  anchorLine?: string;
+  expectedRevision?: string;
+};
 
-export const deleteEditSchema = Type.Object({
-  path: Type.String({ description: "Path to the file to edit." }),
-  startAnchor: Type.String({
-    description:
-      "Start anchor of the range to delete. May be a full ANCHOR§current-line coordinate copied verbatim from read output.",
-  }),
-  endAnchor: Type.String({
-    description:
-      "End anchor of the range to delete. May be a full ANCHOR§current-line coordinate copied verbatim from read output.",
-  }),
-  expectedRevision: Type.Optional(
-    Type.String({ description: "Revision hash from read_anchored_file to prevent stale edits." }),
-  ),
-});
+export type DeleteEditParams = {
+  path: string;
+  startAnchor: string;
+  endAnchor: string;
+  startAnchorLine?: string;
+  endAnchorLine?: string;
+  expectedRevision?: string;
+};
 
-const taggedReplace = Type.Intersect([
-  Type.Object({ type: Type.Literal("replace") }),
-  replaceEditSchema,
-]);
-const taggedInsert = Type.Intersect([
-  Type.Object({ type: Type.Literal("insert") }),
-  insertEditSchema,
-]);
-const taggedDelete = Type.Intersect([
-  Type.Object({ type: Type.Literal("delete") }),
-  deleteEditSchema,
-]);
+export type BatchEditParams =
+  | ({ type: "replace" } & ReplaceEditParams)
+  | ({ type: "insert" } & InsertEditParams)
+  | ({ type: "delete" } & DeleteEditParams);
 
-export const editSchema = Type.Union([taggedReplace, taggedInsert, taggedDelete]);
-export const batchEditsSchema = Type.Object({ edits: Type.Array(editSchema) });
+export type BatchEditsParams = { edits: BatchEditParams[] };
+
+/** The anchor's `*Line` companion: required (strict) or optional (lenient). */
+function anchorLineSchema(requireAnchorLines: boolean, at: string) {
+  const description = requireAnchorLines
+    ? `The exact current source line at ${at}, copied verbatim from read_anchored_file or grep_anchored_files output. Verified before editing; mismatch rejects the edit.`
+    : `Optional. When provided, verified against the anchor's current line; mismatch rejects the edit.`;
+  return requireAnchorLines
+    ? Type.String({ description })
+    : Type.Optional(Type.String({ description }));
+}
+
+export function replaceEditSchema(requireAnchorLines: boolean) {
+  return Type.Object({
+    path: Type.String({ description: "Path to the file to edit." }),
+    startAnchor: Type.String({
+      description:
+        "Start anchor of the range to replace. Copy the anchor word verbatim from read_anchored_file or grep_anchored_files output.",
+    }),
+    endAnchor: Type.String({
+      description:
+        "End anchor of the range to replace. Copy the anchor word verbatim from read_anchored_file or grep_anchored_files output.",
+    }),
+    startAnchorLine: anchorLineSchema(requireAnchorLines, "startAnchor"),
+    endAnchorLine: anchorLineSchema(requireAnchorLines, "endAnchor"),
+    replacement: Type.String({
+      description:
+        "New content to replace the anchor range. Use raw text only — do NOT include the § anchor marker.",
+    }),
+    includeStart: Type.Optional(Type.Boolean({ description: "Include the start anchor line." })),
+    includeEnd: Type.Optional(Type.Boolean({ description: "Include the end anchor line." })),
+    expectedRevision: Type.Optional(
+      Type.String({ description: "Revision hash from read_anchored_file to prevent stale edits." }),
+    ),
+  });
+}
+
+export function insertEditSchema(requireAnchorLines: boolean) {
+  return Type.Object({
+    path: Type.String({ description: "Path to the file to edit." }),
+    anchor: Type.String({
+      description:
+        "Anchor to insert before or after. Copy the anchor word verbatim from read_anchored_file or grep_anchored_files output.",
+    }),
+    anchorLine: anchorLineSchema(requireAnchorLines, "anchor"),
+    position: Type.Union([Type.Literal("before"), Type.Literal("after")], {
+      description: "Insert before or after the anchor.",
+    }),
+    content: Type.String({
+      description: "Content to insert. Use raw text only — do NOT include the § anchor marker.",
+    }),
+    expectedRevision: Type.Optional(
+      Type.String({ description: "Revision hash from read_anchored_file to prevent stale edits." }),
+    ),
+  });
+}
+
+export function deleteEditSchema(requireAnchorLines: boolean) {
+  return Type.Object({
+    path: Type.String({ description: "Path to the file to edit." }),
+    startAnchor: Type.String({
+      description:
+        "Start anchor of the range to delete. Copy the anchor word verbatim from read_anchored_file or grep_anchored_files output.",
+    }),
+    endAnchor: Type.String({
+      description:
+        "End anchor of the range to delete. Copy the anchor word verbatim from read_anchored_file or grep_anchored_files output.",
+    }),
+    startAnchorLine: anchorLineSchema(requireAnchorLines, "startAnchor"),
+    endAnchorLine: anchorLineSchema(requireAnchorLines, "endAnchor"),
+    expectedRevision: Type.Optional(
+      Type.String({ description: "Revision hash from read_anchored_file to prevent stale edits." }),
+    ),
+  });
+}
+
+function taggedReplace(requireAnchorLines: boolean) {
+  return Type.Intersect([
+    Type.Object({ type: Type.Literal("replace") }),
+    replaceEditSchema(requireAnchorLines),
+  ]);
+}
+
+function taggedInsert(requireAnchorLines: boolean) {
+  return Type.Intersect([
+    Type.Object({ type: Type.Literal("insert") }),
+    insertEditSchema(requireAnchorLines),
+  ]);
+}
+
+function taggedDelete(requireAnchorLines: boolean) {
+  return Type.Intersect([
+    Type.Object({ type: Type.Literal("delete") }),
+    deleteEditSchema(requireAnchorLines),
+  ]);
+}
+
+export function editSchema(requireAnchorLines: boolean) {
+  return Type.Union([
+    taggedReplace(requireAnchorLines),
+    taggedInsert(requireAnchorLines),
+    taggedDelete(requireAnchorLines),
+  ]);
+}
+
+export function batchEditsSchema(requireAnchorLines: boolean) {
+  return Type.Object({ edits: Type.Array(editSchema(requireAnchorLines)) });
+}

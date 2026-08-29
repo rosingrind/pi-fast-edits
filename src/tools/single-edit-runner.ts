@@ -32,7 +32,7 @@ export async function runSingleEdit(
   const loaded = await loadStateForPath(session, cwd, edit.path);
   assertExpectedRevision(loaded.relativePath, loaded.state.revisionHash, edit.expectedRevision);
   const beforeAnchors = loaded.state.lines.map((line) => line.anchor);
-  const plan = planEdit(loaded.state, edit);
+  const plan = planEdit(loaded.state, edit, config.requireAnchorLines);
   const beforeLines = loaded.state.lines.map((line) => line.text);
   const afterLines = applyPlansToLines(beforeLines, [plan]);
   // Myers runs once here and is shared by both the preview diff and the

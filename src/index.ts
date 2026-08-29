@@ -32,12 +32,20 @@ export default async function piFastEdits(
 
   registerReadAnchoredFile(pi, session, config);
   registerGrepAnchoredFiles(pi, session, config);
-  registerEditAnchoredRange(pi, session, config);
-  registerInsertAtAnchor(pi, session, config);
-  registerDeleteAnchorRange(pi, session, config);
-  registerPreviewAnchoredEdit(pi, session, config);
-  registerApplyAnchoredEdits(pi, session, config);
-  registerCommands(pi, session, config);
+
+  // The five anchored edit tools re-register whenever the config changes, so
+  // their schemas (strict vs. lenient `*Line` args) follow the live
+  // `requireAnchorLines` setting. pi.replace semantics: registering the same
+  // tool name refreshes it in-session.
+  const registerAnchoredEditTools = () => {
+    registerEditAnchoredRange(pi, session, config);
+    registerInsertAtAnchor(pi, session, config);
+    registerDeleteAnchorRange(pi, session, config);
+    registerPreviewAnchoredEdit(pi, session, config);
+    registerApplyAnchoredEdits(pi, session, config);
+  };
+  registerAnchoredEditTools();
+  registerCommands(pi, session, config, registerAnchoredEditTools);
 
   pi.on("session_start", async () => {
     try {

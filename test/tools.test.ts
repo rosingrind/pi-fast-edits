@@ -64,7 +64,9 @@ describe("anchored tools", () => {
       {
         path: "sample.ts",
         startAnchor: read.details.lines[0].anchor,
+        startAnchorLine: read.details.lines[0].text,
         endAnchor: read.details.lines[2].anchor,
+        endAnchorLine: read.details.lines[2].text,
         replacement: "export function run() {\n  return 2;\n}",
         expectedRevision: read.details.revision,
       },
@@ -116,14 +118,18 @@ describe("anchored tools", () => {
             type: "replace",
             path: "sample.txt",
             startAnchor: lines[0].anchor,
+            startAnchorLine: lines[0].text,
             endAnchor: lines[0].anchor,
+            endAnchorLine: lines[0].text,
             replacement: "ALPHA",
           },
           {
             type: "replace",
             path: "./sample.txt",
             startAnchor: lines[2].anchor,
+            startAnchorLine: lines[2].text,
             endAnchor: lines[2].anchor,
+            endAnchorLine: lines[2].text,
             replacement: "GAMMA",
           },
         ],
@@ -149,7 +155,9 @@ describe("anchored tools", () => {
       {
         path: "sample.txt",
         startAnchor: lines[1].anchor,
+        startAnchorLine: lines[1].text,
         endAnchor: lines[1].anchor,
+        endAnchorLine: lines[1].text,
         replacement: "TWO",
       },
       undefined,
@@ -173,7 +181,9 @@ describe("anchored tools", () => {
       {
         path: "package-lock.json",
         startAnchor: lines[1].anchor,
+        startAnchorLine: lines[1].text,
         endAnchor: lines[1].anchor,
+        endAnchorLine: lines[1].text,
         replacement: '  "lockfileVersion": 4',
       },
       undefined,
@@ -224,6 +234,7 @@ describe("anchored tools", () => {
       {
         path: "sample.txt",
         anchor: lines[0].anchor,
+        anchorLine: lines[0].text,
         position: "after",
         content: "ALPHA_INSERTED",
       },
@@ -243,15 +254,19 @@ describe("anchored tools", () => {
 
     const { lines } = await readAnchored(tools, cwd, "sample.txt");
 
-    await tools
-      .get("delete_anchor_range")!
-      .execute(
-        "1",
-        { path: "sample.txt", startAnchor: lines[0].anchor, endAnchor: lines[2].anchor },
-        undefined,
-        undefined,
-        { cwd },
-      );
+    await tools.get("delete_anchor_range")!.execute(
+      "1",
+      {
+        path: "sample.txt",
+        startAnchor: lines[0].anchor,
+        startAnchorLine: lines[0].text,
+        endAnchor: lines[2].anchor,
+        endAnchorLine: lines[2].text,
+      },
+      undefined,
+      undefined,
+      { cwd },
+    );
 
     await expect(readFile(file, "utf8")).resolves.toBe("delta\n");
   });
@@ -269,7 +284,9 @@ describe("anchored tools", () => {
       {
         path: "sample.txt",
         startAnchor: lines[0].anchor,
+        startAnchorLine: lines[0].text,
         endAnchor: lines[1].anchor,
+        endAnchorLine: lines[1].text,
         replacement: "ALPHA_NEW",
       },
       undefined,
@@ -347,13 +364,16 @@ describe("anchored tools", () => {
             type: "replace",
             path: "sample.txt",
             startAnchor: lines[0].anchor,
+            startAnchorLine: lines[0].text,
             endAnchor: lines[0].anchor,
+            endAnchorLine: lines[0].text,
             replacement: "ALPHA",
           },
           {
             type: "insert",
             path: "sample.txt",
             anchor: lines[3].anchor,
+            anchorLine: lines[3].text,
             position: "before",
             content: "NEW_LINE",
           },
@@ -361,7 +381,9 @@ describe("anchored tools", () => {
             type: "delete",
             path: "sample.txt",
             startAnchor: lines[1].anchor,
+            startAnchorLine: lines[1].text,
             endAnchor: lines[2].anchor,
+            endAnchorLine: lines[2].text,
           },
         ],
       },
@@ -402,6 +424,7 @@ describe("anchored tools", () => {
       {
         path: "sample.txt",
         anchor: lines[0].anchor,
+        anchorLine: lines[0].text,
         position: "after",
         content: "INSERTED",
       },
@@ -432,14 +455,18 @@ describe("anchored tools", () => {
               type: "replace",
               path: "sample.txt",
               startAnchor: lines[0].anchor,
+              startAnchorLine: lines[0].text,
               endAnchor: lines[2].anchor,
+              endAnchorLine: lines[2].text,
               replacement: "X",
             },
             {
               type: "replace",
               path: "sample.txt",
               startAnchor: lines[1].anchor,
+              startAnchorLine: lines[1].text,
               endAnchor: lines[3].anchor,
+              endAnchorLine: lines[3].text,
               replacement: "Y",
             },
           ],
@@ -478,6 +505,7 @@ describe("anchored tools", () => {
               type: "insert" as const,
               path: "overlap.txt",
               anchor: lines[0].anchor,
+              anchorLine: lines[0].text,
               position: "before",
               content: "NEW\n",
               expectedRevision: revision,
@@ -486,7 +514,9 @@ describe("anchored tools", () => {
               type: "replace" as const,
               path: "overlap.txt",
               startAnchor: lines[0].anchor,
+              startAnchorLine: lines[0].text,
               endAnchor: lines[1].anchor,
+              endAnchorLine: lines[1].text,
               replacement: "REPLACED\n",
               expectedRevision: revision,
             },
@@ -508,7 +538,9 @@ describe("anchored tools", () => {
               type: "replace" as const,
               path: "overlap.txt",
               startAnchor: lines[0].anchor,
+              startAnchorLine: lines[0].text,
               endAnchor: lines[1].anchor,
+              endAnchorLine: lines[1].text,
               replacement: "REPLACED\n",
               expectedRevision: revision,
             },
@@ -516,6 +548,7 @@ describe("anchored tools", () => {
               type: "insert" as const,
               path: "overlap.txt",
               anchor: lines[0].anchor,
+              anchorLine: lines[0].text,
               position: "before",
               content: "NEW\n",
               expectedRevision: revision,
@@ -548,14 +581,18 @@ describe("anchored tools", () => {
             type: "replace",
             path: "a.txt",
             startAnchor: linesA[0].anchor,
+            startAnchorLine: linesA[0].text,
             endAnchor: linesA[0].anchor,
+            endAnchorLine: linesA[0].text,
             replacement: "ALPHA",
           },
           {
             type: "replace",
             path: "b.txt",
             startAnchor: linesB[0].anchor,
+            startAnchorLine: linesB[0].text,
             endAnchor: linesB[0].anchor,
+            endAnchorLine: linesB[0].text,
             replacement: "GAMMA_NEW",
           },
         ],
@@ -569,7 +606,7 @@ describe("anchored tools", () => {
     await expect(readFile(file2, "utf8")).resolves.toBe("GAMMA_NEW\ndelta\n");
   });
 
-  it("verifies echoed content on a full coordinate and rejects mismatches", async () => {
+  it("verifies anchor line content via startAnchorLine and rejects mismatches", async () => {
     const cwd = await workspace();
     const file = join(cwd, "sample.ts");
     const source = "export function run() {\n  return 1;\n}\n";
@@ -579,14 +616,16 @@ describe("anchored tools", () => {
       .get("read_anchored_file")!
       .execute("1", { path: "sample.ts" }, undefined, undefined, { cwd });
     const line1 = (read.details.lines as Array<{ anchor: string; text: string }>)[0];
-    // Full coordinate with correct content succeeds:
+    // Correct line content succeeds:
     await expect(
       tools.get("edit_anchored_range")!.execute(
         "2",
         {
           path: "sample.ts",
-          startAnchor: `${line1.anchor}§${line1.text}`,
-          endAnchor: `${line1.anchor}§${line1.text}`,
+          startAnchor: line1.anchor,
+          startAnchorLine: line1.text,
+          endAnchor: line1.anchor,
+          endAnchorLine: line1.text,
           replacement: "export function run() {\n  return 2;\n}",
         },
         undefined,
@@ -594,24 +633,26 @@ describe("anchored tools", () => {
         { cwd },
       ),
     ).resolves.toBeTruthy();
-    // Full coordinate with WRONG content is rejected with a corrective message:
+    // Full coordinate with WRONG line content is rejected with a corrective message:
     await expect(
       tools.get("edit_anchored_range")!.execute(
         "3",
         {
           path: "sample.ts",
-          startAnchor: `${line1.anchor}§totally different`,
-          endAnchor: `${line1.anchor}§totally different`,
+          startAnchor: line1.anchor,
+          startAnchorLine: "totally different",
+          endAnchor: line1.anchor,
+          endAnchorLine: "totally different",
           replacement: "x",
         },
         undefined,
         undefined,
         { cwd },
       ),
-    ).rejects.toThrow(/Anchor content mismatch/);
+    ).rejects.toThrow(/startAnchorLine mismatch/);
   });
 
-  it("applies batch edits using full anchor coordinates", async () => {
+  it("applies batch edits using anchor line args", async () => {
     const cwd = await workspace();
     const file = join(cwd, "sample.txt");
     await writeFile(file, "alpha\nbeta\ngamma\n", "utf8");
@@ -626,22 +667,27 @@ describe("anchored tools", () => {
           {
             type: "replace",
             path: "sample.txt",
-            startAnchor: `${lines[0].anchor}§${lines[0].text}`,
-            endAnchor: `${lines[0].anchor}§${lines[0].text}`,
+            startAnchor: lines[0].anchor,
+            startAnchorLine: lines[0].text,
+            endAnchor: lines[0].anchor,
+            endAnchorLine: lines[0].text,
             replacement: "ALPHA",
           },
           {
             type: "insert",
             path: "sample.txt",
-            anchor: `${lines[1].anchor}§${lines[1].text}`,
+            anchor: lines[1].anchor,
+            anchorLine: lines[1].text,
             position: "before",
             content: "INSERTED",
           },
           {
             type: "delete",
             path: "sample.txt",
-            startAnchor: `${lines[2].anchor}§${lines[2].text}`,
-            endAnchor: `${lines[2].anchor}§${lines[2].text}`,
+            startAnchor: lines[2].anchor,
+            startAnchorLine: lines[2].text,
+            endAnchor: lines[2].anchor,
+            endAnchorLine: lines[2].text,
           },
         ],
       },
@@ -932,7 +978,9 @@ describe("error paths", () => {
             type: "replace" as const,
             path: ".env",
             startAnchor: (readResult.details as any)?.lines[0].anchor,
+            startAnchorLine: (readResult.details as any)?.lines[0].text,
             endAnchor: (readResult.details as any)?.lines[0].anchor,
+            endAnchorLine: (readResult.details as any)?.lines[0].text,
             replacement: "SECRET=2\n",
             expectedRevision: revision,
           },
@@ -965,7 +1013,9 @@ describe("error paths", () => {
       {
         path: "asymmetric.txt",
         startAnchor: lines[0].anchor, // Apple
+        startAnchorLine: lines[0].text,
         endAnchor: lines[2].anchor, // Cider
+        endAnchorLine: lines[2].text,
         includeStart: false,
         includeEnd: true,
         replacement: "NEW\n",
@@ -997,7 +1047,9 @@ describe("error paths", () => {
       {
         path: "asymmetric2.txt",
         startAnchor: lines[0].anchor, // Apple
+        startAnchorLine: lines[0].text,
         endAnchor: lines[2].anchor, // Cider
+        endAnchorLine: lines[2].text,
         includeStart: true,
         includeEnd: false,
         replacement: "NEW\n",
@@ -1041,7 +1093,7 @@ describe("error paths", () => {
     expect(content).toBe("hello\n");
   });
 
-  it("insert_at_anchor rejects a mismatched full coordinate", async () => {
+  it("insert_at_anchor rejects a mismatched anchorLine", async () => {
     const cwd = await workspace();
     const file = join(cwd, "insert-coord.txt");
     await writeFile(file, "alpha\nbeta\n", "utf8");
@@ -1054,7 +1106,8 @@ describe("error paths", () => {
         "1",
         {
           path: "insert-coord.txt",
-          anchor: `${lines[0].anchor}§wrong text`,
+          anchor: lines[0].anchor,
+          anchorLine: "wrong text",
           content: "X\n",
           position: "before",
         },
@@ -1062,12 +1115,12 @@ describe("error paths", () => {
         undefined,
         { cwd },
       ),
-    ).rejects.toThrow(/Anchor content mismatch/);
+    ).rejects.toThrow(/anchorLine mismatch/);
 
     await expect(readFile(file, "utf8")).resolves.toBe("alpha\nbeta\n");
   });
 
-  it("delete_anchor_range rejects a mismatched full coordinate", async () => {
+  it("delete_anchor_range rejects a mismatched anchorLine", async () => {
     const cwd = await workspace();
     const file = join(cwd, "delete-coord.txt");
     await writeFile(file, "alpha\nbeta\n", "utf8");
@@ -1080,19 +1133,21 @@ describe("error paths", () => {
         "1",
         {
           path: "delete-coord.txt",
-          startAnchor: `${lines[0].anchor}§wrong text`,
-          endAnchor: `${lines[1].anchor}§${lines[1].text}`,
+          startAnchor: lines[0].anchor,
+          startAnchorLine: "wrong text",
+          endAnchor: lines[1].anchor,
+          endAnchorLine: lines[1].text,
         },
         undefined,
         undefined,
         { cwd },
       ),
-    ).rejects.toThrow(/Anchor content mismatch/);
+    ).rejects.toThrow(/startAnchorLine mismatch/);
 
     await expect(readFile(file, "utf8")).resolves.toBe("alpha\nbeta\n");
   });
 
-  it("preview_anchored_edit rejects a mismatched full coordinate", async () => {
+  it("preview_anchored_edit rejects a mismatched anchorLine", async () => {
     const cwd = await workspace();
     const file = join(cwd, "preview-coord.txt");
     await writeFile(file, "alpha\nbeta\n", "utf8");
@@ -1105,20 +1160,22 @@ describe("error paths", () => {
         "1",
         {
           path: "preview-coord.txt",
-          startAnchor: `${lines[0].anchor}§wrong text`,
-          endAnchor: `${lines[1].anchor}§${lines[1].text}`,
+          startAnchor: lines[0].anchor,
+          startAnchorLine: "wrong text",
+          endAnchor: lines[1].anchor,
+          endAnchorLine: lines[1].text,
           replacement: "X",
         },
         undefined,
         undefined,
         { cwd },
       ),
-    ).rejects.toThrow(/Anchor content mismatch/);
+    ).rejects.toThrow(/startAnchorLine mismatch/);
 
     await expect(readFile(file, "utf8")).resolves.toBe("alpha\nbeta\n");
   });
 
-  it("apply_anchored_edits rejects a mismatched full coordinate before writing", async () => {
+  it("apply_anchored_edits rejects a mismatched anchorLine before writing", async () => {
     const cwd = await workspace();
     const file = join(cwd, "batch-coord.txt");
     await writeFile(file, "alpha\nbeta\n", "utf8");
@@ -1134,15 +1191,19 @@ describe("error paths", () => {
             {
               type: "replace" as const,
               path: "batch-coord.txt",
-              startAnchor: `${lines[0].anchor}§${lines[0].text}`,
-              endAnchor: `${lines[0].anchor}§${lines[0].text}`,
+              startAnchor: lines[0].anchor,
+              startAnchorLine: lines[0].text,
+              endAnchor: lines[0].anchor,
+              endAnchorLine: lines[0].text,
               replacement: "ALPHA",
             },
             {
               type: "replace" as const,
               path: "batch-coord.txt",
-              startAnchor: `${lines[1].anchor}§wrong text`,
-              endAnchor: `${lines[1].anchor}§wrong text`,
+              startAnchor: lines[1].anchor,
+              startAnchorLine: "wrong text",
+              endAnchor: lines[1].anchor,
+              endAnchorLine: "wrong text",
               replacement: "BETA",
             },
           ],
@@ -1151,9 +1212,9 @@ describe("error paths", () => {
         undefined,
         { cwd },
       ),
-    ).rejects.toThrow(/Anchor content mismatch/);
+    ).rejects.toThrow(/startAnchorLine mismatch/);
 
-    // The batch must not write anything when a coordinate mismatches.
+    // The batch must not write anything when an anchor line mismatches.
     await expect(readFile(file, "utf8")).resolves.toBe("alpha\nbeta\n");
   });
 });
@@ -1174,7 +1235,9 @@ describe("edge cases", () => {
       {
         path: "preview-asym.txt",
         startAnchor: lines[0].anchor,
+        startAnchorLine: lines[0].text,
         endAnchor: lines[1].anchor,
+        endAnchorLine: lines[1].text,
         includeStart: false,
         includeEnd: true,
         replacement: "NEW\n",
@@ -1205,6 +1268,7 @@ describe("edge cases", () => {
       {
         path: "append.txt",
         anchor: lines[1].anchor,
+        anchorLine: lines[1].text,
         position: "after",
         content: "gamma\n",
         expectedRevision: revision,
@@ -1228,6 +1292,7 @@ describe("edge cases", () => {
       .execute("1", { path: "pipe-del.txt" }, undefined, undefined, { cwd });
     const revision = (readResult.details as any)?.revision;
     const line1Anchor = (readResult.details as any)?.lines[0].anchor as string;
+    const line1Text = (readResult.details as any)?.lines[0].text as string;
 
     // Use anchor with trailing | — should work (normalizeAnchor strips it).
     const result = await tools.get("edit_anchored_range")!.execute(
@@ -1235,7 +1300,9 @@ describe("edge cases", () => {
       {
         path: "pipe-del.txt",
         startAnchor: `${line1Anchor}|`,
+        startAnchorLine: line1Text,
         endAnchor: `${line1Anchor}|`,
+        endAnchorLine: line1Text,
         replacement: "ALPHA\n",
         expectedRevision: revision,
       },
@@ -1281,7 +1348,9 @@ describe("edge cases", () => {
       {
         path: "sample.txt",
         startAnchor: lines[0].anchor,
+        startAnchorLine: lines[0].text,
         endAnchor: lines[2].anchor,
+        endAnchorLine: lines[2].text,
         expectedRevision: revision,
       },
       undefined,
@@ -1308,7 +1377,9 @@ describe("edge cases", () => {
       {
         path: "sample.txt",
         startAnchor: lines[0].anchor,
+        startAnchorLine: lines[0].text,
         endAnchor: lines[1].anchor,
+        endAnchorLine: lines[1].text,
         includeStart: false,
         includeEnd: false,
         replacement: "X",
@@ -1341,7 +1412,9 @@ describe("edge cases", () => {
       {
         path: "single-asym.txt",
         startAnchor: lines[0].anchor,
+        startAnchorLine: lines[0].text,
         endAnchor: lines[0].anchor,
+        endAnchorLine: lines[0].text,
         includeStart: true,
         includeEnd: false,
         replacement: "X",
@@ -1371,7 +1444,9 @@ describe("edge cases", () => {
       {
         path: "single.txt",
         startAnchor: lines[0].anchor,
+        startAnchorLine: lines[0].text,
         endAnchor: lines[0].anchor,
+        endAnchorLine: lines[0].text,
         replacement: "changed",
         expectedRevision: revision,
       },
@@ -1414,7 +1489,9 @@ describe("edge cases", () => {
       {
         path: "unicode.txt",
         startAnchor: lines[0].anchor,
+        startAnchorLine: lines[0].text,
         endAnchor: lines[0].anchor,
+        endAnchorLine: lines[0].text,
         replacement: "café",
         expectedRevision: revision,
       },
@@ -1510,7 +1587,9 @@ describe("edge cases", () => {
       {
         path: "mixed-eol.txt",
         startAnchor: lines[0].anchor,
+        startAnchorLine: lines[0].text,
         endAnchor: lines[0].anchor,
+        endAnchorLine: lines[0].text,
         replacement: "ALPHA\r\n",
         expectedRevision: revision,
       },
@@ -1542,7 +1621,9 @@ describe("edge cases", () => {
       {
         path: "bom.txt",
         startAnchor: lines[0].anchor,
+        startAnchorLine: lines[0].text,
         endAnchor: lines[0].anchor,
+        endAnchorLine: lines[0].text,
         replacement: "ALPHA\n",
         expectedRevision: revision,
       },
@@ -1620,7 +1701,9 @@ describe("integration chains", () => {
       {
         path: "chain.txt",
         startAnchor: lines[1].anchor,
+        startAnchorLine: lines[1].text,
         endAnchor: lines[1].anchor,
+        endAnchorLine: lines[1].text,
         replacement: "",
         expectedRevision: revision,
       },
@@ -1655,7 +1738,9 @@ describe("integration chains", () => {
       {
         path: "chain2.txt",
         startAnchor: lines[0].anchor,
+        startAnchorLine: lines[0].text,
         endAnchor: lines[0].anchor,
+        endAnchorLine: lines[0].text,
         replacement: "X",
         expectedRevision: revision,
       },
@@ -1671,7 +1756,9 @@ describe("integration chains", () => {
         {
           path: "chain2.txt",
           startAnchor: lines[2].anchor,
+          startAnchorLine: lines[2].text,
           endAnchor: lines[2].anchor,
+          endAnchorLine: lines[2].text,
           replacement: "Y",
           expectedRevision: revision,
         },
@@ -1697,7 +1784,9 @@ describe("integration chains", () => {
       {
         path: "seq.txt",
         startAnchor: lines0[0].anchor,
+        startAnchorLine: lines0[0].text,
         endAnchor: lines0[0].anchor,
+        endAnchorLine: lines0[0].text,
         replacement: "A",
         expectedRevision: (r as any).details.revision,
       },
@@ -1716,7 +1805,9 @@ describe("integration chains", () => {
       {
         path: "seq.txt",
         startAnchor: lines1[2].anchor,
+        startAnchorLine: lines1[2].text,
         endAnchor: lines1[2].anchor,
+        endAnchorLine: lines1[2].text,
         replacement: "C",
         expectedRevision: (r as any).details.revision,
       },
@@ -1751,6 +1842,7 @@ describe("integration chains", () => {
               type: "insert" as const,
               path: "adjacent.txt",
               anchor: lines[0].anchor, // Apple (line 1, "a")
+              anchorLine: lines[0].text,
               position: "after",
               content: "B\n",
               expectedRevision: revision,
@@ -1759,7 +1851,9 @@ describe("integration chains", () => {
               type: "delete" as const,
               path: "adjacent.txt",
               startAnchor: lines[1].anchor, // Brave (line 2, "b")
+              startAnchorLine: lines[1].text,
               endAnchor: lines[1].anchor,
+              endAnchorLine: lines[1].text,
               expectedRevision: revision,
             },
           ],
@@ -1806,7 +1900,9 @@ describe("batch integrity", () => {
               type: "replace" as const,
               path: "batch-a.txt",
               startAnchor: linesA[0].anchor,
+              startAnchorLine: linesA[0].text,
               endAnchor: linesA[0].anchor,
+              endAnchorLine: linesA[0].text,
               replacement: "ALPHA\n",
               expectedRevision: revA,
             },
@@ -1814,7 +1910,9 @@ describe("batch integrity", () => {
               type: "replace" as const,
               path: "batch-b.txt",
               startAnchor: linesB[0].anchor,
+              startAnchorLine: linesB[0].text,
               endAnchor: linesB[0].anchor,
+              endAnchorLine: linesB[0].text,
               replacement: "BETA\n",
               expectedRevision: revB, // stale
             },
@@ -1847,7 +1945,9 @@ describe("confirmation flow", () => {
       {
         path: "confirm-true.txt",
         startAnchor: (readResult as any).details.lines[0].anchor,
+        startAnchorLine: (readResult as any).details.lines[0].text,
         endAnchor: (readResult as any).details.lines[0].anchor,
+        endAnchorLine: (readResult as any).details.lines[0].text,
         replacement: "ALPHA\n",
         expectedRevision: revision,
       },
@@ -1875,7 +1975,9 @@ describe("confirmation flow", () => {
       {
         path: "confirm-false.txt",
         startAnchor: (readResult as any).details.lines[0].anchor,
+        startAnchorLine: (readResult as any).details.lines[0].text,
         endAnchor: (readResult as any).details.lines[0].anchor,
+        endAnchorLine: (readResult as any).details.lines[0].text,
         replacement: "ALPHA\n",
         expectedRevision: revision,
       },
@@ -1903,7 +2005,9 @@ describe("confirmation flow", () => {
       {
         path: ".env",
         startAnchor: (readResult as any).details.lines[0].anchor,
+        startAnchorLine: (readResult as any).details.lines[0].text,
         endAnchor: (readResult as any).details.lines[0].anchor,
+        endAnchorLine: (readResult as any).details.lines[0].text,
         replacement: "SECRET=2\n",
         expectedRevision: revision,
       },
@@ -2046,7 +2150,9 @@ describe("anchor range validation", () => {
         {
           path: "reversed.txt",
           startAnchor: lines[2].anchor,
+          startAnchorLine: lines[2].text,
           endAnchor: lines[0].anchor,
+          endAnchorLine: lines[0].text,
           replacement: "X",
         },
         undefined,
@@ -2062,15 +2168,19 @@ describe("anchor range validation", () => {
     const tools = await loadTools();
     const { lines } = await readAnchored(tools, cwd, "reversed-del.txt");
     await expect(
-      tools
-        .get("delete_anchor_range")!
-        .execute(
-          "1",
-          { path: "reversed-del.txt", startAnchor: lines[2].anchor, endAnchor: lines[0].anchor },
-          undefined,
-          undefined,
-          { cwd },
-        ),
+      tools.get("delete_anchor_range")!.execute(
+        "1",
+        {
+          path: "reversed-del.txt",
+          startAnchor: lines[2].anchor,
+          startAnchorLine: lines[2].text,
+          endAnchor: lines[0].anchor,
+          endAnchorLine: lines[0].text,
+        },
+        undefined,
+        undefined,
+        { cwd },
+      ),
     ).rejects.toThrow("Invalid delete range");
   });
 
@@ -2085,7 +2195,9 @@ describe("anchor range validation", () => {
         {
           path: "single-exclude.txt",
           startAnchor: lines[0].anchor,
+          startAnchorLine: lines[0].text,
           endAnchor: lines[0].anchor,
+          endAnchorLine: lines[0].text,
           includeStart: false,
           includeEnd: false,
           replacement: "X",
@@ -2112,13 +2224,16 @@ describe("additional edge cases", () => {
       .execute("1", { path: "link.txt" }, undefined, undefined, { cwd });
     const revision = (readResult as any).details.revision;
     const line1Anchor = (readResult as any).details.lines[0].anchor as string;
+    const line1Text = (readResult as any).details.lines[0].text as string;
 
     await tools.get("edit_anchored_range")!.execute(
       "2",
       {
         path: "link.txt",
         startAnchor: line1Anchor,
+        startAnchorLine: line1Text,
         endAnchor: line1Anchor,
+        endAnchorLine: line1Text,
         replacement: "modified\n",
         expectedRevision: revision,
       },
@@ -2142,13 +2257,16 @@ describe("additional edge cases", () => {
       .execute("1", { path: "no-eol.txt" }, undefined, undefined, { cwd });
     const revision = (readResult as any).details.revision;
     const line1Anchor = (readResult as any).details.lines[0].anchor as string;
+    const line1Text = (readResult as any).details.lines[0].text as string;
 
     await tools.get("edit_anchored_range")!.execute(
       "2",
       {
         path: "no-eol.txt",
         startAnchor: line1Anchor,
+        startAnchorLine: line1Text,
         endAnchor: line1Anchor,
+        endAnchorLine: line1Text,
         replacement: "ALPHA\n",
         expectedRevision: revision,
       },
@@ -2170,13 +2288,16 @@ describe("additional edge cases", () => {
       .execute("1", { path: "normalize.txt" }, undefined, undefined, { cwd });
     const revision = (readResult as any).details.revision;
     const line1Anchor = (readResult as any).details.lines[0].anchor as string;
+    const line1Text = (readResult as any).details.lines[0].text as string;
 
     const result = await tools.get("edit_anchored_range")!.execute(
       "2",
       {
         path: "normalize.txt",
         startAnchor: `${line1Anchor}§`,
+        startAnchorLine: line1Text,
         endAnchor: `${line1Anchor}§`,
+        endAnchorLine: line1Text,
         replacement: "ALPHA\n",
         expectedRevision: revision,
       },
@@ -2211,7 +2332,9 @@ describe("protected-path safety", () => {
       {
         path: ".env-alias",
         startAnchor: (readResult.details as any)?.lines[0].anchor,
+        startAnchorLine: (readResult.details as any)?.lines[0].text,
         endAnchor: (readResult.details as any)?.lines[0].anchor,
+        endAnchorLine: (readResult.details as any)?.lines[0].text,
         replacement: "SECRET=2\n",
         expectedRevision: revision,
       },
@@ -2257,7 +2380,9 @@ describe("line-ending and BOM preservation", () => {
       {
         path: "cr-only.txt",
         startAnchor: lines[0].anchor,
+        startAnchorLine: lines[0].text,
         endAnchor: lines[0].anchor,
+        endAnchorLine: lines[0].text,
         replacement: "A\r\n",
         expectedRevision: revision,
       },
@@ -2294,7 +2419,9 @@ describe("line-ending and BOM preservation", () => {
       {
         path: "bom-remove.txt",
         startAnchor: (readResult.details as any)?.lines[0].anchor,
+        startAnchorLine: (readResult.details as any)?.lines[0].text,
         endAnchor: (readResult.details as any)?.lines[0].anchor,
+        endAnchorLine: (readResult.details as any)?.lines[0].text,
         replacement: "ALPHA\n",
         expectedRevision: revision,
       },

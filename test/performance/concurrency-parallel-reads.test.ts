@@ -44,6 +44,7 @@ describe("concurrency: parallel read + edit races", () => {
         .get("read_anchored_file")!
         .execute("0", { path: "race-read-edit.txt" }, undefined, undefined, { cwd });
       const line1Anchor = (pre.details as any)?.lines[0].anchor as string;
+      const line1Text = (pre.details as any)?.lines[0].text as string;
 
       // Start a long-running read first (simulated by starting read before edit)
       const readPromise = tools
@@ -57,7 +58,9 @@ describe("concurrency: parallel read + edit races", () => {
         {
           path: "race-read-edit.txt",
           startAnchor: line1Anchor,
+          startAnchorLine: line1Text,
           endAnchor: line1Anchor,
+          endAnchorLine: line1Text,
           replacement: "LINE1\n",
         },
         undefined,
@@ -155,6 +158,7 @@ describe("concurrency: parallel read + edit races", () => {
         .get("read_anchored_file")!
         .execute("0", { path: "skeleton-race.txt" }, undefined, undefined, { cwd });
       const line1Anchor = (pre.details as any)?.lines[0].anchor as string;
+      const line1Text = (pre.details as any)?.lines[0].text as string;
 
       // Fire skeleton read and edit in parallel
       const [skeletonResult, editResult] = await Promise.all([
@@ -168,7 +172,9 @@ describe("concurrency: parallel read + edit races", () => {
           {
             path: "skeleton-race.txt",
             startAnchor: line1Anchor,
+            startAnchorLine: line1Text,
             endAnchor: line1Anchor,
+            endAnchorLine: line1Text,
             replacement: "function B() {}\n",
           },
           undefined,
@@ -210,6 +216,8 @@ describe("concurrency: parallel read + edit races", () => {
       const initialRevision = (initialRead.details as any)?.revision;
       const line1Anchor = (initialRead.details as any)?.lines[0].anchor as string;
       const line2Anchor = (initialRead.details as any)?.lines[1].anchor as string;
+      const line1Text = (initialRead.details as any)?.lines[0].text as string;
+      const line2Text = (initialRead.details as any)?.lines[1].text as string;
 
       // First edit succeeds with valid revision
       const result1 = await tools.get("edit_anchored_range")!.execute(
@@ -217,7 +225,9 @@ describe("concurrency: parallel read + edit races", () => {
         {
           path: "rapid-edits.txt",
           startAnchor: line1Anchor,
+          startAnchorLine: line1Text,
           endAnchor: line1Anchor,
+          endAnchorLine: line1Text,
           replacement: "LINE1\n",
           expectedRevision: initialRevision,
         },
@@ -256,7 +266,9 @@ describe("concurrency: parallel read + edit races", () => {
         {
           path: "rapid-edits.txt",
           startAnchor: line2Anchor,
+          startAnchorLine: line2Text,
           endAnchor: line2Anchor,
+          endAnchorLine: line2Text,
           replacement: "LINE2\n",
           expectedRevision: revision2,
         },
@@ -284,6 +296,7 @@ describe("concurrency: parallel read + edit races", () => {
         .get("read_anchored_file")!
         .execute("0", { path: "preview-edit-same.txt" }, undefined, undefined, { cwd });
       const line1Anchor = (pre.details as any)?.lines[0].anchor as string;
+      const line1Text = (pre.details as any)?.lines[0].text as string;
 
       // Both tools target the SAME file with SAME anchors - this is the real race
       const [previewResult, editResult] = await Promise.all([
@@ -292,7 +305,9 @@ describe("concurrency: parallel read + edit races", () => {
           {
             path: "preview-edit-same.txt",
             startAnchor: line1Anchor,
+            startAnchorLine: line1Text,
             endAnchor: line1Anchor,
+            endAnchorLine: line1Text,
             replacement: "NEW\n",
           },
           undefined,
@@ -304,7 +319,9 @@ describe("concurrency: parallel read + edit races", () => {
           {
             path: "preview-edit-same.txt",
             startAnchor: line1Anchor,
+            startAnchorLine: line1Text,
             endAnchor: line1Anchor,
+            endAnchorLine: line1Text,
             replacement: "CHANGED\n",
           },
           undefined,
@@ -338,6 +355,7 @@ describe("concurrency: parallel read + edit races", () => {
         .execute("1", { path: "revision-invalidation.txt" }, undefined, undefined, { cwd });
       const revision1 = (read1.details as any)?.revision;
       const line1Anchor = (read1.details as any)?.lines[0].anchor as string;
+      const line1Text = (read1.details as any)?.lines[0].text as string;
 
       // Edit file
       await tools.get("edit_anchored_range")!.execute(
@@ -345,7 +363,9 @@ describe("concurrency: parallel read + edit races", () => {
         {
           path: "revision-invalidation.txt",
           startAnchor: line1Anchor,
+          startAnchorLine: line1Text,
           endAnchor: line1Anchor,
+          endAnchorLine: line1Text,
           replacement: "LINE1\n",
         },
         undefined,
@@ -390,34 +410,52 @@ describe("concurrency: parallel read + edit races", () => {
       const a1 = (r1.details as any)?.lines[0].anchor as string;
       const a2 = (r2.details as any)?.lines[0].anchor as string;
       const a3 = (r3.details as any)?.lines[0].anchor as string;
+      const t1 = (r1.details as any)?.lines[0].text as string;
+      const t2 = (r2.details as any)?.lines[0].text as string;
+      const t3 = (r3.details as any)?.lines[0].text as string;
       const [edit1, edit2, edit3] = await Promise.all([
-        tools
-          .get("edit_anchored_range")!
-          .execute(
-            "4",
-            { path: "file1.txt", startAnchor: a1, endAnchor: a1, replacement: "ALPHA\n" },
-            undefined,
-            undefined,
-            { cwd },
-          ),
-        tools
-          .get("edit_anchored_range")!
-          .execute(
-            "5",
-            { path: "file2.txt", startAnchor: a2, endAnchor: a2, replacement: "BETA\n" },
-            undefined,
-            undefined,
-            { cwd },
-          ),
-        tools
-          .get("edit_anchored_range")!
-          .execute(
-            "6",
-            { path: "file3.txt", startAnchor: a3, endAnchor: a3, replacement: "GAMMA\n" },
-            undefined,
-            undefined,
-            { cwd },
-          ),
+        tools.get("edit_anchored_range")!.execute(
+          "4",
+          {
+            path: "file1.txt",
+            startAnchor: a1,
+            startAnchorLine: t1,
+            endAnchor: a1,
+            endAnchorLine: t1,
+            replacement: "ALPHA\n",
+          },
+          undefined,
+          undefined,
+          { cwd },
+        ),
+        tools.get("edit_anchored_range")!.execute(
+          "5",
+          {
+            path: "file2.txt",
+            startAnchor: a2,
+            startAnchorLine: t2,
+            endAnchor: a2,
+            endAnchorLine: t2,
+            replacement: "BETA\n",
+          },
+          undefined,
+          undefined,
+          { cwd },
+        ),
+        tools.get("edit_anchored_range")!.execute(
+          "6",
+          {
+            path: "file3.txt",
+            startAnchor: a3,
+            startAnchorLine: t3,
+            endAnchor: a3,
+            endAnchorLine: t3,
+            replacement: "GAMMA\n",
+          },
+          undefined,
+          undefined,
+          { cwd },
+        ),
       ]);
 
       // All three should succeed — each returns a unified diff.

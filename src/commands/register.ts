@@ -9,6 +9,7 @@ export function registerCommands(
   pi: ExtensionAPI,
   session: SessionState,
   config: PiFastEditsConfig,
+  onConfigChanged: () => void,
 ): void {
   pi.registerCommand("pi-fast-edits", {
     description: "Configure pi-fast-edits. Usage: /pi-fast-edits status|config",
@@ -41,7 +42,7 @@ export function registerCommands(
       }
 
       if (action === "config") {
-        await showConfigMenu(config, ctx);
+        await showConfigMenu(config, ctx, onConfigChanged);
         return;
       }
 

@@ -3,6 +3,8 @@ export type ConfirmationMode = "always" | "protected-paths" | "never";
 export type PiFastEditsConfig = {
   overrideBuiltInEditTools: boolean;
   confirmation: ConfirmationMode;
+  /** When true (default), edit tools require the exact anchor line content (startAnchorLine/endAnchorLine/anchorLine) on every edit. */
+  requireAnchorLines: boolean;
   maxFullReadBytes: number;
   maxFullReadLines: number;
   maxRangeReadLines: number;
@@ -100,6 +102,10 @@ type ReplaceEdit = RevisionGuard & {
   path: string;
   startAnchor: string;
   endAnchor: string;
+  /** Expected current source line at startAnchor, verified before editing (strict) or when provided (lenient). */
+  startAnchorLine?: string;
+  /** Expected current source line at endAnchor, verified before editing (strict) or when provided (lenient). */
+  endAnchorLine?: string;
   replacement: string;
   includeStart?: boolean;
   includeEnd?: boolean;
@@ -109,6 +115,8 @@ type InsertEdit = RevisionGuard & {
   type: "insert";
   path: string;
   anchor: string;
+  /** Expected current source line at anchor, verified before editing (strict) or when provided (lenient). */
+  anchorLine?: string;
   position: "before" | "after";
   content: string;
 };
@@ -118,6 +126,10 @@ type DeleteEdit = RevisionGuard & {
   path: string;
   startAnchor: string;
   endAnchor: string;
+  /** Expected current source line at startAnchor, verified before editing (strict) or when provided (lenient). */
+  startAnchorLine?: string;
+  /** Expected current source line at endAnchor, verified before editing (strict) or when provided (lenient). */
+  endAnchorLine?: string;
 };
 
 export type AnchoredEdit = ReplaceEdit | InsertEdit | DeleteEdit;

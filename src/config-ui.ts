@@ -246,6 +246,14 @@ function buildItems(
       currentValue: config.confirmation,
       values: ["always", "protected-paths", "never"],
     },
+    {
+      id: "requireAnchorLines",
+      label: "Require anchor line args",
+      description:
+        "Edit tools require the exact anchor line content (startAnchorLine/endAnchorLine/anchorLine) on every edit",
+      currentValue: config.requireAnchorLines ? "on" : "off",
+      values: ["on", "off"],
+    },
     numeric(
       "maxFullReadBytes",
       "Max full-read bytes",
@@ -297,6 +305,7 @@ function buildItems(
 export async function showConfigMenu(
   config: PiFastEditsConfig,
   ctx: ExtensionCommandContext,
+  onConfigChanged: () => void,
 ): Promise<void> {
   if (!ctx.hasUI) {
     ctx.ui.notify("The pi-fast-edits config menu requires an interactive terminal.", "warning");
@@ -310,6 +319,9 @@ export async function showConfigMenu(
           break;
         case "confirmation":
           config.confirmation = parseConfirmationMode(newValue) ?? config.confirmation;
+          break;
+        case "requireAnchorLines":
+          config.requireAnchorLines = newValue === "on";
           break;
         case "maxFullReadBytes":
           config.maxFullReadBytes = toPositiveInt(newValue, config.maxFullReadBytes);
@@ -325,6 +337,8 @@ export async function showConfigMenu(
           break;
         // "protectedPaths" is handled by its own submenu; no main-list change.
       }
+      // Re-register the edit tools so their schemas follow the new setting.
+      onConfigChanged();
       void saveConfig(config);
     };
     return new ConfigMenuComponent(buildItems(config, theme, onChange), theme, onChange, () =>

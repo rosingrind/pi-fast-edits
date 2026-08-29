@@ -1,12 +1,9 @@
-import type { Static } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { PiFastEditsConfig, SessionState } from "../types.js";
 import { renderEditResult, runSingleEdit } from "./single-edit-runner.js";
 import { renderToolCall } from "./render.js";
 import type { PiContext } from "./shared.js";
-import { replaceEditSchema } from "./schemas.js";
-
-type RangeParams = Static<typeof replaceEditSchema>;
+import { replaceEditSchema, type ReplaceEditParams } from "./schemas.js";
 
 export function registerEditAnchoredRange(
   pi: ExtensionAPI,
@@ -19,8 +16,8 @@ export function registerEditAnchoredRange(
     description: "Replace a range of lines between two word anchors.",
     promptSnippet: "Replace a range between two word anchors",
     promptGuidelines: [
-      "Anchors may be passed as complete ANCHOR§current-line coordinates copied verbatim from read/grep output — content is verified before editing",
-      "Reference anchors from a prior read_anchored_file result",
+      "Copy anchor words verbatim from a prior read_anchored_file or grep_anchored_files result",
+      "Pass the exact current source line at each anchor as startAnchorLine/endAnchorLine, copied verbatim from read/grep output — the line content is verified before editing",
       "Use includeStart/includeEnd to fine-tune which anchor lines are replaced",
       "Pass the revision hash from read_anchored_file as expectedRevision",
       "Use raw text only in replacement — do NOT include the § anchor marker",
@@ -29,10 +26,10 @@ export function registerEditAnchoredRange(
     executionMode: "sequential",
     renderCall: renderToolCall("edit_anchored_range"),
     renderResult: renderEditResult,
-    parameters: replaceEditSchema,
+    parameters: replaceEditSchema(config.requireAnchorLines),
     async execute(
       _toolCallId: string,
-      params: RangeParams,
+      params: ReplaceEditParams,
       _signal: AbortSignal | undefined,
       _onUpdate: unknown,
       ctx: PiContext,
@@ -46,6 +43,8 @@ export function registerEditAnchoredRange(
           path: params.path,
           startAnchor: params.startAnchor,
           endAnchor: params.endAnchor,
+          startAnchorLine: params.startAnchorLine,
+          endAnchorLine: params.endAnchorLine,
           replacement: params.replacement,
           includeStart: params.includeStart,
           includeEnd: params.includeEnd,

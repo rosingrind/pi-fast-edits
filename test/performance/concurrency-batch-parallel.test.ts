@@ -56,7 +56,9 @@ describe("concurrency: batch + parallel edit scenarios", () => {
                 type: "replace" as const,
                 path: "batch-overlap.txt",
                 startAnchor: lines[0].anchor,
+                startAnchorLine: lines[0].text,
                 endAnchor: lines[0].anchor,
+                endAnchorLine: lines[0].text,
                 replacement: "ALPHA\n",
                 expectedRevision: revision,
               },
@@ -74,7 +76,9 @@ describe("concurrency: batch + parallel edit scenarios", () => {
                 type: "replace" as const,
                 path: "batch-overlap.txt",
                 startAnchor: lines[2].anchor,
+                startAnchorLine: lines[2].text,
                 endAnchor: lines[2].anchor,
+                endAnchorLine: lines[2].text,
                 replacement: "GAMMA\n",
                 expectedRevision: revision,
               },
@@ -121,7 +125,9 @@ describe("concurrency: batch + parallel edit scenarios", () => {
                 type: "replace" as const,
                 path: "batch-single-overlap.txt",
                 startAnchor: lines[0].anchor,
+                startAnchorLine: lines[0].text,
                 endAnchor: lines[0].anchor,
+                endAnchorLine: lines[0].text,
                 replacement: "ALPHA\n",
                 expectedRevision: revision,
               },
@@ -136,7 +142,9 @@ describe("concurrency: batch + parallel edit scenarios", () => {
           {
             path: "batch-single-overlap.txt",
             startAnchor: lines[2].anchor,
+            startAnchorLine: lines[2].text,
             endAnchor: lines[2].anchor,
+            endAnchorLine: lines[2].text,
             replacement: "GAMMA\n",
             expectedRevision: revision,
           },
@@ -176,7 +184,9 @@ describe("concurrency: batch + parallel edit scenarios", () => {
         {
           path: "parallel-fail.txt",
           startAnchor: lines[0].anchor,
+          startAnchorLine: lines[0].text,
           endAnchor: lines[0].anchor,
+          endAnchorLine: lines[0].text,
           replacement: "ALPHA\n",
           expectedRevision: revision,
         },
@@ -192,7 +202,9 @@ describe("concurrency: batch + parallel edit scenarios", () => {
           {
             path: "parallel-fail.txt",
             startAnchor: lines[2].anchor,
+            startAnchorLine: lines[2].text,
             endAnchor: lines[2].anchor,
+            endAnchorLine: lines[2].text,
             replacement: "GAMMA\n",
             expectedRevision: revision, // stale
           },
@@ -205,7 +217,9 @@ describe("concurrency: batch + parallel edit scenarios", () => {
           {
             path: "parallel-fail.txt",
             startAnchor: lines[2].anchor,
+            startAnchorLine: lines[2].text,
             endAnchor: lines[2].anchor,
+            endAnchorLine: lines[2].text,
             replacement: "GAMMA\n",
             expectedRevision: revision, // stale
           },
@@ -249,7 +263,9 @@ describe("concurrency: batch + parallel edit scenarios", () => {
         {
           path: "subagent-stale.txt",
           startAnchor: linesA[0].anchor,
+          startAnchorLine: linesA[0].text,
           endAnchor: linesA[0].anchor,
+          endAnchorLine: linesA[0].text,
           replacement: "ALPHA\n",
           expectedRevision: revisionA,
         },
@@ -265,7 +281,9 @@ describe("concurrency: batch + parallel edit scenarios", () => {
           {
             path: "subagent-stale.txt",
             startAnchor: linesB[2].anchor,
+            startAnchorLine: linesB[2].text,
             endAnchor: linesB[2].anchor,
+            endAnchorLine: linesB[2].text,
             replacement: "GAMMA\n",
             expectedRevision: revisionB, // stale
           },
@@ -292,8 +310,7 @@ describe("concurrency: batch + parallel edit scenarios", () => {
         .execute("1", { path: "valid.txt" }, undefined, undefined, { cwd });
       const revision = (r.details as any)?.revision;
       const line1Anchor = (r.details as any)?.lines[0].anchor as string;
-
-      // Batch with one valid, one invalid - should throw
+      const line1Text = (r.details as any)?.lines[0].text as string;
       await expect(
         tools.get("apply_anchored_edits")!.execute(
           "2",
@@ -303,7 +320,9 @@ describe("concurrency: batch + parallel edit scenarios", () => {
                 type: "replace" as const,
                 path: "valid.txt",
                 startAnchor: line1Anchor,
+                startAnchorLine: line1Text,
                 endAnchor: line1Anchor,
+                endAnchorLine: line1Text,
                 replacement: "ALPHA\n",
                 expectedRevision: revision,
               },
@@ -347,6 +366,7 @@ describe("concurrency: batch + parallel edit scenarios", () => {
       const revA = (rA.details as any)?.revision;
       const revB = (rB.details as any)?.revision;
       const lineA1 = (rA.details as any)?.lines[0].anchor as string;
+      const lineA1Text = (rA.details as any)?.lines[0].text as string;
 
       // Batch with one valid, one invalid anchor - should throw
       await expect(
@@ -358,7 +378,9 @@ describe("concurrency: batch + parallel edit scenarios", () => {
                 type: "replace" as const,
                 path: "batch-anchor-a.txt",
                 startAnchor: lineA1,
+                startAnchorLine: lineA1Text,
                 endAnchor: lineA1,
+                endAnchorLine: lineA1Text,
                 replacement: "ALPHA\n",
                 expectedRevision: revA,
               },

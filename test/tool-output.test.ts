@@ -35,7 +35,7 @@ describe("structured tool output", () => {
     const read = await tools
       .get("read_anchored_file")!
       .execute("1", { path: "sample.ts" }, undefined, undefined, { cwd });
-    const lines = (read.details as any).lines as Array<{ anchor: string }>;
+    const lines = (read.details as any).lines as Array<{ anchor: string; text: string }>;
     const removed = [lines[0].anchor, lines[1].anchor];
 
     const result = await tools.get("edit_anchored_range")!.execute(
@@ -43,7 +43,9 @@ describe("structured tool output", () => {
       {
         path: "sample.ts",
         startAnchor: lines[0].anchor,
+        startAnchorLine: lines[0].text,
         endAnchor: lines[1].anchor,
+        endAnchorLine: lines[1].text,
         replacement: "ONE",
       },
       undefined,
@@ -70,7 +72,7 @@ describe("structured tool output", () => {
     const read = await tools
       .get("read_anchored_file")!
       .execute("1", { path: "sample.txt" }, undefined, undefined, { cwd });
-    const lines = (read.details as any).lines as Array<{ anchor: string }>;
+    const lines = (read.details as any).lines as Array<{ anchor: string; text: string }>;
 
     const result = await tools.get("apply_anchored_edits")!.execute(
       "2",
@@ -80,14 +82,18 @@ describe("structured tool output", () => {
             type: "replace",
             path: "sample.txt",
             startAnchor: lines[0].anchor,
+            startAnchorLine: lines[0].text,
             endAnchor: lines[0].anchor,
+            endAnchorLine: lines[0].text,
             replacement: "ALPHA",
           },
           {
             type: "replace",
             path: "sample.txt",
             startAnchor: lines[1].anchor,
+            startAnchorLine: lines[1].text,
             endAnchor: lines[1].anchor,
+            endAnchorLine: lines[1].text,
             replacement: "BETA",
           },
         ],
@@ -114,7 +120,7 @@ describe("structured tool output", () => {
     const read = await tools
       .get("read_anchored_file")!
       .execute("1", { path: "sample.txt" }, undefined, undefined, { cwd });
-    const lines = (read.details as any).lines as Array<{ anchor: string }>;
+    const lines = (read.details as any).lines as Array<{ anchor: string; text: string }>;
 
     const result = await tools.get("apply_anchored_edits")!.execute(
       "2",
@@ -124,14 +130,18 @@ describe("structured tool output", () => {
             type: "replace",
             path: "sample.txt",
             startAnchor: lines[2].anchor,
+            startAnchorLine: lines[2].text,
             endAnchor: lines[2].anchor,
+            endAnchorLine: lines[2].text,
             replacement: "GAMMA",
           },
           {
             type: "replace",
             path: "sample.txt",
             startAnchor: lines[0].anchor,
+            startAnchorLine: lines[0].text,
             endAnchor: lines[0].anchor,
+            endAnchorLine: lines[0].text,
             replacement: "ALPHA",
           },
         ],

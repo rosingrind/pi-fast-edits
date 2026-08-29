@@ -3,6 +3,7 @@ import type { ConfirmationMode, PiFastEditsConfig } from "./types.js";
 export const DEFAULT_CONFIG: PiFastEditsConfig = {
   overrideBuiltInEditTools: false,
   confirmation: "protected-paths",
+  requireAnchorLines: true,
   maxFullReadBytes: 80_000,
   maxFullReadLines: 1_500,
   maxRangeReadLines: 400,

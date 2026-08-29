@@ -14,3 +14,19 @@ export function anchorOf(anchoredOutput: string, lineText: string): string {
   if (!m) throw new Error(`No anchor found for line: ${lineText}`);
   return m[1];
 }
+
+/**
+ * Extract the verbatim source line for a search text from rendered
+ * grep_anchored_files output (`Anchor§ text    line N`). Throws when no
+ * anchored line matches.
+ */
+export function lineTextFrom(anchoredOutput: string, searchText: string): string {
+  const anchored = anchoredOutput.split("\n").filter((l) => l.includes("§ "));
+  for (const line of anchored) {
+    if (line.includes(searchText)) {
+      const after = line.slice(line.indexOf("§ ") + 2);
+      return after.replace(/ {4}line \d+$/, "");
+    }
+  }
+  throw new Error(`No anchored line found for: ${searchText}`);
+}
