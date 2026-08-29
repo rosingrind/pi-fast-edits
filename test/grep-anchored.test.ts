@@ -277,6 +277,56 @@ describe("grep_anchored_files (rg-backed)", () => {
     },
   );
 
+  it.skipIf(!rgAvailable)(
+    "excludes nested node_modules and .git paths from rg results",
+    async () => {
+      const cwd = await mkdtemp(join(tmpdir(), "pi-fast-edits-grep-"));
+      await mkdir(join(cwd, "packages", "x", "node_modules", "dep"), { recursive: true });
+      await mkdir(join(cwd, "packages", "x", ".git"), { recursive: true });
+      // Dependency and VCS trees at arbitrary depth: only top-level
+      // node_modules/.git segments were filtered before the rg-path fix.
+      await writeFile(
+        join(cwd, "packages", "x", "node_modules", "dep", "index.js"),
+        "leaky-pattern nested dependency\n",
+        "utf8",
+      );
+      await writeFile(
+        join(cwd, "packages", "x", ".git", "config"),
+        "leaky-pattern = nested git config\n",
+        "utf8",
+      );
+      await writeFile(
+        join(cwd, "packages", "x", "src.ts"),
+        "const ok = 'leaky-pattern';\n",
+        "utf8",
+      );
+      const tools = await loadTools();
+      const result = await tools
+        .get("grep_anchored_files")!
+        .execute("1", { pattern: "leaky-pattern" }, undefined, undefined, { cwd });
+      const text = result.content[0].text as string;
+      expect(text).toContain("File: packages/x/src.ts");
+      expect(text).not.toContain("index.js");
+      expect(text).not.toContain(".git");
+    },
+  );
+
+  it.skipIf(!rgAvailable)("skips files larger than MAX_FILE_BYTES in rg results", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "pi-fast-edits-grep-"));
+    // Just over 1MB so the per-file cap (MAX_FILE_BYTES) must kick in; the
+    // padded single line keeps the fixture cheap to write.
+    const huge = `oversize-pattern ${`x`.repeat(1024 * 1024 + 200)}\n`;
+    await writeFile(join(cwd, "huge.ts"), huge, "utf8");
+    await writeFile(join(cwd, "small.ts"), "oversize-pattern small\n", "utf8");
+    const tools = await loadTools();
+    const result = await tools
+      .get("grep_anchored_files")!
+      .execute("1", { pattern: "oversize-pattern" }, undefined, undefined, { cwd });
+    const text = result.content[0].text as string;
+    expect(text).toContain("File: small.ts");
+    expect(text).not.toContain("huge.ts");
+  });
+
   it("falls back to the JS scanner when rg is unavailable", async () => {
     // Force resolveRg to report no binary, then re-import the tool chain
     // fresh: the static import at the top of this file still references the

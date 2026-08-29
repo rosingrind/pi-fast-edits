@@ -188,6 +188,10 @@ async function grepWithRg(
   if (params.ignoreCase) args.push("-i");
   if (params.glob) args.push("--glob", params.glob);
   if (context > 0) args.push("--context", String(context));
+  // rg has no built-in knowledge of dependency trees: in non-git workspaces
+  // it surfaces node_modules and .git dirs at any depth (only top-level
+  // segments were filtered before), so exclude them at the source.
+  args.push("--glob", "!**/node_modules/**", "--glob", "!**/.git/**");
   // Always pass the absolute root so rg searches the right directory even when
   // the host process cwd differs from the workspace being searched.
   args.push(rootAbs);
@@ -237,6 +241,11 @@ async function grepWithRg(
       if (SKIPPED_DIRS.has(relativePath.split("/")[0] ?? "")) continue;
       if (isProtectedPath(relativePath, PROTECTED_SKIP)) continue;
     }
+
+    // Skip files too large to index: same cap as the JS scanner, so the rg
+    // path cannot churn the anchor LRU with multi-megabyte files.
+    const fileStat = await stat(absPath).catch(() => undefined);
+    if (!fileStat || !fileStat.isFile() || fileStat.size > MAX_FILE_BYTES) continue;
 
     let loaded: Awaited<ReturnType<typeof loadStateForPath>>;
     try {
