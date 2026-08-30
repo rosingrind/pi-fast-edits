@@ -27,7 +27,6 @@ async function workspace() {
 }
 
 describe("structured tool output", () => {
-
   it("batch edits return per-edit anchor details", async () => {
     const cwd = await workspace();
     await writeFile(join(cwd, "sample.txt"), "alpha\nbeta\ngamma\n", "utf8");
@@ -38,7 +37,7 @@ describe("structured tool output", () => {
       .execute("1", { path: "sample.txt" }, undefined, undefined, { cwd });
     const lines = (read.details as any).lines as Array<{ anchor: string; text: string }>;
 
-    const result = await tools.get("apply_anchored")!.execute(
+    const result = await tools.get("edit_anchored")!.execute(
       "2",
       {
         edits: [
@@ -86,7 +85,7 @@ describe("structured tool output", () => {
       .execute("1", { path: "sample.txt" }, undefined, undefined, { cwd });
     const lines = (read.details as any).lines as Array<{ anchor: string; text: string }>;
 
-    const result = await tools.get("apply_anchored")!.execute(
+    const result = await tools.get("edit_anchored")!.execute(
       "2",
       {
         edits: [
@@ -124,7 +123,7 @@ describe("structured tool output", () => {
     const tools = await loadTools();
 
     const result = await tools
-      .get("apply_anchored")!
+      .get("edit_anchored")!
       .execute("1", { edits: [] }, undefined, undefined, { cwd });
 
     expect(result.content[0].text).toBe("No edits to apply.");

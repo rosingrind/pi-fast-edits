@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { initTheme } from "@earendil-works/pi-coding-agent";
 import { Container, Text } from "@earendil-works/pi-tui";
 import { renderReadAnchoredResult } from "../src/tools/read-anchored.js";
-import { renderBatchResult } from "../src/tools/apply-anchored.js";
+import { renderBatchResult } from "../src/tools/edit-anchored.js";
 import { renderEditResult } from "../src/tools/render-edit-result.js";
 import { renderToolCall } from "../src/tools/render.js";
 import type { Theme } from "../src/tools/theme.js";
@@ -244,7 +244,7 @@ describe("renderToolCall", () => {
   });
 });
 
-describe("apply_anchored call chip (override-mode `edit`)", () => {
+describe("edit_anchored call chip (override-mode `edit`)", () => {
   const theme = { fg: (_k: string, s: string) => s, bold: (s: string) => s };
 
   it("shows the target file name in the suffix", async () => {
@@ -258,8 +258,8 @@ describe("apply_anchored call chip (override-mode `edit`)", () => {
       } as any,
       { requireAnchorLines: false },
     );
-    const def = tools.get("apply_anchored");
-    if (!def) throw new Error("apply_anchored not registered");
+    const def = tools.get("edit_anchored");
+    if (!def) throw new Error("edit_anchored not registered");
     const renderCall = def.renderCall as (
       args: Record<string, unknown>,
       theme: Record<string, (k: string, s: string) => string>,
@@ -308,11 +308,11 @@ it("glues a range suffix to the path (read path:1-2) without extra spaces", () =
 });
 
 it("keeps a target-name suffix's own single leading space (edit a.ts)", () => {
-  const renderer = renderToolCall("apply_anchored", (args, t) =>
+  const renderer = renderToolCall("edit_anchored", (args, t) =>
     t.fg("warning", ` ${args.display}`),
   );
   const component = renderer({ display: "a.ts" }, theme, noContext);
   const text = textOf(component).trim();
-  expect(text).toBe("apply_anchored a.ts");
+  expect(text).toBe("edit_anchored a.ts");
   expect(text).not.toContain("  ");
 });

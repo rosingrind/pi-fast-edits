@@ -51,11 +51,7 @@ describe("concurrency: empty-file and session-map stress scenarios", () => {
       expect(typeof read.details.revision).toBe("string");
       expect(read.content[0].text).toContain("Lines: 0");
     });
-
-
-
   });
-
 
   describe("E3 — Batch partial application on a mid-batch I/O failure", () => {
     it.skipIf(isRoot)(
@@ -89,7 +85,7 @@ describe("concurrency: empty-file and session-map stress scenarios", () => {
         try {
           // fileA's edit comes first so it is planned and written before fileB.
           await expect(
-            tools.get("apply_anchored")!.execute(
+            tools.get("edit_anchored")!.execute(
               "3",
               {
                 edits: [
@@ -131,5 +127,4 @@ describe("concurrency: empty-file and session-map stress scenarios", () => {
       },
     );
   });
-
 });

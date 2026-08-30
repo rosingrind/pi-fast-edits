@@ -79,7 +79,7 @@ describe("write_anchored", () => {
     };
 
     // No read_anchored call: the write itself seeded the session state.
-    const edit = await tools.get("apply_anchored")!.execute(
+    const edit = await tools.get("edit_anchored")!.execute(
       "2",
       {
         edits: [

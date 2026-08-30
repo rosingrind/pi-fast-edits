@@ -24,7 +24,7 @@ function oursFull(): ToolDef[] {
   return [
     { name: "read_anchored", parameters: { properties: { path: {} } }, execute: () => {} },
     {
-      name: "apply_anchored",
+      name: "edit_anchored",
       parameters: { properties: { edits: {} } },
       execute: () => {},
     },
@@ -337,7 +337,7 @@ describe("renderToolCall name overrides", () => {
   });
 });
 
-describe("apply_anchored prepareArguments (edits-as-string quirk)", () => {
+describe("edit_anchored prepareArguments (edits-as-string quirk)", () => {
   async function getDef() {
     const tools = new Map<string, any>();
     const { default: piFastEdits } = await import("../src/index.js");
@@ -349,7 +349,7 @@ describe("apply_anchored prepareArguments (edits-as-string quirk)", () => {
       } as any,
       { requireAnchorLines: false },
     );
-    return tools.get("apply_anchored");
+    return tools.get("edit_anchored");
   }
 
   it("normalizes edits sent as a JSON string", async () => {

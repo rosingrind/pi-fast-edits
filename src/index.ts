@@ -13,7 +13,7 @@ import { registerReadAnchored } from "./tools/read-anchored.js";
 import { registerGrepAnchored } from "./tools/grep-anchored.js";
 import { registerWriteAnchored } from "./tools/write-anchored.js";
 import { registerPreviewAnchored } from "./tools/preview-anchored.js";
-import { registerApplyAnchored } from "./tools/apply-anchored.js";
+import { registerEditAnchored } from "./tools/edit-anchored.js";
 import {
   applyOverrideMode,
   installInterceptionFallback,
@@ -44,7 +44,7 @@ export default async function piFastEdits(
   // tool name refreshes it in-session.
   const registerAnchoredEditTools = () => {
     registerPreviewAnchored(pi, session, config);
-    registerApplyAnchored(pi, session, config);
+    registerEditAnchored(pi, session, config);
   };
   registerAnchoredEditTools();
 
@@ -54,7 +54,7 @@ export default async function piFastEdits(
   // registry in-session.
   const overrideDeps: OverrideDeps = {
     registerRead: registerReadAnchored,
-    registerEdit: registerApplyAnchored,
+    registerEdit: registerEditAnchored,
     registerGrep: registerGrepAnchored,
     registerWrite: registerWriteAnchored,
     installInterception: installInterceptionFallback,

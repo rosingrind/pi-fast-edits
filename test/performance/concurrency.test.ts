@@ -36,9 +36,6 @@ async function workspace() {
 const isRoot = typeof process.getuid === "function" && process.getuid() === 0;
 
 describe("concurrency: parallel subagent scenarios", () => {
-
-
-
   describe("H1b — Batch partial application on write failure", () => {
     it("batch applies multiple files atomically on the happy path", async () => {
       const cwd = await workspace();
@@ -61,7 +58,7 @@ describe("concurrency: parallel subagent scenarios", () => {
       const linesA = (rA.details as any)?.lines as any[];
       const linesB = (rB.details as any)?.lines as any[];
 
-      const result = await tools.get("apply_anchored")!.execute(
+      const result = await tools.get("edit_anchored")!.execute(
         "3",
         {
           edits: [
@@ -128,7 +125,7 @@ describe("concurrency: parallel subagent scenarios", () => {
           // fileA writes first (writable), fileB write then fails. The batch
           // rejects, but fileA is already persisted (partial application).
           await expect(
-            tools.get("apply_anchored")!.execute(
+            tools.get("edit_anchored")!.execute(
               "3",
               {
                 edits: [
@@ -191,7 +188,7 @@ describe("concurrency: parallel subagent scenarios", () => {
         tools
           .get("read_anchored")!
           .execute("2", { path: "read-edit-concurrent.txt" }, undefined, undefined, { cwd }),
-        tools.get("apply_anchored")!.execute(
+        tools.get("edit_anchored")!.execute(
           "3",
           {
             edits: [
@@ -217,7 +214,6 @@ describe("concurrency: parallel subagent scenarios", () => {
       expect(editResult.content[0].text).toMatch(/^[+-]/m);
     });
   });
-
 
   describe("H3 — Concurrent batch write clobbers", () => {
     it("batch writes clobber concurrent external modification", async () => {
@@ -246,7 +242,7 @@ describe("concurrency: parallel subagent scenarios", () => {
       // Session A runs a batch where file-b's revision is now stale. The whole
       // batch aborts before any write (all-or-nothing).
       await expect(
-        toolsA.get("apply_anchored")!.execute(
+        toolsA.get("edit_anchored")!.execute(
           "3",
           {
             edits: [
@@ -325,7 +321,7 @@ describe("concurrency: parallel subagent scenarios", () => {
       // Anchors live in per-file namespaces: each file assigns its own
       // (randomized) anchor words, and an anchor always refers to its own file.
       // Editing file-y via its own line-1 anchor must change only file-y.
-      await toolsY.get("apply_anchored")!.execute(
+      await toolsY.get("edit_anchored")!.execute(
         "3",
         {
           edits: [
@@ -353,7 +349,6 @@ describe("concurrency: parallel subagent scenarios", () => {
     });
   });
 
-
   describe("H3b — Cross-session concurrent batch writes", () => {
     it("concurrent batch writes from two sessions: last-writer-wins", async () => {
       const cwd = await workspace();
@@ -379,7 +374,7 @@ describe("concurrency: parallel subagent scenarios", () => {
       const linesB = (rB.details as any)?.lines as any[];
 
       const [resultA, resultB] = await Promise.all([
-        toolsA.get("apply_anchored")!.execute(
+        toolsA.get("edit_anchored")!.execute(
           "3",
           {
             edits: [
@@ -398,7 +393,7 @@ describe("concurrency: parallel subagent scenarios", () => {
           undefined,
           { cwd },
         ),
-        toolsB.get("apply_anchored")!.execute(
+        toolsB.get("edit_anchored")!.execute(
           "4",
           {
             edits: [
@@ -459,7 +454,7 @@ describe("concurrency: parallel subagent scenarios", () => {
       // converge to the final state. This documents the non-transactional
       // multi-file batch contract.
       const [batchResult, observed] = await Promise.all([
-        tools.get("apply_anchored")!.execute(
+        tools.get("edit_anchored")!.execute(
           "3",
           {
             edits: [
@@ -513,7 +508,7 @@ describe("concurrency: parallel subagent scenarios", () => {
       const controller = new AbortController();
       controller.abort();
 
-      const result = await tools.get("apply_anchored")!.execute(
+      const result = await tools.get("edit_anchored")!.execute(
         "1",
         {
           edits: [
@@ -583,7 +578,7 @@ describe("concurrency: parallel subagent scenarios", () => {
         },
       } as AbortSignal;
 
-      const result = await tools.get("apply_anchored")!.execute(
+      const result = await tools.get("edit_anchored")!.execute(
         "3",
         {
           edits: [

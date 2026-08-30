@@ -50,7 +50,7 @@ describe("Myers diff performance edge cases", () => {
 
     const start = Date.now();
     // Replace entire old file content with new file content.
-    const editResult = await tools.get("apply_anchored")!.execute(
+    const editResult = await tools.get("edit_anchored")!.execute(
       "3",
       {
         edits: [
@@ -98,7 +98,7 @@ describe("Myers diff performance edge cases", () => {
     const lastAnchorLine = linesData[linesData.length - 1].text;
 
     const start = Date.now();
-    const editResult = await tools.get("apply_anchored")!.execute(
+    const editResult = await tools.get("edit_anchored")!.execute(
       "2",
       {
         edits: [
@@ -151,7 +151,7 @@ describe("Myers diff performance edge cases", () => {
     const lastAnchorLine = linesData[linesData.length - 1].text;
 
     // Replace with identical content — edit succeeds, file unchanged.
-    const editResult = await tools.get("apply_anchored")!.execute(
+    const editResult = await tools.get("edit_anchored")!.execute(
       "2",
       {
         edits: [
@@ -259,7 +259,7 @@ describe("unicode and emoji in anchors", () => {
     const lines = readResult.details.lines as Array<{ anchor: string; text: string }>;
     const firstAnchor = lines[0].anchor;
 
-    const editResult = await tools.get("apply_anchored")!.execute(
+    const editResult = await tools.get("edit_anchored")!.execute(
       "2",
       {
         edits: [
@@ -312,7 +312,7 @@ describe("anchor churn under rapid edits", () => {
       const anchor = lines[targetLine].anchor;
       const anchorLineText = lines[targetLine].text;
 
-      const result = await tools.get("apply_anchored")!.execute(
+      const result = await tools.get("edit_anchored")!.execute(
         String(i * 2 + 1),
         {
           edits: [
@@ -374,7 +374,7 @@ describe("Myers fallback branch (n + m >= 4000)", () => {
     const lastAnchorLine = linesData[linesData.length - 1].text;
 
     // Replace the whole file content with the new lines.
-    const editResult = await tools.get("apply_anchored")!.execute(
+    const editResult = await tools.get("edit_anchored")!.execute(
       "2",
       {
         edits: [

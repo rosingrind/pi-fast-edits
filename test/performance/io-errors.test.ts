@@ -44,7 +44,7 @@ describe("I/O errors on the reconcile/read path", () => {
 
     // Editing with the (now unusable) revision must fail without recreating the file.
     await expect(
-      tools.get("apply_anchored")!.execute(
+      tools.get("edit_anchored")!.execute(
         "2",
         {
           edits: [
@@ -75,11 +75,9 @@ describe("I/O errors on the reconcile/read path", () => {
     const tools = await loadTools();
 
     // First read populates the session cache.
-    await tools
-      .get("read_anchored")!
-      .execute("1", { path: "gone.txt" }, undefined, undefined, {
-        cwd,
-      });
+    await tools.get("read_anchored")!.execute("1", { path: "gone.txt" }, undefined, undefined, {
+      cwd,
+    });
 
     await rm(file, { force: true });
 
@@ -118,7 +116,7 @@ describe("atomic-write failure cleanup", () => {
 
         // Edit should fail because atomic write can't create temp file.
         await expect(
-          tools.get("apply_anchored")!.execute(
+          tools.get("edit_anchored")!.execute(
             "2",
             {
               edits: [

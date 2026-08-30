@@ -2,7 +2,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { clearToolNameOverrides, setToolNameOverrides } from "./render.js";
 import type { PiFastEditsConfig, SessionState } from "../types.js";
 import type * as readAnchoredFileModule from "./read-anchored.js";
-import type * as applyAnchoredEditsModule from "./apply-anchored.js";
+import type * as editAnchoredModule from "./edit-anchored.js";
 import type * as grepAnchoredModule from "./grep-anchored.js";
 import type * as writeAnchoredModule from "./write-anchored.js";
 
@@ -33,7 +33,7 @@ export const SUFFIXED_TOOL_NAMES = [
   "grep_anchored",
   "write_anchored",
   "preview_anchored",
-  "apply_anchored",
+  "edit_anchored",
 ] as const;
 
 const hasExecute = (def: ToolDef): boolean => typeof def.execute === "function";
@@ -94,12 +94,7 @@ export function checkOverrideCompatibility(builtins: ToolDef[], ours: ToolDef[])
     }
   }
 
-  for (const oursName of [
-    "read_anchored",
-    "apply_anchored",
-    "grep_anchored",
-    "write_anchored",
-  ]) {
+  for (const oursName of ["read_anchored", "edit_anchored", "grep_anchored", "write_anchored"]) {
     const def = oursByName(oursName);
     if (!def) {
       reasons.push(`Our '${oursName}' tool is not registered.`);
@@ -153,7 +148,7 @@ export function installInterceptionFallback(pi: ExtensionAPI, config: PiFastEdit
 /** The registration functions (re-callable, stateless) that produce our tool definitions. */
 export type OverrideDeps = {
   registerRead: typeof readAnchoredFileModule.registerReadAnchored;
-  registerEdit: typeof applyAnchoredEditsModule.registerApplyAnchored;
+  registerEdit: typeof editAnchoredModule.registerEditAnchored;
   registerGrep: typeof grepAnchoredModule.registerGrepAnchored;
   registerWrite: typeof writeAnchoredModule.registerWriteAnchored;
   installInterception: (pi: ExtensionAPI, config: PiFastEditsConfig) => void;
@@ -282,7 +277,7 @@ export function applyOverrideMode(
   // Rendered titles follow the built-in names the definitions now carry.
   setToolNameOverrides({
     read_anchored: "read",
-    apply_anchored: "edit",
+    edit_anchored: "edit",
     grep_anchored: "grep",
     write_anchored: "write",
   });

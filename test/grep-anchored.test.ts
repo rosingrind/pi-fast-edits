@@ -162,9 +162,7 @@ describe("grep_anchored", () => {
     const cwd = await sampleWorkspace();
     const tools = await loadTools();
     await expect(
-      tools
-        .get("grep_anchored")!
-        .execute("1", { pattern: "(bad" }, undefined, undefined, { cwd }),
+      tools.get("grep_anchored")!.execute("1", { pattern: "(bad" }, undefined, undefined, { cwd }),
     ).rejects.toThrow(/Invalid regex/);
   });
 
@@ -180,7 +178,7 @@ describe("grep_anchored", () => {
     const alphaLine = lineTextFrom(grepText, "export function alpha() {");
 
     // The grep result's revision must satisfy the edit tool's revision guard.
-    const edit = await tools.get("apply_anchored")!.execute(
+    const edit = await tools.get("edit_anchored")!.execute(
       "2",
       {
         edits: [

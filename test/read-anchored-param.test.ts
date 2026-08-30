@@ -136,7 +136,7 @@ describe("read_anchored anchored param", () => {
       .execute("1", { path: "plain-edit.txt", anchored: false }, undefined, undefined, { cwd });
     const { revision, lines } = read.details;
 
-    await tools.get("apply_anchored")!.execute(
+    await tools.get("edit_anchored")!.execute(
       "2",
       {
         edits: [

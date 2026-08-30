@@ -41,13 +41,13 @@ function isSingleEdit(value: unknown): boolean {
   );
 }
 
-export function registerApplyAnchored(
+export function registerEditAnchored(
   pi: ExtensionAPI,
   session: SessionState,
   config: PiFastEditsConfig,
 ) {
   const tool = {
-    name: "apply_anchored",
+    name: "edit_anchored",
     label: "Apply Anchored Edits",
     description:
       "Apply multiple anchored edits in a single batch, validating all anchors before writing and reconciling lazily with Myers diff.",
@@ -109,7 +109,7 @@ export function registerApplyAnchored(
       }
       return { edits: edits as BatchStatic["edits"] } as BatchStatic;
     },
-    renderCall: renderToolCall("apply_anchored", (args, theme) => {
+    renderCall: renderToolCall("edit_anchored", (args, theme) => {
       const edits = Array.isArray(args.edits)
         ? args.edits.filter(
             (e) =>

@@ -16,7 +16,7 @@ import {
   type OverrideDeps,
 } from "../src/tools/override.js";
 import { registerReadAnchoredFile } from "../src/tools/read-anchored.js";
-import { registerApplyAnchoredEdits } from "../src/tools/apply-anchored.js";
+import { registerApplyAnchoredEdits } from "../src/tools/edit-anchored.js";
 import { registerGrepAnchoredFiles } from "../src/tools/grep-anchored.js";
 import { registerWriteAnchored } from "../src/tools/write-anchored.js";
 
@@ -30,7 +30,7 @@ function makeConfig(overrideBuiltInEditTools: boolean): PiFastEditsConfig {
 
 /** The approved notice copy (task-4 brief, review-fix); pinned verbatim so copy edits are intentional. */
 const ANCHORED_LIST =
-  "read_anchored, grep_anchored, preview_anchored, apply_anchored, write_anchored";
+  "read_anchored, grep_anchored, preview_anchored, edit_anchored, write_anchored";
 
 describe("override toggle notice", () => {
   it("notice copy matches the approved contract exactly", () => {

@@ -48,7 +48,7 @@ describe("concurrency: batch + parallel edit scenarios", () => {
 
       // Two batches in parallel, both editing same file (no expectedRevision - each plans fresh)
       const [batch1, batch2] = await Promise.all([
-        tools.get("apply_anchored")!.execute(
+        tools.get("edit_anchored")!.execute(
           "1",
           {
             edits: [
@@ -68,7 +68,7 @@ describe("concurrency: batch + parallel edit scenarios", () => {
           undefined,
           { cwd },
         ),
-        tools.get("apply_anchored")!.execute(
+        tools.get("edit_anchored")!.execute(
           "2",
           {
             edits: [
@@ -100,14 +100,10 @@ describe("concurrency: batch + parallel edit scenarios", () => {
     });
   });
 
-
-
-
   describe("BP5 — Batch with one invalid path", () => {
     it("batch with valid and invalid paths: valid paths succeed, invalid paths fail with appropriate error", async () => {
       const cwd = await workspace();
       const validFile = join(cwd, "valid.txt");
-      const invalidFile = join(cwd, "nonexistent.txt");
       await writeFile(validFile, "alpha\nbeta\n", "utf8");
 
       const tools = await loadTools();
@@ -120,7 +116,7 @@ describe("concurrency: batch + parallel edit scenarios", () => {
       const line1Anchor = (r.details as any)?.lines[0].anchor as string;
       const line1Text = (r.details as any)?.lines[0].text as string;
       await expect(
-        tools.get("apply_anchored")!.execute(
+        tools.get("edit_anchored")!.execute(
           "2",
           {
             edits: [
@@ -178,7 +174,7 @@ describe("concurrency: batch + parallel edit scenarios", () => {
 
       // Batch with one valid, one invalid anchor - should throw
       await expect(
-        tools.get("apply_anchored")!.execute(
+        tools.get("edit_anchored")!.execute(
           "3",
           {
             edits: [

@@ -82,12 +82,10 @@ describe("anchor line args", () => {
 
   it("registered tool definitions follow the live requireAnchorLines setting", async () => {
     const strict = await loadTools();
-    expect((strict.get("preview_anchored")!.parameters as any).required).toContain(
-      "endAnchorLine",
-    );
+    expect((strict.get("preview_anchored")!.parameters as any).required).toContain("endAnchorLine");
     // Batch: the outer object requires `edits`; strictness lives on each
     // per-edit variant.
-    const strictBatchTool = strict.get("apply_anchored")!.parameters as any;
+    const strictBatchTool = strict.get("edit_anchored")!.parameters as any;
     expect(strictBatchTool.required).toEqual(["edits"]);
     const strictVariant = strictBatchTool.properties.edits.items.anyOf[0];
     expect(strictVariant.allOf.flatMap((t: any) => t.required ?? [])).toContain("startAnchorLine");
@@ -96,16 +94,11 @@ describe("anchor line args", () => {
     expect((lenient.get("preview_anchored")!.parameters as any).required).not.toContain(
       "endAnchorLine",
     );
-    const lenientBatchTool = lenient.get("apply_anchored")!.parameters as any;
+    const lenientBatchTool = lenient.get("edit_anchored")!.parameters as any;
     expect(
       lenientBatchTool.properties.edits.items.anyOf[0].allOf.flatMap((t: any) => t.required ?? []),
     ).not.toContain("startAnchorLine");
   });
-
-
-
-
-
 
   it("strict: batch edits require the line args per edit and verify them before writing", async () => {
     const cwd = await workspace();
@@ -116,7 +109,7 @@ describe("anchor line args", () => {
 
     // Missing line args in one batch edit rejects the whole batch.
     await expect(
-      tools.get("apply_anchored")!.execute(
+      tools.get("edit_anchored")!.execute(
         "1",
         {
           edits: [
@@ -138,7 +131,7 @@ describe("anchor line args", () => {
 
     // A mismatched line arg in one edit aborts the whole batch.
     await expect(
-      tools.get("apply_anchored")!.execute(
+      tools.get("edit_anchored")!.execute(
         "2",
         {
           edits: [
@@ -169,7 +162,7 @@ describe("anchor line args", () => {
     await expect(readFile(file, "utf8")).resolves.toBe("alpha\nbeta\ngamma\n");
 
     // All-correct batch succeeds.
-    const result = await tools.get("apply_anchored")!.execute(
+    const result = await tools.get("edit_anchored")!.execute(
       "3",
       {
         edits: [
@@ -200,7 +193,6 @@ describe("anchor line args", () => {
     await expect(readFile(file, "utf8")).resolves.toBe("ALPHA\nbeta\nNEW\ngamma\n");
   });
 
-
   it("lineTextFrom extracts the verbatim line from rendered grep-style output", () => {
     const output =
       "1 file matched.\n\nFile: src/a.ts\nRevision: abc123\n\nApple§ export function alpha() {    line 1\nBrave§   return 1;    line 2\n";
@@ -208,8 +200,6 @@ describe("anchor line args", () => {
     expect(lineTextFrom(output, "  return 1;")).toBe("  return 1;");
     expect(() => lineTextFrom(output, "missing")).toThrow(/No anchored line found/);
   });
-
-
 
   it("batch rejects as a whole when one edit carries anchor-marked text", async () => {
     const cwd = await workspace();
@@ -222,7 +212,7 @@ describe("anchor line args", () => {
     const lines = read.details.lines as Array<{ anchor: string; text: string }>;
 
     await expect(
-      tools.get("apply_anchored")!.execute(
+      tools.get("edit_anchored")!.execute(
         "2",
         {
           edits: [
@@ -252,5 +242,4 @@ describe("anchor line args", () => {
     ).rejects.toThrow(/anchor-marked content/);
     await expect(readFile(file, "utf8")).resolves.toBe("one\ntwo\n");
   });
-
 });
