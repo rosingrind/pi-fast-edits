@@ -9,7 +9,7 @@ Anchored tools map every line to a stable random **anchor word** and guard edits
 
 ## Decode the rendered form
 
-Tool output renders lines as `Tunnel§ target alpha one    line 13`. The `AnchorWord§` prefix and the trailing `line N` / `lines N` are **display metadata only** — never part of the file, never valid parameter content:
+Tool output renders lines as `Tunnel§ target alpha one` — `grep` appends `    line N` per line, `skeleton` reads append `    lines N`, `range`/`full` reads append no suffix. The `AnchorWord§` prefix and any trailing `line N` / `lines N` are **display metadata only** — never part of the file, never valid parameter content:
 
 - `startAnchorLine` / `endAnchorLine` / `anchorLine` = the bare source line, copied verbatim: `target alpha one`. The mismatch error appends a drop-the-suffix hint only when your value ends in that rendered shape.
 - Blank lines render as `Dragon§` but their content is the **empty string** — pass `""`.
@@ -29,7 +29,7 @@ Every file read/edited carries a `Revision:` hash — the first 16 hex chars of 
 | Need                                                      | Tool                                                                                          |
 | --------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | Find anchors for target lines                             | `grep_anchored` (edit-ready output)                                                           |
-| Big file, only a region matters                           | `read_anchored` mode `range`, or `skeleton` for structure                                     |
+| Big file, only a region matters                           | `read_anchored` mode `range`, or `skeleton` for a capped pass over comment/declaration lines  |
 | Verbatim lines without anchors                            | `read_anchored` with `anchored: false`                                                        |
 | One change                                                | `edit_anchored` with a single edit — range replace; same anchor for start + end = single line |
 | Several changes (same or **multiple files**)              | `edit_anchored` with a batch — atomic: any failure rejects everything, zero partial writes    |
@@ -43,16 +43,17 @@ Every file read/edited carries a `Revision:` hash — the first 16 hex chars of 
 - Two edits may not claim the same insertion point or overlapping ranges (`after`-A and `before`-B collide when A and B are adjacent). Split points or split calls.
 - New content must be raw text. Anchor-shaped content (`Word§…` immediately after a word) requires `allowAnchoredLines: true`; a `§` elsewhere in the line is accepted.
 - Content that lands at EOF without a trailing newline leaves the file without one (`write` preserves content verbatim either way) — a later external append (e.g. bash `>>`) fuses onto the last line.
+- Batch `delete` includes **both** anchor lines and takes no include flags.
 
 ## Failure playbook
 
-| Rejection (verbatim prefix)                                                                              | Meaning                                                         | Fix                                                                    |
-| -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `startAnchorLine` / `endAnchorLine` / `anchorLine` mismatch for `<anchor>` — the line is currently `"…"` | Provided line ≠ current content (copied `§`/`line N`, or stale) | Copy the bare current line from the error or a fresh read              |
-| `Revision mismatch … current <hash>`                                                                     | File changed since that hash                                    | Re-read/grep, retry with `<hash>`                                      |
-| `Overlapping edits are not supported in one file.`                                                       | Two edits share an insertion point/range                        | Restructure the batch                                                  |
-| `Could not find [start\|end] anchor X`                                                                   | Unknown/stale anchor word (insert vs range forms)               | Grep the file for fresh anchors                                        |
-| `Text contains anchor-marked content ("X§…")`                                                            | Anchor-shaped (`Word§…`) text in replacement/content            | Strip the shape, or set `allowAnchoredLines: true` for genuine content |
+| Rejection (verbatim prefix)                                                                              | Meaning                                                                         | Fix                                                                    |
+| -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `startAnchorLine` / `endAnchorLine` / `anchorLine` mismatch for `<anchor>` — the line is currently `"…"` | Provided line ≠ current content (copied `§`/`line N`, or stale)                 | Copy the bare current line from the error or a fresh read              |
+| `Revision mismatch … current <hash>`                                                                     | File changed since that hash                                                    | Re-read/grep, retry with `<hash>`                                      |
+| `Overlapping edits are not supported in one file.`                                                       | Two edits share an insertion point/range                                        | Restructure the batch                                                  |
+| `Could not find [start\|end] anchor <word> in <abs path>.`                                               | Unknown/stale anchor word (replace uses `start`/`end`; insert/delete uses none) | Grep the file for fresh anchors                                        |
+| `Text contains anchor-marked content ("X§…")`                                                            | Anchor-shaped (`Word§…`) text in replacement/content                            | Strip the shape, or set `allowAnchoredLines: true` for genuine content |
 
 ## If your plain tools behave this way
 
