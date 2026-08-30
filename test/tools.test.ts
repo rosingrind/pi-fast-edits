@@ -229,7 +229,6 @@ describe("anchored tools", () => {
     ).rejects.toThrow(/binary file/);
   });
 
-
   it("read_anchored skeleton mode for large files", async () => {
     const cwd = await workspace();
     const lines = Array.from({ length: 200 }, (_, i) => `line ${i + 1}`);
@@ -588,8 +587,6 @@ describe("error paths", () => {
     ).rejects.toThrow();
   });
 
-
-
   it("edit_anchored rejects batch with invalid anchor", async () => {
     const cwd = await workspace();
     const file = join(cwd, "batch-invalid.txt");
@@ -732,7 +729,6 @@ describe("error paths", () => {
     expect(content).toBe("hello\n");
   });
 
-
   it("edit_anchored rejects a mismatched anchorLine before writing", async () => {
     const cwd = await workspace();
     const file = join(cwd, "batch-coord.txt");
@@ -778,7 +774,6 @@ describe("error paths", () => {
 });
 
 describe("edge cases", () => {
-
   it("anchors whitespace-only lines", async () => {
     const cwd = await workspace();
     await writeFile(join(cwd, "whitespace.txt"), "   \n  \n\n", "utf8");
@@ -828,7 +823,6 @@ describe("edge cases", () => {
     // Replacing a line with identical content yields no diff.
     expect(result.content[0].text).toContain("No changes");
   });
-
 });
 
 describe("integration chains", () => {
