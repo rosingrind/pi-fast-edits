@@ -1,4 +1,20 @@
 import { Text } from "@earendil-works/pi-tui";
+
+/**
+ * Display-name overrides applied in override mode: when a tool definition is
+ * re-registered under a built-in name, its rendered title follows via this map
+ * (renderToolCall closures capture the original registration name).
+ */
+const toolNameOverrides = new Map<string, string>();
+
+export function setToolNameOverrides(map: Record<string, string>): void {
+  toolNameOverrides.clear();
+  for (const [from, to] of Object.entries(map)) toolNameOverrides.set(from, to);
+}
+
+export function clearToolNameOverrides(): void {
+  toolNameOverrides.clear();
+}
 import type { Component } from "@earendil-works/pi-tui";
 import type { Theme } from "./theme.js";
 
@@ -30,10 +46,11 @@ export function renderToolCall(
 ): (args: Record<string, unknown>, theme: Theme, context: RenderContext) => Component {
   return (args, theme, context) => {
     const text = context.lastComponent instanceof Text ? context.lastComponent : new Text("", 0, 0);
+    const displayName = toolNameOverrides.get(toolName) ?? toolName;
     const path = (args as { path?: string }).path;
     const pathDisplay = path ? theme.fg("accent", path) : theme.fg("toolOutput", "...");
     const suffix = getSuffix ? getSuffix(args, theme) : "";
-    text.setText(theme.fg("toolTitle", theme.bold(toolName)) + " " + pathDisplay + suffix);
+    text.setText(theme.fg("toolTitle", theme.bold(displayName)) + " " + pathDisplay + suffix);
     return text;
   };
 }

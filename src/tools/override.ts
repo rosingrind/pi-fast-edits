@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { clearToolNameOverrides, setToolNameOverrides } from "./render.js";
 import type { PiFastEditsConfig, SessionState } from "../types.js";
 import type * as readAnchoredFileModule from "./read-anchored-file.js";
 import type * as applyAnchoredEditsModule from "./apply-anchored-edits.js";
@@ -205,6 +206,7 @@ export function applyOverrideMode(
   if (!config.overrideBuiltInEditTools) {
     // Disable path (mid-session toggle-off): the suffixed names are still in
     // the registry, just deactivated — re-add them to the active set.
+    clearToolNameOverrides();
     const keepActive = new Set(pi.getActiveTools());
     for (const name of SUFFIXED_TOOL_NAMES) {
       keepActive.add(name);
@@ -222,6 +224,7 @@ export function applyOverrideMode(
   const ours: ToolDef[] = [readDef, editDef, grepDef, writeDef];
 
   const fail = (reasons: string[]) => {
+    clearToolNameOverrides();
     deps.installInterception(pi, config);
     ctx?.ui?.notify?.(
       `pi-fast-edits: built-in read/edit/write/grep override could not be enabled ` +
@@ -279,4 +282,11 @@ export function applyOverrideMode(
     keepActive.add(name);
   }
   pi.setActiveTools([...keepActive]);
+  // Rendered titles follow the built-in names the definitions now carry.
+  setToolNameOverrides({
+    read_anchored_file: "read",
+    apply_anchored_edits: "edit",
+    grep_anchored_files: "grep",
+    write_anchored: "write",
+  });
 }

@@ -302,3 +302,37 @@ describe("applyOverrideMode wiring", () => {
     expect(setActiveToolsCalls).toHaveLength(0);
   });
 });
+
+describe("renderToolCall name overrides", () => {
+  it("rendered titles follow the built-in names in override mode", async () => {
+    const { renderToolCall, setToolNameOverrides, clearToolNameOverrides } =
+      await import("../src/tools/render.js");
+    const { Text } = await import("@earendil-works/pi-tui");
+    const theme = { fg: (_k: string, s: string) => s, bold: (s: string) => s };
+
+    const render = renderToolCall("read_anchored_file", () => "");
+    render(
+      { path: "a.txt" },
+      theme as any,
+      { lastComponent: undefined, isPartial: false, isError: false } as any,
+    );
+    // (component text asserted below after overrides are set)
+
+    setToolNameOverrides({ read_anchored_file: "read" });
+    const comp = render(
+      { path: "a.txt" },
+      theme as any,
+      { lastComponent: undefined, isPartial: false, isError: false } as any,
+    );
+    expect((comp as InstanceType<typeof Text>).render(200)[0]).toContain("read ");
+    expect((comp as InstanceType<typeof Text>).render(200)[0]).not.toContain("read_anchored_file");
+
+    clearToolNameOverrides();
+    const comp2 = render(
+      { path: "a.txt" },
+      theme as any,
+      { lastComponent: undefined, isPartial: false, isError: false } as any,
+    );
+    expect((comp2 as InstanceType<typeof Text>).render(200)[0]).toContain("read_anchored_file");
+  });
+});
