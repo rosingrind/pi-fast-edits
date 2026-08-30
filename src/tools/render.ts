@@ -57,12 +57,10 @@ export function renderToolCall(
     // carry it in their suffix instead — a bare "..." reads as noise.
     const pathDisplay = path ? theme.fg("accent", path) : "";
     const suffix = getSuffix ? getSuffix(args, theme) : "";
-    // Assemble without double spaces: pathDisplay/suffix may be empty (no
-    // top-level path) or carry their own leading space (suffix conventions).
-    const title =
-      displayName +
-      (pathDisplay ? ` ${pathDisplay}` : "") +
-      (suffix ? (suffix.startsWith(" ") ? suffix : ` ${suffix}`) : "");
+    // Suffixes own their spacing: a range suffix glues to the path
+    // (`read path:1-2`), a target-name suffix carries its own leading space
+    // (`edit a.ts`). Assembly never adds or removes spaces itself.
+    const title = displayName + (pathDisplay ? ` ${pathDisplay}` : "") + suffix;
     text.setText(title);
     return text;
   };

@@ -294,3 +294,25 @@ describe("apply_anchored_edits call chip (override-mode `edit`)", () => {
     expect((empty as any).render(200).join("\n")).not.toMatch(/\+\d+ more/);
   });
 });
+
+it("glues a range suffix to the path (read path:1-2) without extra spaces", () => {
+  const renderer = renderToolCall("read_anchored_file", (args, t) =>
+    t.fg(
+      "warning",
+      `:${args.startLine ?? 1}${args.endLine === undefined ? "" : `-${args.endLine}`}`,
+    ),
+  );
+  const component = renderer({ path: "x.md", startLine: 1, endLine: 2 }, theme, noContext);
+  const text = textOf(component).trim();
+  expect(text).toBe("read_anchored_file x.md:1-2");
+});
+
+it("keeps a target-name suffix's own single leading space (edit a.ts)", () => {
+  const renderer = renderToolCall("apply_anchored_edits", (args, t) =>
+    t.fg("warning", ` ${args.display}`),
+  );
+  const component = renderer({ display: "a.ts" }, theme, noContext);
+  const text = textOf(component).trim();
+  expect(text).toBe("apply_anchored_edits a.ts");
+  expect(text).not.toContain("  ");
+});
