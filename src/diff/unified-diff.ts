@@ -25,16 +25,22 @@ export function unifiedDiff(
   let oldLine = 1;
   let newLine = 1;
   let lastWasChange = false;
+  // Initial-state number for the next inserted line. A pure insertion sits at
+  // the next original line's number; a replacement (delete-then-insert) sits
+  // at the first deleted line's number. Stacked insertions increment.
+  let insertNumber = 1;
 
   for (let i = 0; i < diffOps.length; i++) {
     const op = diffOps[i];
     if (op.type === "insert") {
       for (let k = 0; k < op.count; k++) {
-        out.push(`+${String(newLine).padStart(width, " ")} ${after[op.newStart + k]}`);
+        out.push(`+${String(insertNumber).padStart(width, " ")} ${after[op.newStart + k]}`);
+        insertNumber++;
         newLine++;
       }
       lastWasChange = true;
     } else if (op.type === "delete") {
+      insertNumber = op.oldStart + 1;
       for (let k = 0; k < op.count; k++) {
         out.push(`-${String(oldLine).padStart(width, " ")} ${before[op.oldStart + k]}`);
         oldLine++;
@@ -72,6 +78,7 @@ export function unifiedDiff(
       // Else: context not adjacent to any change, skip entirely.
       oldLine += count;
       newLine += count;
+      insertNumber = oldLine;
       lastWasChange = false;
     }
   }

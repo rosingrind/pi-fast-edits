@@ -67,3 +67,25 @@ describe("unifiedDiff", () => {
     expect(diff).toContain("    ...");
   });
 });
+
+it("numbers insertions by initial state after earlier deletions (no new-file drift)", () => {
+  // user-reported case: delete 5 lines (initial 100-104), then insert one
+  // line between initial 110 and 111. The inserted line must be numbered in
+  // initial-file space (+111), not after-file space (+106).
+  const before = [
+    ...Array.from({ length: 130 }, (_, i) => `filler ${String(i + 1).padStart(3, "0")}`),
+  ];
+  const after = [
+    ...before.slice(0, 99), // initial 1-99
+    ...before.slice(104, 110), // initial 105-110 (drops initial 100-104)
+    "comment between filler 020 and 021", // inserted between initial 110 and 111
+    ...before.slice(110), // initial 111-130
+  ];
+  const diff = unifiedDiff(before, after);
+  expect(diff).toContain("-100 filler 100");
+  expect(diff).toContain(" 110 filler 110");
+  expect(diff).toContain("+111 comment between filler 020 and 021");
+  expect(diff).toContain(" 111 filler 111");
+  // the drifted new-file number must not appear
+  expect(diff).not.toContain("+106 comment");
+});
