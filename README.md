@@ -21,7 +21,7 @@ The agent can then replace the `Cider..Eagle` range with new code. The extension
 ## Usage notes
 
 - Anchor names (e.g., `Cider`) are used in tool parameters to reference lines
-- Anchor parameters take the bare anchor word copied from `read_anchored_file`/`grep_anchored_files` output
+- Anchor parameters take the bare anchor word copied from `read_anchored`/`grep_anchored` output
 - With `requireAnchorLines` on (the default), every edit must also pass the exact current source line at each anchor — `startAnchorLine`/`endAnchorLine` (or `anchorLine` for inserts) — copied verbatim from read/grep output. The line is verified against the file before editing; a mismatch rejects the edit with a corrective message
 - Rendered lines end with a `line N` (grep) or `lines N` (skeleton) positional suffix — it is metadata, not part of the line, and must NOT be copied into `startAnchorLine`/`endAnchorLine`/`anchorLine` values
 - When `requireAnchorLines` is off, the line args are optional but still verified whenever they are provided
@@ -56,7 +56,7 @@ pi -e ./src/index.ts
 
 ## Tools
 
-### `read_anchored_file`
+### `read_anchored`
 
 Reads a text file with stable word anchors.
 
@@ -73,7 +73,7 @@ For large files, `auto` mode returns a heuristic skeleton instead of dumping the
 
 ### `write_anchored`
 
-Writes a full file and seeds its anchor state in one call, returning the revision hash plus an anchored preview of the first 5 lines so the anchored edit tools work immediately without a `read_anchored_file` call.
+Writes a full file and seeds its anchor state in one call, returning the revision hash plus an anchored preview of the first 5 lines so the anchored edit tools work immediately without a `read_anchored` call.
 
 ```json
 {
@@ -87,9 +87,9 @@ Writes a full file and seeds its anchor state in one call, returning the revisio
 
 Rejects protected paths before any write; overwriting an existing file replaces its content and refreshes the revision. This is the same behavior `write` gets in [override mode](#override-mode).
 
-### `grep_anchored_files`
+### `grep_anchored`
 
-Searches file contents with a regex and returns matching lines with the same anchors and revision hashes as `read_anchored_file`, ready to feed into the edit tools: pass the per-file `Revision` as `expectedRevision`, and copy the matching line text verbatim into `startAnchorLine`/`endAnchorLine`/`anchorLine` — dropping the trailing `line N` suffix, which is positional metadata and not part of the line.
+Searches file contents with a regex and returns matching lines with the same anchors and revision hashes as `read_anchored`, ready to feed into the edit tools: pass the per-file `Revision` as `expectedRevision`, and copy the matching line text verbatim into `startAnchorLine`/`endAnchorLine`/`anchorLine` — dropping the trailing `line N` suffix, which is positional metadata and not part of the line.
 
 ```json
 {
@@ -129,7 +129,7 @@ Batches multiple edits. This is the preferred tool for multi-file or multi-regio
 }
 ```
 
-### `preview_anchored_edit`
+### `preview_anchored`
 
 Returns a diff for a replacement edit without writing files.
 
@@ -147,12 +147,12 @@ When enabled, a load-time safety check fingerprints pi's built-in tool definitio
 
 The four replaced names:
 
-- `read` — `read_anchored_file` under the built-in name, anchored by default. Pass `anchored: false` for plain `lineNo: text` output without anchors or the revision header; schema, caps, and `details` are unchanged.
-- `edit` — anchored multi-edit (`apply_anchored_edits` behavior) under the built-in name.
+- `read` — `read_anchored` under the built-in name, anchored by default. Pass `anchored: false` for plain `lineNo: text` output without anchors or the revision header; schema, caps, and `details` are unchanged.
+- `edit` — anchored multi-edit (`apply_anchored` behavior) under the built-in name.
 - `write` — anchor-seeding write (`write_anchored`): full-file writes that seed anchor state and return the revision plus an anchored preview, so subsequent edits need no re-read. Protection checks (`protectedPaths`), workspace bounds, and atomic writes apply exactly as elsewhere.
-- `grep` — anchored search (`grep_anchored_files`) under the built-in name, edit-ready by construction.
+- `grep` — anchored search (`grep_anchored`) under the built-in name, edit-ready by construction.
 
-While override is on, the five suffixed names (`read_anchored_file`, `grep_anchored_files`, `write_anchored`, `preview_anchored_edit`, `apply_anchored_edits`) are deactivated via `setActiveTools` — the same behavior is never exposed under two names. Each overridden description carries a prefix ("Anchored read (default).", "Anchored edit (batch).", etc.) so the model can tell the definitions apart.
+While override is on, the five suffixed names (`read_anchored`, `grep_anchored`, `write_anchored`, `preview_anchored`, `apply_anchored`) are deactivated via `setActiveTools` — the same behavior is never exposed under two names. Each overridden description carries a prefix ("Anchored read (default).", "Anchored edit (batch).", etc.) so the model can tell the definitions apart.
 
 Toggling the setting from the config menu re-registers the surface immediately and injects a one-shot notice into the conversation announcing the change in both directions. On the disable direction, the overridden names keep their anchored definitions until pi reloads the extension (pi has no unregister API); the suffixed tools re-activate alongside, so the surface works immediately but is fully native only after a reload.
 

@@ -41,14 +41,14 @@ describe("concurrency: batch + parallel edit scenarios", () => {
 
       // Read file in session
       const r = await tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("0", { path: "batch-overlap.txt" }, undefined, undefined, { cwd });
       const revision = (r.details as any)?.revision;
       const lines = (r.details as any)?.lines as any[];
 
       // Two batches in parallel, both editing same file (no expectedRevision - each plans fresh)
       const [batch1, batch2] = await Promise.all([
-        tools.get("apply_anchored_edits")!.execute(
+        tools.get("apply_anchored")!.execute(
           "1",
           {
             edits: [
@@ -68,7 +68,7 @@ describe("concurrency: batch + parallel edit scenarios", () => {
           undefined,
           { cwd },
         ),
-        tools.get("apply_anchored_edits")!.execute(
+        tools.get("apply_anchored")!.execute(
           "2",
           {
             edits: [
@@ -114,13 +114,13 @@ describe("concurrency: batch + parallel edit scenarios", () => {
 
       // Read valid file
       const r = await tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("1", { path: "valid.txt" }, undefined, undefined, { cwd });
       const revision = (r.details as any)?.revision;
       const line1Anchor = (r.details as any)?.lines[0].anchor as string;
       const line1Text = (r.details as any)?.lines[0].text as string;
       await expect(
-        tools.get("apply_anchored_edits")!.execute(
+        tools.get("apply_anchored")!.execute(
           "2",
           {
             edits: [
@@ -166,10 +166,10 @@ describe("concurrency: batch + parallel edit scenarios", () => {
 
       // Read both files
       const rA = await tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("1", { path: "batch-anchor-a.txt" }, undefined, undefined, { cwd });
       const rB = await tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("2", { path: "batch-anchor-b.txt" }, undefined, undefined, { cwd });
       const revA = (rA.details as any)?.revision;
       const revB = (rB.details as any)?.revision;
@@ -178,7 +178,7 @@ describe("concurrency: batch + parallel edit scenarios", () => {
 
       // Batch with one valid, one invalid anchor - should throw
       await expect(
-        tools.get("apply_anchored_edits")!.execute(
+        tools.get("apply_anchored")!.execute(
           "3",
           {
             edits: [

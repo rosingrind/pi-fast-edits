@@ -36,7 +36,7 @@ describe("auto mode boundary (line-count threshold)", () => {
     const tools = await loadTools();
 
     const result = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "many-short.txt" }, undefined, undefined, { cwd });
 
     expect(result.details.mode).toBe("skeleton");
@@ -51,7 +51,7 @@ describe("auto mode boundary (line-count threshold)", () => {
     const tools = await loadTools();
 
     const result = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "at-limit.txt" }, undefined, undefined, { cwd });
 
     expect(result.details.mode).toBe("full");
@@ -68,7 +68,7 @@ describe("auto mode boundary (line-count threshold)", () => {
     const tools = await loadTools();
 
     const result = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "huge-line.txt" }, undefined, undefined, { cwd });
 
     expect(result.details.mode).toBe("skeleton");
@@ -85,7 +85,7 @@ describe("config degenerate zero-values", () => {
     // Without endLine, the default end = min(3, 1 + 0 - 1) = 0, so start(1) > end(0).
     await expect(
       tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("1", { path: "range-zero.txt", startLine: 1 }, undefined, undefined, { cwd }),
     ).rejects.toThrow(/Invalid range/);
   });
@@ -98,7 +98,7 @@ describe("config degenerate zero-values", () => {
     const tools = await loadTools({ maxSkeletonItems: 0 });
 
     const result = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "skeleton-zero.txt", mode: "skeleton" }, undefined, undefined, { cwd });
 
     expect(result.details.mode).toBe("skeleton");
@@ -115,7 +115,7 @@ describe("config degenerate zero-values", () => {
     const tools = await loadTools({ maxFullReadLines: 0 });
 
     const result = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "full-zero.txt", mode: "full" }, undefined, undefined, { cwd });
 
     // Full mode has no line cap — maxFullReadLines only affects auto mode.
@@ -134,7 +134,7 @@ describe("maxRangeReadLines clamp", () => {
 
     // Without endLine, the default end = min(1000, 1 + 400 - 1) = 400.
     const result = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "range-clamp.txt", startLine: 1 }, undefined, undefined, { cwd });
 
     expect(result.details.mode).toBe("range");
@@ -158,7 +158,7 @@ describe("config NaN and negative values", () => {
     const tools = await loadTools({ maxFullReadBytes: NaN as any });
 
     const result = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "nan-bytes.txt" }, undefined, undefined, { cwd });
 
     // byteLength > NaN is always false, so auto mode must not escalate to skeleton.
@@ -173,7 +173,7 @@ describe("config NaN and negative values", () => {
 
     // slice(0, NaN) yields no lines; the start>end guard is skipped because 1 > NaN is false.
     const result = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "nan-range.txt", startLine: 1 }, undefined, undefined, { cwd });
 
     expect(result.details.mode).toBe("range");
@@ -189,7 +189,7 @@ describe("config NaN and negative values", () => {
     // end = min(100, 1 + (-1) - 1) = -1, so start(1) > end(-1) → invalid range.
     await expect(
       tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("1", { path: "neg-range.txt", startLine: 1 }, undefined, undefined, { cwd }),
     ).rejects.toThrow(/Invalid range/);
   });
@@ -204,7 +204,7 @@ describe("maxSkeletonItems cap", () => {
     const tools = await loadTools({ maxSkeletonItems: 120 });
 
     const result = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "skeleton-cap.txt", mode: "skeleton" }, undefined, undefined, { cwd });
 
     expect(result.details.mode).toBe("skeleton");

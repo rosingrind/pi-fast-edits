@@ -22,14 +22,14 @@ function fullBuiltins(): ToolDef[] {
 
 function oursFull(): ToolDef[] {
   return [
-    { name: "read_anchored_file", parameters: { properties: { path: {} } }, execute: () => {} },
+    { name: "read_anchored", parameters: { properties: { path: {} } }, execute: () => {} },
     {
-      name: "apply_anchored_edits",
+      name: "apply_anchored",
       parameters: { properties: { edits: {} } },
       execute: () => {},
     },
     {
-      name: "grep_anchored_files",
+      name: "grep_anchored",
       parameters: { properties: { pattern: {} } },
       execute: () => {},
     },
@@ -150,11 +150,11 @@ describe("checkOverrideCompatibility", () => {
 
   it("fails when our definition has no execute handler", () => {
     const ours = oursFull().map((def) =>
-      def.name === "read_anchored_file" ? { ...def, execute: null } : def,
+      def.name === "read_anchored" ? { ...def, execute: null } : def,
     );
     const check = checkOverrideCompatibility(fullBuiltins(), ours);
     expect(check.ok).toBe(false);
-    expect(check.reasons).toContain("Our 'read_anchored_file' tool has no execute handler.");
+    expect(check.reasons).toContain("Our 'read_anchored' tool has no execute handler.");
   });
 });
 
@@ -262,7 +262,7 @@ describe("applyOverrideMode wiring", () => {
     expect(write?.reason).toContain("pi-fast-edits override");
     const edit = await handlers.tool_call!({ toolName: "edit" }, {});
     expect(edit?.block).toBe(true);
-    const read = await handlers.tool_call!({ toolName: "read_anchored_file" }, {});
+    const read = await handlers.tool_call!({ toolName: "read_anchored" }, {});
     expect(read).toBeUndefined();
 
     // A visible warning explains the fallback.
@@ -310,7 +310,7 @@ describe("renderToolCall name overrides", () => {
     const { Text } = await import("@earendil-works/pi-tui");
     const theme = { fg: (_k: string, s: string) => s, bold: (s: string) => s };
 
-    const render = renderToolCall("read_anchored_file", () => "");
+    const render = renderToolCall("read_anchored", () => "");
     render(
       { path: "a.txt" },
       theme as any,
@@ -318,14 +318,14 @@ describe("renderToolCall name overrides", () => {
     );
     // (component text asserted below after overrides are set)
 
-    setToolNameOverrides({ read_anchored_file: "read" });
+    setToolNameOverrides({ read_anchored: "read" });
     const comp = render(
       { path: "a.txt" },
       theme as any,
       { lastComponent: undefined, isPartial: false, isError: false } as any,
     );
     expect((comp as InstanceType<typeof Text>).render(200)[0]).toContain("read ");
-    expect((comp as InstanceType<typeof Text>).render(200)[0]).not.toContain("read_anchored_file");
+    expect((comp as InstanceType<typeof Text>).render(200)[0]).not.toContain("read_anchored");
 
     clearToolNameOverrides();
     const comp2 = render(
@@ -333,11 +333,11 @@ describe("renderToolCall name overrides", () => {
       theme as any,
       { lastComponent: undefined, isPartial: false, isError: false } as any,
     );
-    expect((comp2 as InstanceType<typeof Text>).render(200)[0]).toContain("read_anchored_file");
+    expect((comp2 as InstanceType<typeof Text>).render(200)[0]).toContain("read_anchored");
   });
 });
 
-describe("apply_anchored_edits prepareArguments (edits-as-string quirk)", () => {
+describe("apply_anchored prepareArguments (edits-as-string quirk)", () => {
   async function getDef() {
     const tools = new Map<string, any>();
     const { default: piFastEdits } = await import("../src/index.js");
@@ -349,7 +349,7 @@ describe("apply_anchored_edits prepareArguments (edits-as-string quirk)", () => 
       } as any,
       { requireAnchorLines: false },
     );
-    return tools.get("apply_anchored_edits");
+    return tools.get("apply_anchored");
   }
 
   it("normalizes edits sent as a JSON string", async () => {

@@ -39,7 +39,7 @@ describe("Myers diff performance edge cases", () => {
 
     // Read old file to get anchors.
     const oldResult = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "old.txt", mode: "full" }, undefined, undefined, { cwd });
     const oldRevision = oldResult.details.revision;
     const oldLinesData = oldResult.details.lines as Array<{ anchor: string; text: string }>;
@@ -50,7 +50,7 @@ describe("Myers diff performance edge cases", () => {
 
     const start = Date.now();
     // Replace entire old file content with new file content.
-    const editResult = await tools.get("apply_anchored_edits")!.execute(
+    const editResult = await tools.get("apply_anchored")!.execute(
       "3",
       {
         edits: [
@@ -88,7 +88,7 @@ describe("Myers diff performance edge cases", () => {
 
     // Full read gets the anchors and revision.
     const readResult = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "rewrite.txt", mode: "full" }, undefined, undefined, { cwd });
     const revision = readResult.details.revision;
     const linesData = readResult.details.lines as Array<{ anchor: string; text: string }>;
@@ -98,7 +98,7 @@ describe("Myers diff performance edge cases", () => {
     const lastAnchorLine = linesData[linesData.length - 1].text;
 
     const start = Date.now();
-    const editResult = await tools.get("apply_anchored_edits")!.execute(
+    const editResult = await tools.get("apply_anchored")!.execute(
       "2",
       {
         edits: [
@@ -126,7 +126,7 @@ describe("Myers diff performance edge cases", () => {
 
     // Final file has the new content.
     const afterResult = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("3", { path: "rewrite.txt", mode: "full" }, undefined, undefined, { cwd });
     const afterLines = afterResult.details.lines as Array<{ text: string }>;
     expect(afterLines).toHaveLength(3000);
@@ -141,7 +141,7 @@ describe("Myers diff performance edge cases", () => {
     const tools = await loadTools();
 
     const readResult = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "same.txt", mode: "full" }, undefined, undefined, { cwd });
     const revision = readResult.details.revision;
     const linesData = readResult.details.lines as Array<{ anchor: string; text: string }>;
@@ -151,7 +151,7 @@ describe("Myers diff performance edge cases", () => {
     const lastAnchorLine = linesData[linesData.length - 1].text;
 
     // Replace with identical content — edit succeeds, file unchanged.
-    const editResult = await tools.get("apply_anchored_edits")!.execute(
+    const editResult = await tools.get("apply_anchored")!.execute(
       "2",
       {
         edits: [
@@ -176,7 +176,7 @@ describe("Myers diff performance edge cases", () => {
     expect(editResult.content[0].text).toContain("No changes");
     // File content is unchanged (edit was a no-op at content level).
     const afterResult = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("3", { path: "same.txt", mode: "full" }, undefined, undefined, { cwd });
     const afterLines = afterResult.details.lines as Array<{ text: string }>;
     expect(afterLines[0].text).toBe("line-0");
@@ -190,7 +190,7 @@ describe("Myers diff performance edge cases", () => {
     const tools = await loadTools();
 
     const result = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "long.txt", mode: "full" }, undefined, undefined, { cwd });
 
     // Should succeed, not crash.
@@ -213,7 +213,7 @@ describe("session state growth", () => {
     // Read all 100 files in sequence.
     for (let i = 0; i < 100; i++) {
       const result = await tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute(String(i), { path: `file-${i}.txt` }, undefined, undefined, { cwd });
       expect(result.details.revision).toBeDefined();
     }
@@ -233,7 +233,7 @@ describe("unicode and emoji in anchors", () => {
     const tools = await loadTools();
 
     const result = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "unicode.txt", mode: "full" }, undefined, undefined, { cwd });
 
     expect(result.details.mode).toBe("full");
@@ -253,13 +253,13 @@ describe("unicode and emoji in anchors", () => {
     const tools = await loadTools();
 
     const readResult = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "unicode-edit.txt", mode: "full" }, undefined, undefined, { cwd });
     const revision = readResult.details.revision;
     const lines = readResult.details.lines as Array<{ anchor: string; text: string }>;
     const firstAnchor = lines[0].anchor;
 
-    const editResult = await tools.get("apply_anchored_edits")!.execute(
+    const editResult = await tools.get("apply_anchored")!.execute(
       "2",
       {
         edits: [
@@ -296,7 +296,7 @@ describe("anchor churn under rapid edits", () => {
     for (let i = 0; i < 50; i++) {
       // Read current state before each edit
       const read = await tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute(String(i * 2), { path: "churn.txt" }, undefined, undefined, { cwd });
       const lines = (read.details as any)?.lines as Array<{ anchor: string; text: string }>;
 
@@ -312,7 +312,7 @@ describe("anchor churn under rapid edits", () => {
       const anchor = lines[targetLine].anchor;
       const anchorLineText = lines[targetLine].text;
 
-      const result = await tools.get("apply_anchored_edits")!.execute(
+      const result = await tools.get("apply_anchored")!.execute(
         String(i * 2 + 1),
         {
           edits: [
@@ -340,7 +340,7 @@ describe("anchor churn under rapid edits", () => {
 
     // Verify anchors are all unique
     const finalRead = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("100", { path: "churn.txt" }, undefined, undefined, { cwd });
     const finalLinesData = (finalRead.details as any)?.lines as Array<{
       anchor: string;
@@ -363,7 +363,7 @@ describe("Myers fallback branch (n + m >= 4000)", () => {
     const tools = await loadTools();
 
     const readResult = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "fallback.txt", mode: "full" }, undefined, undefined, { cwd });
     const revision = readResult.details.revision;
     const linesData = readResult.details.lines as Array<{ anchor: string; text: string }>;
@@ -374,7 +374,7 @@ describe("Myers fallback branch (n + m >= 4000)", () => {
     const lastAnchorLine = linesData[linesData.length - 1].text;
 
     // Replace the whole file content with the new lines.
-    const editResult = await tools.get("apply_anchored_edits")!.execute(
+    const editResult = await tools.get("apply_anchored")!.execute(
       "2",
       {
         edits: [
@@ -400,7 +400,7 @@ describe("Myers fallback branch (n + m >= 4000)", () => {
 
     // Final file content is correct: all 3200 new lines.
     const afterResult = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("3", { path: "fallback.txt", mode: "full" }, undefined, undefined, { cwd });
     const afterLines = afterResult.details.lines as Array<{ anchor: string; text: string }>;
     expect(afterLines).toHaveLength(lineCount);

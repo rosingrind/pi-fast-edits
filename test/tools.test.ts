@@ -35,7 +35,7 @@ async function workspace() {
   return mkdtemp(join(tmpdir(), "pi-fast-edits-"));
 }
 
-/** Read a file with read_anchored_file and return its text, revision, and anchored lines. */
+/** Read a file with read_anchored and return its text, revision, and anchored lines. */
 async function readAnchored(
   tools: Map<string, ToolDef>,
   cwd: string,
@@ -43,7 +43,7 @@ async function readAnchored(
   toolCallId = "1",
 ) {
   const read = await tools
-    .get("read_anchored_file")!
+    .get("read_anchored")!
     .execute(toolCallId, { path }, undefined, undefined, { cwd });
   const details = (read as any).details as {
     revision: string;
@@ -60,13 +60,13 @@ describe("anchored tools", () => {
     const tools = await loadTools();
 
     const read = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "sample.ts" }, undefined, undefined, { cwd });
     const text = read.content[0].text as string;
     expect(text).toContain(`${read.details.lines[0].anchor}§ export function run()`);
     expect(read.details.revision).toMatch(/^[a-f0-9]{16}$/);
 
-    await tools.get("apply_anchored_edits")!.execute(
+    await tools.get("apply_anchored")!.execute(
       "2",
       {
         edits: [
@@ -101,7 +101,7 @@ describe("anchored tools", () => {
     const tools = await loadTools();
 
     const read1 = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "sample.ts" }, undefined, undefined, { cwd });
     const details1 = read1.details as {
       lines: Array<{ anchor: string; text: string }>;
@@ -112,7 +112,7 @@ describe("anchored tools", () => {
     await writeFile(file, "one\ntwo changed\nthree\nfour\n", "utf8");
 
     await expect(
-      tools.get("apply_anchored_edits")!.execute(
+      tools.get("apply_anchored")!.execute(
         "2",
         {
           edits: [
@@ -136,14 +136,14 @@ describe("anchored tools", () => {
 
     // Recovery: re-read gives a fresh mapping and the edit goes through.
     const read2 = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("3", { path: "sample.ts" }, undefined, undefined, { cwd });
     const details2 = read2.details as {
       lines: Array<{ anchor: string; text: string }>;
       revision: string;
     };
     const target = details2.lines.find((l) => l.text === "two changed")!;
-    await tools.get("apply_anchored_edits")!.execute(
+    await tools.get("apply_anchored")!.execute(
       "4",
       {
         edits: [
@@ -174,7 +174,7 @@ describe("anchored tools", () => {
 
     const { lines } = await readAnchored(tools, cwd, "sample.txt");
 
-    await tools.get("apply_anchored_edits")!.execute(
+    await tools.get("apply_anchored")!.execute(
       "1",
       {
         edits: [
@@ -216,7 +216,7 @@ describe("anchored tools", () => {
 
     await expect(
       tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("1", { path: outside }, undefined, undefined, { cwd }),
     ).rejects.toThrow(/outside workspace/);
   });
@@ -229,14 +229,14 @@ describe("anchored tools", () => {
 
     await expect(
       tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("1", { path: "binary.dat" }, undefined, undefined, { cwd }),
     ).rejects.toThrow(/binary file/);
   });
 
 
 
-  it("preview_anchored_edit shows diff without writing", async () => {
+  it("preview_anchored shows diff without writing", async () => {
     const cwd = await workspace();
     const file = join(cwd, "sample.txt");
     await writeFile(file, "alpha\nbeta\ngamma\n", "utf8");
@@ -244,7 +244,7 @@ describe("anchored tools", () => {
 
     const { lines } = await readAnchored(tools, cwd, "sample.txt");
 
-    const result = await tools.get("preview_anchored_edit")!.execute(
+    const result = await tools.get("preview_anchored")!.execute(
       "1",
       {
         path: "sample.txt",
@@ -265,7 +265,7 @@ describe("anchored tools", () => {
     await expect(readFile(file, "utf8")).resolves.toBe("alpha\nbeta\ngamma\n");
   });
 
-  it("read_anchored_file skeleton mode for large files", async () => {
+  it("read_anchored skeleton mode for large files", async () => {
     const cwd = await workspace();
     const lines = Array.from({ length: 200 }, (_, i) => `line ${i + 1}`);
     const file = join(cwd, "large.txt");
@@ -273,7 +273,7 @@ describe("anchored tools", () => {
     const tools = await loadTools();
 
     const result = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "large.txt", mode: "skeleton" }, undefined, undefined, { cwd });
 
     const text = result.content[0].text as string;
@@ -289,20 +289,20 @@ describe("anchored tools", () => {
     await writeFile(file, content, "utf8");
     const tools = await loadTools();
     const result = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "large-bytes.txt" }, undefined, undefined, { cwd });
     const text = result.content[0].text as string;
     expect(text).toContain("Mode: skeleton");
   });
 
-  it("read_anchored_file range mode with clamping", async () => {
+  it("read_anchored range mode with clamping", async () => {
     const cwd = await workspace();
     const file = join(cwd, "sample.txt");
     await writeFile(file, "alpha\nbeta\ngamma\n", "utf8");
     const tools = await loadTools();
 
     const result = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "sample.txt", startLine: 1, endLine: 2 }, undefined, undefined, {
         cwd,
       });
@@ -321,7 +321,7 @@ describe("anchored tools", () => {
 
     const { lines } = await readAnchored(tools, cwd, "sample.txt");
 
-    await tools.get("apply_anchored_edits")!.execute(
+    await tools.get("apply_anchored")!.execute(
       "1",
       {
         edits: [
@@ -368,7 +368,7 @@ describe("anchored tools", () => {
     const tools = await loadTools();
 
     const result = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "large.txt" }, undefined, undefined, { cwd });
 
     const text = result.content[0].text as string;
@@ -377,7 +377,7 @@ describe("anchored tools", () => {
   });
 
 
-  it("rejects overlapping edits in apply_anchored_edits", async () => {
+  it("rejects overlapping edits in apply_anchored", async () => {
     const cwd = await workspace();
     const file = join(cwd, "sample.txt");
     await writeFile(file, "alpha\nbeta\ngamma\ndelta\n", "utf8");
@@ -386,7 +386,7 @@ describe("anchored tools", () => {
     const { lines } = await readAnchored(tools, cwd, "sample.txt");
 
     await expect(
-      tools.get("apply_anchored_edits")!.execute(
+      tools.get("apply_anchored")!.execute(
         "1",
         {
           edits: [
@@ -427,7 +427,7 @@ describe("anchored tools", () => {
 
     // Read to get the revision hash
     const readResult = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "overlap.txt" }, undefined, undefined, { cwd });
     const revision = (readResult.details as any)?.revision;
     const lines = (readResult.details as any)?.lines as any[];
@@ -436,7 +436,7 @@ describe("anchored tools", () => {
     // Insert before INS + replace INS..REP
     // Order: insert first
     await expect(
-      tools.get("apply_anchored_edits")!.execute(
+      tools.get("apply_anchored")!.execute(
         "2",
         {
           edits: [
@@ -469,7 +469,7 @@ describe("anchored tools", () => {
 
     // Same edits in reverse order
     await expect(
-      tools.get("apply_anchored_edits")!.execute(
+      tools.get("apply_anchored")!.execute(
         "3",
         {
           edits: [
@@ -512,7 +512,7 @@ describe("anchored tools", () => {
     const { lines: linesA } = await readAnchored(tools, cwd, "a.txt");
     const { lines: linesB } = await readAnchored(tools, cwd, "b.txt", "2");
 
-    await tools.get("apply_anchored_edits")!.execute(
+    await tools.get("apply_anchored")!.execute(
       "1",
       {
         edits: [
@@ -554,7 +554,7 @@ describe("anchored tools", () => {
 
     const { lines } = await readAnchored(tools, cwd, "sample.txt");
 
-    await tools.get("apply_anchored_edits")!.execute(
+    await tools.get("apply_anchored")!.execute(
       "1",
       {
         edits: [
@@ -600,7 +600,7 @@ describe("error paths", () => {
     const tools = await loadTools();
     await expect(
       tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("1", { path: "nonexistent.txt" }, undefined, undefined, { cwd }),
     ).rejects.toThrow(/ENOENT|no such file/i);
   });
@@ -611,7 +611,7 @@ describe("error paths", () => {
     const tools = await loadTools();
     await expect(
       tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("1", { path: "subdir" }, undefined, undefined, { cwd }),
     ).rejects.toThrow(/not a regular file/);
   });
@@ -624,17 +624,17 @@ describe("error paths", () => {
     const tools = await loadTools();
     await expect(
       tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("1", { path: "broken-link.txt" }, undefined, undefined, { cwd }),
     ).rejects.toThrow();
   });
 
-  it("preview_anchored_edit rejects a stale revision", async () => {
+  it("preview_anchored rejects a stale revision", async () => {
     const cwd = await workspace();
     await writeFile(join(cwd, "preview.txt"), "alpha\nbeta\n", "utf8");
     const tools = await loadTools();
     await expect(
-      tools.get("preview_anchored_edit")!.execute(
+      tools.get("preview_anchored")!.execute(
         "1",
         {
           path: "preview.txt",
@@ -650,12 +650,12 @@ describe("error paths", () => {
     ).rejects.toThrow(/Revision mismatch/);
   });
 
-  it("preview_anchored_edit rejects an invalid anchor", async () => {
+  it("preview_anchored rejects an invalid anchor", async () => {
     const cwd = await workspace();
     await writeFile(join(cwd, "preview2.txt"), "alpha\nbeta\n", "utf8");
     const tools = await loadTools();
     await expect(
-      tools.get("preview_anchored_edit")!.execute(
+      tools.get("preview_anchored")!.execute(
         "1",
         {
           path: "preview2.txt",
@@ -670,13 +670,13 @@ describe("error paths", () => {
     ).rejects.toThrow(/Could not find start anchor/);
   });
 
-  it("apply_anchored_edits rejects batch with invalid anchor", async () => {
+  it("apply_anchored rejects batch with invalid anchor", async () => {
     const cwd = await workspace();
     const file = join(cwd, "batch-invalid.txt");
     await writeFile(file, "alpha\nbeta\n", "utf8");
     const tools = await loadTools();
     await expect(
-      tools.get("apply_anchored_edits")!.execute(
+      tools.get("apply_anchored")!.execute(
         "1",
         {
           edits: [
@@ -708,7 +708,7 @@ describe("error paths", () => {
     const tools = await loadTools();
     await expect(
       tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("1", { path: "binary-late.txt" }, undefined, undefined, { cwd }),
     ).rejects.toThrow("binary");
   });
@@ -720,7 +720,7 @@ describe("error paths", () => {
     const tools = await loadTools();
 
     await expect(
-      tools.get("apply_anchored_edits")!.execute(
+      tools.get("apply_anchored")!.execute(
         "1",
         {
           edits: [
@@ -753,13 +753,13 @@ describe("error paths", () => {
     await writeFile(file, "SECRET=1\n", "utf8");
     const tools = await loadTools();
     const readResult = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: ".env" }, undefined, undefined, { cwd });
     const revision = (readResult.details as any)?.revision;
 
     // Default config (confirmation: "protected-paths") on a protected path with
     // no confirmation UI available cancels the whole batch without writing.
-    const result = await tools.get("apply_anchored_edits")!.execute(
+    const result = await tools.get("apply_anchored")!.execute(
       "2",
       {
         edits: [
@@ -793,7 +793,7 @@ describe("error paths", () => {
     await writeFile(file, "", "utf8");
     const tools = await loadTools();
 
-    const result = await tools.get("apply_anchored_edits")!.execute(
+    const result = await tools.get("apply_anchored")!.execute(
       "1",
       {
         edits: [
@@ -818,7 +818,7 @@ describe("error paths", () => {
 
 
 
-  it("preview_anchored_edit rejects a mismatched anchorLine", async () => {
+  it("preview_anchored rejects a mismatched anchorLine", async () => {
     const cwd = await workspace();
     const file = join(cwd, "preview-coord.txt");
     await writeFile(file, "alpha\nbeta\n", "utf8");
@@ -827,7 +827,7 @@ describe("error paths", () => {
     const { lines } = await readAnchored(tools, cwd, "preview-coord.txt");
 
     await expect(
-      tools.get("preview_anchored_edit")!.execute(
+      tools.get("preview_anchored")!.execute(
         "1",
         {
           path: "preview-coord.txt",
@@ -846,7 +846,7 @@ describe("error paths", () => {
     await expect(readFile(file, "utf8")).resolves.toBe("alpha\nbeta\n");
   });
 
-  it("apply_anchored_edits rejects a mismatched anchorLine before writing", async () => {
+  it("apply_anchored rejects a mismatched anchorLine before writing", async () => {
     const cwd = await workspace();
     const file = join(cwd, "batch-coord.txt");
     await writeFile(file, "alpha\nbeta\n", "utf8");
@@ -855,7 +855,7 @@ describe("error paths", () => {
     const { lines } = await readAnchored(tools, cwd, "batch-coord.txt");
 
     await expect(
-      tools.get("apply_anchored_edits")!.execute(
+      tools.get("apply_anchored")!.execute(
         "1",
         {
           edits: [
@@ -891,17 +891,17 @@ describe("error paths", () => {
 });
 
 describe("edge cases", () => {
-  it("preview_anchored_edit with includeStart=false works", async () => {
+  it("preview_anchored with includeStart=false works", async () => {
     const cwd = await workspace();
     const file = join(cwd, "preview-asym.txt");
     await writeFile(file, "alpha\nbeta\ngamma\n", "utf8");
     const tools = await loadTools();
     const readResult = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "preview-asym.txt" }, undefined, undefined, { cwd });
     const lines = (readResult.details as any)?.lines as any[];
 
-    const result = await tools.get("preview_anchored_edit")!.execute(
+    const result = await tools.get("preview_anchored")!.execute(
       "2",
       {
         path: "preview-asym.txt",
@@ -934,7 +934,7 @@ describe("edge cases", () => {
     await writeFile(join(cwd, "whitespace.txt"), "   \n  \n\n", "utf8");
     const tools = await loadTools();
     const result = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "whitespace.txt" }, undefined, undefined, { cwd });
     const text = result.content[0].text as string;
     const anchored = text.split("\n").filter((l) => l.includes("§"));
@@ -947,7 +947,7 @@ describe("edge cases", () => {
     await writeFile(file, "café\nnaïve\n日本語\n", "utf8");
     const tools = await loadTools();
     const read = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "unicode.txt" }, undefined, undefined, { cwd });
     const text = read.content[0].text as string;
     const anchored = text.split("\n").filter((l) => l.includes("§"));
@@ -955,7 +955,7 @@ describe("edge cases", () => {
 
     const revision = (read as any).details.revision as string;
     const lines = (read as any).details.lines as any[];
-    const result = await tools.get("apply_anchored_edits")!.execute(
+    const result = await tools.get("apply_anchored")!.execute(
       "1",
       {
         edits: [
@@ -979,12 +979,12 @@ describe("edge cases", () => {
     expect(result.content[0].text).toContain("No changes");
   });
 
-  it("preview_anchored_edit on empty file succeeds", async () => {
+  it("preview_anchored on empty file succeeds", async () => {
     const cwd = await workspace();
     const file = join(cwd, "preview-empty.txt");
     await writeFile(file, "", "utf8");
     const tools = await loadTools();
-    const result = await tools.get("preview_anchored_edit")!.execute(
+    const result = await tools.get("preview_anchored")!.execute(
       "1",
       {
         path: "preview-empty.txt",
@@ -1016,13 +1016,13 @@ describe("integration chains", () => {
     const tools = await loadTools();
 
     const r1 = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "chain.txt" }, undefined, undefined, { cwd });
     const revision = (r1 as any).details.revision as string;
     const lines = (r1 as any).details.lines as any[];
 
     // Remove the middle line (beta).
-    await tools.get("apply_anchored_edits")!.execute(
+    await tools.get("apply_anchored")!.execute(
       "1",
       {
         edits: [
@@ -1044,7 +1044,7 @@ describe("integration chains", () => {
     );
 
     const r2 = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("2", { path: "chain.txt" }, undefined, undefined, { cwd });
     const text = r2.content[0].text as string;
     const anchored = text.split("\n").filter((l) => l.includes("§"));
@@ -1059,12 +1059,12 @@ describe("integration chains", () => {
     const tools = await loadTools();
 
     const r1 = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "chain2.txt" }, undefined, undefined, { cwd });
     const revision = (r1 as any).details.revision as string;
     const lines = (r1 as any).details.lines as any[];
 
-    await tools.get("apply_anchored_edits")!.execute(
+    await tools.get("apply_anchored")!.execute(
       "1",
       {
         edits: [
@@ -1087,7 +1087,7 @@ describe("integration chains", () => {
 
     // Reusing the same (now stale) revision must fail.
     await expect(
-      tools.get("apply_anchored_edits")!.execute(
+      tools.get("apply_anchored")!.execute(
         "2",
         {
           edits: [
@@ -1117,10 +1117,10 @@ describe("integration chains", () => {
     const tools = await loadTools();
 
     let r = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "seq.txt" }, undefined, undefined, { cwd });
     const lines0 = (r as any).details.lines as any[];
-    await tools.get("apply_anchored_edits")!.execute(
+    await tools.get("apply_anchored")!.execute(
       "1",
       {
         edits: [
@@ -1143,10 +1143,10 @@ describe("integration chains", () => {
 
     // Re-read to obtain a fresh revision for the next edit.
     r = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("2", { path: "seq.txt" }, undefined, undefined, { cwd });
     const lines1 = (r as any).details.lines as any[];
-    await tools.get("apply_anchored_edits")!.execute(
+    await tools.get("apply_anchored")!.execute(
       "2",
       {
         edits: [
@@ -1177,7 +1177,7 @@ describe("integration chains", () => {
     const tools = await loadTools();
 
     const readResult = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "adjacent.txt" }, undefined, undefined, { cwd });
     const lines = (readResult.details as any)?.lines as any[];
     const revision = (readResult.details as any)?.revision;
@@ -1185,7 +1185,7 @@ describe("integration chains", () => {
     // Insert after "a" + delete "b" — these are adjacent, not truly conflicting,
     // but the current overlap detector treats them as overlapping.
     await expect(
-      tools.get("apply_anchored_edits")!.execute(
+      tools.get("apply_anchored")!.execute(
         "2",
         {
           edits: [
@@ -1229,10 +1229,10 @@ describe("batch integrity", () => {
     const tools = await loadTools();
 
     const rA = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "batch-a.txt" }, undefined, undefined, { cwd });
     const rB = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("2", { path: "batch-b.txt" }, undefined, undefined, { cwd });
     const revA = (rA as any).details?.revision;
     const revB = (rB as any).details?.revision;
@@ -1243,7 +1243,7 @@ describe("batch integrity", () => {
     await writeFile(fileB, "beta-changed\n", "utf8");
 
     await expect(
-      tools.get("apply_anchored_edits")!.execute(
+      tools.get("apply_anchored")!.execute(
         "3",
         {
           edits: [
@@ -1327,7 +1327,7 @@ describe("override", () => {
     const edit = await toolCallHandler!({ toolName: "edit" }, {});
     expect(edit?.block).toBe(true);
 
-    const read = await toolCallHandler!({ toolName: "read_anchored_file" }, {});
+    const read = await toolCallHandler!({ toolName: "read_anchored" }, {});
     expect(read).toBeUndefined();
 
     expect(notifications).toHaveLength(1);
@@ -1359,7 +1359,7 @@ describe("anchored read range modes", () => {
     const tools = await loadTools();
     await expect(
       tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("1", { path: "range-edge.txt", startLine: 5, endLine: 2 }, undefined, undefined, {
           cwd,
         }),
@@ -1371,7 +1371,7 @@ describe("anchored read range modes", () => {
     await writeFile(join(cwd, "range-start.txt"), "a\nb\nc\nd\ne\n", "utf8");
     const tools = await loadTools();
     const result = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "range-start.txt", startLine: 2 }, undefined, undefined, { cwd });
     const text = result.content[0].text as string;
     expect(text).toContain("Lines: 2-5 of 5");
@@ -1384,7 +1384,7 @@ describe("anchored read range modes", () => {
     await writeFile(join(cwd, "range-end.txt"), "a\nb\nc\nd\ne\n", "utf8");
     const tools = await loadTools();
     const result = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "range-end.txt", endLine: 2 }, undefined, undefined, { cwd });
     const text = result.content[0].text as string;
     expect(text).toContain("Lines: 1-2 of 5");
@@ -1398,7 +1398,7 @@ describe("anchored read range modes", () => {
     const tools = await loadTools();
     await expect(
       tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute(
           "1",
           { path: "range-clamp.txt", startLine: 10, endLine: 20 },
@@ -1418,7 +1418,7 @@ describe("anchored read range modes", () => {
     await writeFile(file, lines.join("\n") + "\n", "utf8");
     const tools = await loadTools();
     const result = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "large-lines.txt" }, undefined, undefined, { cwd });
     expect(result.content[0].text).toContain("Mode: skeleton");
   });
@@ -1431,7 +1431,7 @@ describe("read empty file", () => {
     await writeFile(file, "", "utf8");
     const tools = await loadTools();
     const result = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "empty-read.txt" }, undefined, undefined, { cwd });
     const text = result.content[0].text as string;
     expect(text).toContain("Lines: 0");

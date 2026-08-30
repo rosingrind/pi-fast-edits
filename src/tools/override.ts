@@ -1,8 +1,8 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { clearToolNameOverrides, setToolNameOverrides } from "./render.js";
 import type { PiFastEditsConfig, SessionState } from "../types.js";
-import type * as readAnchoredFileModule from "./read-anchored-file.js";
-import type * as applyAnchoredEditsModule from "./apply-anchored-edits.js";
+import type * as readAnchoredFileModule from "./read-anchored.js";
+import type * as applyAnchoredEditsModule from "./apply-anchored.js";
 import type * as grepAnchoredModule from "./grep-anchored.js";
 import type * as writeAnchoredModule from "./write-anchored.js";
 
@@ -29,11 +29,11 @@ export type SafetyCheck = { ok: boolean; reasons: string[] };
 
 /** Our tools whose behavior is replaced (and which are deactivated) in override mode. */
 export const SUFFIXED_TOOL_NAMES = [
-  "read_anchored_file",
-  "grep_anchored_files",
+  "read_anchored",
+  "grep_anchored",
   "write_anchored",
-  "preview_anchored_edit",
-  "apply_anchored_edits",
+  "preview_anchored",
+  "apply_anchored",
 ] as const;
 
 const hasExecute = (def: ToolDef): boolean => typeof def.execute === "function";
@@ -95,9 +95,9 @@ export function checkOverrideCompatibility(builtins: ToolDef[], ours: ToolDef[])
   }
 
   for (const oursName of [
-    "read_anchored_file",
-    "apply_anchored_edits",
-    "grep_anchored_files",
+    "read_anchored",
+    "apply_anchored",
+    "grep_anchored",
     "write_anchored",
   ]) {
     const def = oursByName(oursName);
@@ -143,7 +143,7 @@ export function installInterceptionFallback(pi: ExtensionAPI, config: PiFastEdit
       return {
         block: true,
         reason:
-          "pi-fast-edits override is enabled but the built-in tools could not be replaced. Use read_anchored_file plus the anchored edit tools instead.",
+          "pi-fast-edits override is enabled but the built-in tools could not be replaced. Use read_anchored plus the anchored edit tools instead.",
       };
     }
     return undefined;
@@ -152,9 +152,9 @@ export function installInterceptionFallback(pi: ExtensionAPI, config: PiFastEdit
 
 /** The registration functions (re-callable, stateless) that produce our tool definitions. */
 export type OverrideDeps = {
-  registerRead: typeof readAnchoredFileModule.registerReadAnchoredFile;
-  registerEdit: typeof applyAnchoredEditsModule.registerApplyAnchoredEdits;
-  registerGrep: typeof grepAnchoredModule.registerGrepAnchoredFiles;
+  registerRead: typeof readAnchoredFileModule.registerReadAnchored;
+  registerEdit: typeof applyAnchoredEditsModule.registerApplyAnchored;
+  registerGrep: typeof grepAnchoredModule.registerGrepAnchored;
   registerWrite: typeof writeAnchoredModule.registerWriteAnchored;
   installInterception: (pi: ExtensionAPI, config: PiFastEditsConfig) => void;
 };
@@ -281,9 +281,9 @@ export function applyOverrideMode(
   pi.setActiveTools([...keepActive]);
   // Rendered titles follow the built-in names the definitions now carry.
   setToolNameOverrides({
-    read_anchored_file: "read",
-    apply_anchored_edits: "edit",
-    grep_anchored_files: "grep",
+    read_anchored: "read",
+    apply_anchored: "edit",
+    grep_anchored: "grep",
     write_anchored: "write",
   });
 }

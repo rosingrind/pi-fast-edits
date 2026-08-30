@@ -62,14 +62,14 @@ const rgAvailable = (await resolveRg()) !== null;
 // (no JS fallback) when rg is missing, so these tests cannot run there.
 const itWithRg = rgAvailable ? it : it.skip;
 
-describe("grep_anchored_files", () => {
+describe("grep_anchored", () => {
   itWithRg(
     "finds matches across a directory with anchors, line numbers, and revision",
     async () => {
       const cwd = await sampleWorkspace();
       const tools = await loadTools();
       const result = await tools
-        .get("grep_anchored_files")!
+        .get("grep_anchored")!
         .execute("1", { pattern: "alpha" }, undefined, undefined, { cwd });
       const text = result.content[0].text as string;
 
@@ -92,7 +92,7 @@ describe("grep_anchored_files", () => {
     const cwd = await sampleWorkspace();
     const tools = await loadTools();
     const result = await tools
-      .get("grep_anchored_files")!
+      .get("grep_anchored")!
       .execute("1", { pattern: "beta", path: "src/a.ts" }, undefined, undefined, { cwd });
     const text = result.content[0].text as string;
     expect(text).toContain("File: src/a.ts");
@@ -105,7 +105,7 @@ describe("grep_anchored_files", () => {
     const cwd = await sampleWorkspace();
     const tools = await loadTools();
     const result = await tools
-      .get("grep_anchored_files")!
+      .get("grep_anchored")!
       .execute(
         "1",
         { pattern: "greeting", ignoreCase: true, path: "src/b.ts" },
@@ -124,7 +124,7 @@ describe("grep_anchored_files", () => {
     const cwd = await sampleWorkspace();
     const tools = await loadTools();
     const result = await tools
-      .get("grep_anchored_files")!
+      .get("grep_anchored")!
       .execute("1", { pattern: "alpha", glob: "*.md" }, undefined, undefined, { cwd });
     const text = result.content[0].text as string;
     expect(text).toContain("File: notes.md");
@@ -135,7 +135,7 @@ describe("grep_anchored_files", () => {
     const cwd = await sampleWorkspace();
     const tools = await loadTools();
     const result = await tools
-      .get("grep_anchored_files")!
+      .get("grep_anchored")!
       .execute(
         "1",
         { pattern: "alpha|beta", maxMatches: 2, path: "src/a.ts" },
@@ -153,7 +153,7 @@ describe("grep_anchored_files", () => {
     const cwd = await sampleWorkspace();
     const tools = await loadTools();
     const result = await tools
-      .get("grep_anchored_files")!
+      .get("grep_anchored")!
       .execute("1", { pattern: "zzz_not_found" }, undefined, undefined, { cwd });
     expect(result.content[0].text).toContain("No matches");
   });
@@ -163,7 +163,7 @@ describe("grep_anchored_files", () => {
     const tools = await loadTools();
     await expect(
       tools
-        .get("grep_anchored_files")!
+        .get("grep_anchored")!
         .execute("1", { pattern: "(bad" }, undefined, undefined, { cwd }),
     ).rejects.toThrow(/Invalid regex/);
   });
@@ -172,7 +172,7 @@ describe("grep_anchored_files", () => {
     const cwd = await sampleWorkspace();
     const tools = await loadTools();
     const grep = await tools
-      .get("grep_anchored_files")!
+      .get("grep_anchored")!
       .execute("1", { pattern: "alpha", path: "src/a.ts" }, undefined, undefined, { cwd });
     const grepText = grep.content[0].text as string;
     const revision = /Revision: ([a-f0-9]+)/.exec(grepText)![1];
@@ -180,7 +180,7 @@ describe("grep_anchored_files", () => {
     const alphaLine = lineTextFrom(grepText, "export function alpha() {");
 
     // The grep result's revision must satisfy the edit tool's revision guard.
-    const edit = await tools.get("apply_anchored_edits")!.execute(
+    const edit = await tools.get("apply_anchored")!.execute(
       "2",
       {
         edits: [
@@ -209,7 +209,7 @@ describe("grep_anchored_files", () => {
     await writeFile(join(cwd, "app.ts"), "const x = 1;\n", "utf8");
     const tools = await loadTools();
     const result = await tools
-      .get("grep_anchored_files")!
+      .get("grep_anchored")!
       .execute("1", { pattern: "secret-value|const x" }, undefined, undefined, { cwd });
     const text = result.content[0].text as string;
     expect(text).toContain("File: app.ts");
@@ -217,7 +217,7 @@ describe("grep_anchored_files", () => {
   });
 });
 
-describe("grep_anchored_files (rg-backed)", () => {
+describe("grep_anchored (rg-backed)", () => {
   it("omits drifted files and reports them", async () => {
     // Pure-function test of the drift check.
     const { filterDrifted } = await import("../src/tools/grep-anchored.js");
@@ -242,7 +242,7 @@ describe("grep_anchored_files (rg-backed)", () => {
     const cwd = await sampleWorkspace();
     const tools = await loadTools();
     const result = await tools
-      .get("grep_anchored_files")!
+      .get("grep_anchored")!
       .execute("1", { pattern: "beta", path: "src/a.ts", context: 1 }, undefined, undefined, {
         cwd,
       });
@@ -268,7 +268,7 @@ describe("grep_anchored_files (rg-backed)", () => {
       await writeFile(join(cwd, "big.ts"), `${lines.join("\n")}\n`, "utf8");
       const tools = await loadTools();
       const result = await tools
-        .get("grep_anchored_files")!
+        .get("grep_anchored")!
         .execute(
           "1",
           { pattern: "target", path: "big.ts", maxMatches: 500 },
@@ -316,7 +316,7 @@ describe("grep_anchored_files (rg-backed)", () => {
       );
       const tools = await loadTools();
       const result = await tools
-        .get("grep_anchored_files")!
+        .get("grep_anchored")!
         .execute("1", { pattern: "leaky-pattern" }, undefined, undefined, { cwd });
       const text = result.content[0].text as string;
       expect(text).toContain("File: packages/x/src.ts");
@@ -334,7 +334,7 @@ describe("grep_anchored_files (rg-backed)", () => {
     await writeFile(join(cwd, "small.ts"), "oversize-pattern small\n", "utf8");
     const tools = await loadTools();
     const result = await tools
-      .get("grep_anchored_files")!
+      .get("grep_anchored")!
       .execute("1", { pattern: "oversize-pattern" }, undefined, undefined, { cwd });
     const text = result.content[0].text as string;
     expect(text).toContain("File: small.ts");
@@ -364,7 +364,7 @@ describe("grep_anchored_files (rg-backed)", () => {
 
     await expect(
       tools
-        .get("grep_anchored_files")!
+        .get("grep_anchored")!
         .execute("1", { pattern: "alpha", path: "src/a.ts" }, undefined, undefined, { cwd }),
     ).rejects.toThrow(/ripgrep \(rg\) is required for this tool but was not found/);
 
@@ -379,7 +379,7 @@ describe("grep_anchored_files (rg-backed)", () => {
     // A look-behind is invalid in Rust regex (rg's engine) but valid in JS.
     await expect(
       tools
-        .get("grep_anchored_files")!
+        .get("grep_anchored")!
         .execute("1", { pattern: "(?<=x)alpha", path: "src/a.ts" }, undefined, undefined, { cwd }),
     ).rejects.toThrow(/ripgrep search failed/);
   });

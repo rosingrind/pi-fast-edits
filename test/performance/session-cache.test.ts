@@ -39,10 +39,10 @@ describe("session cache + anchor stability", () => {
     const tools = await loadTools();
 
     const r1 = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "stable.txt" }, undefined, undefined, { cwd });
     const r2 = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("2", { path: "stable.txt" }, undefined, undefined, { cwd });
 
     const text1 = r1.content[0].text as string;
@@ -63,10 +63,10 @@ describe("session cache + anchor stability", () => {
     const tools = await loadTools();
 
     const r1 = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "stable-large.txt" }, undefined, undefined, { cwd });
     const r2 = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("2", { path: "stable-large.txt" }, undefined, undefined, { cwd });
 
     const a1 = (r1.details.lines as Array<{ anchor: string; text: string }>).map((l) => l.anchor);

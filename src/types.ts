@@ -93,7 +93,7 @@ export type SessionState = {
 export type ReadMode = "auto" | "full" | "range" | "skeleton";
 
 type RevisionGuard = {
-  /** Optional read_anchored_file revision hash. If provided, edits fail when the file changed since the read. */
+  /** Optional read_anchored revision hash. If provided, edits fail when the file changed since the read. */
   expectedRevision?: string;
 };
 

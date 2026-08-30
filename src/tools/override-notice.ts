@@ -3,16 +3,16 @@ import type { PiFastEditsConfig } from "../types.js";
 /**
  * The anchored tool names announced in the override transition notices.
  *
- * All eight suffixed names, including `grep_anchored_files`: the enabled
+ * All eight suffixed names, including `grep_anchored`: the enabled
  * notice lists them as deactivated while override is on, and the disabled
  * notice lists them as re-activated. Keep in sync with that copy — the tests
  * pin it verbatim.
  */
 export const ANCHORED_TOOL_NAMES = [
-  "read_anchored_file",
-  "grep_anchored_files",
-  "preview_anchored_edit",
-  "apply_anchored_edits",
+  "read_anchored",
+  "grep_anchored",
+  "preview_anchored",
+  "apply_anchored",
   "write_anchored",
 ] as const;
 

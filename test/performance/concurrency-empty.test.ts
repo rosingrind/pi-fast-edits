@@ -36,14 +36,14 @@ const isRoot = typeof process.getuid === "function" && process.getuid() === 0;
 
 describe("concurrency: empty-file and session-map stress scenarios", () => {
   describe("E1 — Edit operations on an empty (no-anchor) file", () => {
-    it("read_anchored_file on an empty file reports zero lines and a revision", async () => {
+    it("read_anchored on an empty file reports zero lines and a revision", async () => {
       const cwd = await workspace();
       const file = join(cwd, "empty-read.txt");
       await writeFile(file, "", "utf8");
       const tools = await loadTools();
 
       const read = await tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("0", { path: "empty-read.txt" }, undefined, undefined, { cwd });
 
       expect(read.details.mode).toBe("full");
@@ -73,10 +73,10 @@ describe("concurrency: empty-file and session-map stress scenarios", () => {
         const tools = await loadTools();
 
         const rA = await tools
-          .get("read_anchored_file")!
+          .get("read_anchored")!
           .execute("1", { path: "a.txt" }, undefined, undefined, { cwd });
         const rB = await tools
-          .get("read_anchored_file")!
+          .get("read_anchored")!
           .execute("2", { path: "readonly-dir/b.txt" }, undefined, undefined, { cwd });
         const revA = rA.details.revision as string;
         const revB = rB.details.revision as string;
@@ -89,7 +89,7 @@ describe("concurrency: empty-file and session-map stress scenarios", () => {
         try {
           // fileA's edit comes first so it is planned and written before fileB.
           await expect(
-            tools.get("apply_anchored_edits")!.execute(
+            tools.get("apply_anchored")!.execute(
               "3",
               {
                 edits: [

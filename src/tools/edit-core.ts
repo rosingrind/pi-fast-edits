@@ -36,7 +36,7 @@ function verifyAnchorLines(
     if (expected === undefined) {
       if (requireAnchorLines) {
         throw new Error(
-          `Missing ${label}Line: pass the exact current source line at ${label}, copied verbatim from read_anchored_file or grep_anchored_files output.`,
+          `Missing ${label}Line: pass the exact current source line at ${label}, copied verbatim from read_anchored or grep_anchored output.`,
         );
       }
       continue;

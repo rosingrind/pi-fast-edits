@@ -17,7 +17,7 @@ export function anchorOf(anchoredOutput: string, lineText: string): string {
 
 /**
  * Extract the verbatim source line for a search text from rendered
- * grep_anchored_files output (`Anchor§ text    line N`). Throws when no
+ * grep_anchored output (`Anchor§ text    line N`). Throws when no
  * anchored line matches.
  */
 export function lineTextFrom(anchoredOutput: string, searchText: string): string {

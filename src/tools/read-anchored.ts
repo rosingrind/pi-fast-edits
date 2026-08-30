@@ -47,17 +47,17 @@ const readSchema = Type.Object({
 });
 type ReadParams = Static<typeof readSchema>;
 
-export function registerReadAnchoredFile(
+export function registerReadAnchored(
   pi: ExtensionAPI,
   session: SessionState,
   config: PiFastEditsConfig,
 ) {
   const tool = {
-    name: "read_anchored_file",
+    name: "read_anchored",
     label: "Read Anchored File",
     description:
       "Read a text file with stable word anchors for fast subsequent edits. For large files, returns a skeleton unless a range is requested. Set anchored:false to read plain line-numbered output.",
-    renderCall: renderToolCall("read_anchored_file", (args, theme) => {
+    renderCall: renderToolCall("read_anchored", (args, theme) => {
       const startLine = args.startLine as number | undefined;
       const endLine = args.endLine as number | undefined;
       if (startLine === undefined && endLine === undefined) return "";

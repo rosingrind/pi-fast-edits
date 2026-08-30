@@ -36,7 +36,7 @@ describe("large file end-to-end (10k+ lines)", () => {
     const tools = await loadTools();
 
     const result = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "big.ts", mode: "skeleton" }, undefined, undefined, { cwd });
 
     const text = result.content[0].text as string;
@@ -55,7 +55,7 @@ describe("large file end-to-end (10k+ lines)", () => {
     const tools = await loadTools();
 
     const result = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute(
         "1",
         { path: "range.ts", mode: "range", startLine: 100, endLine: 199 },
@@ -79,7 +79,7 @@ describe("large file end-to-end (10k+ lines)", () => {
     const tools = await loadTools();
 
     const result = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "full.ts", mode: "full" }, undefined, undefined, { cwd });
 
     expect(result.details.mode).toBe("full");

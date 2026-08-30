@@ -65,17 +65,17 @@ const grepSchema = Type.Object({
 });
 type GrepParams = Static<typeof grepSchema>;
 
-export function registerGrepAnchoredFiles(
+export function registerGrepAnchored(
   pi: ExtensionAPI,
   session: SessionState,
   config: PiFastEditsConfig,
 ) {
   const tool = {
-    name: "grep_anchored_files",
+    name: "grep_anchored",
     label: "Grep Anchored Files",
     description:
       "Search file contents with a regex and get matching lines back with stable word anchors and revision hashes, " +
-      "exactly as read_anchored_file renders them. Results can be fed straight into the anchored edit tools " +
+      "exactly as read_anchored renders them. Results can be fed straight into the anchored edit tools " +
       "(use the per-file Revision as expectedRevision). Searches the workspace or a subpath; skips .git, node_modules, protected paths, and binary files.",
     renderCall: (args: Record<string, unknown>, theme: Theme, context: RenderContext) => {
       // Mirrors pi's built-in grep call title (name + /pattern/ in path), with
@@ -84,7 +84,7 @@ export function registerGrepAnchoredFiles(
       const glob = args.glob as string | undefined;
       const path = args.path as string | undefined;
       const text =
-        theme.fg("toolTitle", theme.bold(resolveToolDisplayName("grep_anchored_files"))) +
+        theme.fg("toolTitle", theme.bold(resolveToolDisplayName("grep_anchored"))) +
         " " +
         theme.fg("accent", pattern === undefined ? "..." : `/${pattern}/`) +
         theme.fg("toolOutput", ` in ${path ?? "..."}`) +
@@ -97,7 +97,7 @@ export function registerGrepAnchoredFiles(
     renderResult: renderGrepResult,
     promptSnippet: "Search files with a regex and get anchored, editable results",
     promptGuidelines: [
-      "Results carry the same anchors and revision hashes as read_anchored_file",
+      "Results carry the same anchors and revision hashes as read_anchored",
       "Pass the per-file Revision header as expectedRevision when editing matches",
       "Use glob to narrow file types, e.g. '**/*.ts'",
       "The `    line N` suffix after each rendered line is positional metadata, not part of the line — do NOT include it in startAnchorLine/endAnchorLine/anchorLine values",

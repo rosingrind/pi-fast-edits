@@ -45,7 +45,7 @@ describe("session event wiring (e2e)", () => {
     const file = join(cwd, "a.ts");
     writeFileSync(file, "one\ntwo\n");
     await s.tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "a.ts" }, undefined, undefined, { cwd });
 
     await s.handlers.session_shutdown!();

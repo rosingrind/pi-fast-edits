@@ -9,11 +9,11 @@ import {
   stateFilePath,
 } from "./anchor/state-persistence.js";
 import { registerCommands } from "./commands/register.js";
-import { registerReadAnchoredFile } from "./tools/read-anchored-file.js";
-import { registerGrepAnchoredFiles } from "./tools/grep-anchored.js";
+import { registerReadAnchored } from "./tools/read-anchored.js";
+import { registerGrepAnchored } from "./tools/grep-anchored.js";
 import { registerWriteAnchored } from "./tools/write-anchored.js";
-import { registerPreviewAnchoredEdit } from "./tools/preview-anchored-edit.js";
-import { registerApplyAnchoredEdits } from "./tools/apply-anchored-edits.js";
+import { registerPreviewAnchored } from "./tools/preview-anchored.js";
+import { registerApplyAnchored } from "./tools/apply-anchored.js";
 import {
   applyOverrideMode,
   installInterceptionFallback,
@@ -34,8 +34,8 @@ export default async function piFastEdits(
   };
   const session: SessionState = { files: new LRUMap() };
 
-  registerReadAnchoredFile(pi, session, config);
-  registerGrepAnchoredFiles(pi, session, config);
+  registerReadAnchored(pi, session, config);
+  registerGrepAnchored(pi, session, config);
   registerWriteAnchored(pi, session, config);
 
   // The five anchored edit tools re-register whenever the config changes, so
@@ -43,8 +43,8 @@ export default async function piFastEdits(
   // `requireAnchorLines` setting. pi.replace semantics: registering the same
   // tool name refreshes it in-session.
   const registerAnchoredEditTools = () => {
-    registerPreviewAnchoredEdit(pi, session, config);
-    registerApplyAnchoredEdits(pi, session, config);
+    registerPreviewAnchored(pi, session, config);
+    registerApplyAnchored(pi, session, config);
   };
   registerAnchoredEditTools();
 
@@ -53,9 +53,9 @@ export default async function piFastEdits(
   // after extension loading, and re-registering at runtime refreshes the
   // registry in-session.
   const overrideDeps: OverrideDeps = {
-    registerRead: registerReadAnchoredFile,
-    registerEdit: registerApplyAnchoredEdits,
-    registerGrep: registerGrepAnchoredFiles,
+    registerRead: registerReadAnchored,
+    registerEdit: registerApplyAnchored,
+    registerGrep: registerGrepAnchored,
     registerWrite: registerWriteAnchored,
     installInterception: installInterceptionFallback,
   };

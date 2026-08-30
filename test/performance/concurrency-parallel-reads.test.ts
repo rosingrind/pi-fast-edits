@@ -41,19 +41,19 @@ describe("concurrency: parallel read + edit races", () => {
 
       // Pre-read so the edit can target the (randomized) line-1 anchor.
       const pre = await tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("0", { path: "race-read-edit.txt" }, undefined, undefined, { cwd });
       const line1Anchor = (pre.details as any)?.lines[0].anchor as string;
       const line1Text = (pre.details as any)?.lines[0].text as string;
 
       // Start a long-running read first (simulated by starting read before edit)
       const readPromise = tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("1", { path: "race-read-edit.txt", mode: "full" }, undefined, undefined, { cwd });
 
       // Give read a tiny head start, then fire edit
       await new Promise((r) => setTimeout(r, 1));
-      const editPromise = tools.get("apply_anchored_edits")!.execute(
+      const editPromise = tools.get("apply_anchored")!.execute(
         "2",
         {
           edits: [
@@ -104,7 +104,7 @@ describe("concurrency: parallel read + edit races", () => {
       // Fire 10 parallel reads
       const reads = Array.from({ length: 10 }, (_, i) =>
         tools
-          .get("read_anchored_file")!
+          .get("read_anchored")!
           .execute(String(i), { path: "many-reads.txt" }, undefined, undefined, { cwd }),
       );
 
@@ -137,7 +137,7 @@ describe("concurrency: parallel read + edit races", () => {
       // Fire 10 parallel reads to different files
       const reads = Array.from({ length: 10 }, (_, i) =>
         tools
-          .get("read_anchored_file")!
+          .get("read_anchored")!
           .execute(String(i), { path: `file${i}.txt` }, undefined, undefined, { cwd }),
       );
 
@@ -160,7 +160,7 @@ describe("concurrency: parallel read + edit races", () => {
 
       // Pre-read so the edit can target the (randomized) line-1 anchor.
       const pre = await tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("0", { path: "skeleton-race.txt" }, undefined, undefined, { cwd });
       const line1Anchor = (pre.details as any)?.lines[0].anchor as string;
       const line1Text = (pre.details as any)?.lines[0].text as string;
@@ -168,11 +168,11 @@ describe("concurrency: parallel read + edit races", () => {
       // Fire skeleton read and edit in parallel
       const [skeletonResult, editResult] = await Promise.all([
         tools
-          .get("read_anchored_file")!
+          .get("read_anchored")!
           .execute("1", { path: "skeleton-race.txt", mode: "skeleton" }, undefined, undefined, {
             cwd,
           }),
-        tools.get("apply_anchored_edits")!.execute(
+        tools.get("apply_anchored")!.execute(
           "2",
           {
             edits: [
@@ -221,7 +221,7 @@ describe("concurrency: parallel read + edit races", () => {
 
       // Read initial state
       const initialRead = await tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("0", { path: "rapid-edits.txt" }, undefined, undefined, { cwd });
       const initialRevision = (initialRead.details as any)?.revision;
       const line1Anchor = (initialRead.details as any)?.lines[0].anchor as string;
@@ -230,7 +230,7 @@ describe("concurrency: parallel read + edit races", () => {
       const line2Text = (initialRead.details as any)?.lines[1].text as string;
 
       // First edit succeeds with valid revision
-      const result1 = await tools.get("apply_anchored_edits")!.execute(
+      const result1 = await tools.get("apply_anchored")!.execute(
         "1",
         {
           edits: [
@@ -254,7 +254,7 @@ describe("concurrency: parallel read + edit races", () => {
 
       // Second edit with the SAME revision should fail (file changed after first edit)
       await expect(
-        tools.get("apply_anchored_edits")!.execute(
+        tools.get("apply_anchored")!.execute(
           "2",
           {
             edits: [
@@ -276,12 +276,12 @@ describe("concurrency: parallel read + edit races", () => {
 
       // Read again to get fresh revision
       const read2 = await tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("3", { path: "rapid-edits.txt" }, undefined, undefined, { cwd });
       const revision2 = (read2.details as any)?.revision;
 
       // Now the second edit succeeds with the fresh revision
-      const result2 = await tools.get("apply_anchored_edits")!.execute(
+      const result2 = await tools.get("apply_anchored")!.execute(
         "4",
         {
           edits: [
@@ -318,14 +318,14 @@ describe("concurrency: parallel read + edit races", () => {
 
       // Pre-read so both tools can target the (randomized) line-1 anchor.
       const pre = await tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("0", { path: "preview-edit-same.txt" }, undefined, undefined, { cwd });
       const line1Anchor = (pre.details as any)?.lines[0].anchor as string;
       const line1Text = (pre.details as any)?.lines[0].text as string;
 
       // Both tools target the SAME file with SAME anchors - this is the real race
       const [previewResult, editResult] = await Promise.all([
-        tools.get("preview_anchored_edit")!.execute(
+        tools.get("preview_anchored")!.execute(
           "1",
           {
             path: "preview-edit-same.txt",
@@ -339,7 +339,7 @@ describe("concurrency: parallel read + edit races", () => {
           undefined,
           { cwd },
         ),
-        tools.get("apply_anchored_edits")!.execute(
+        tools.get("apply_anchored")!.execute(
           "2",
           {
             edits: [
@@ -381,14 +381,14 @@ describe("concurrency: parallel read + edit races", () => {
 
       // Read file - get initial revision
       const read1 = await tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("1", { path: "revision-invalidation.txt" }, undefined, undefined, { cwd });
       const revision1 = (read1.details as any)?.revision;
       const line1Anchor = (read1.details as any)?.lines[0].anchor as string;
       const line1Text = (read1.details as any)?.lines[0].text as string;
 
       // Edit file
-      await tools.get("apply_anchored_edits")!.execute(
+      await tools.get("apply_anchored")!.execute(
         "2",
         {
           edits: [
@@ -410,7 +410,7 @@ describe("concurrency: parallel read + edit races", () => {
 
       // Read again - should get NEW revision
       const read2 = await tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("3", { path: "revision-invalidation.txt" }, undefined, undefined, { cwd });
       const revision2 = (read2.details as any)?.revision;
 

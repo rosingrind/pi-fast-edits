@@ -78,8 +78,8 @@ describe("write_anchored", () => {
       lines: Array<{ anchor: string; text: string; lineNo: number }>;
     };
 
-    // No read_anchored_file call: the write itself seeded the session state.
-    const edit = await tools.get("apply_anchored_edits")!.execute(
+    // No read_anchored call: the write itself seeded the session state.
+    const edit = await tools.get("apply_anchored")!.execute(
       "2",
       {
         edits: [
@@ -151,7 +151,7 @@ describe("write_anchored", () => {
     expect(text).toContain("Anchors are ready");
     expect(text).not.toContain("edit_anchored_range");
     expect(text).not.toContain("insert_at_anchor");
-    expect(text).not.toContain("read_anchored_file");
+    expect(text).not.toContain("read_anchored");
     expect(text).toContain("the anchored edit tools can edit this file now");
   });
 

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { initTheme } from "@earendil-works/pi-coding-agent";
 import { Container, Text } from "@earendil-works/pi-tui";
-import { renderReadAnchoredResult } from "../src/tools/read-anchored-file.js";
-import { renderBatchResult } from "../src/tools/apply-anchored-edits.js";
+import { renderReadAnchoredResult } from "../src/tools/read-anchored.js";
+import { renderBatchResult } from "../src/tools/apply-anchored.js";
 import { renderEditResult } from "../src/tools/render-edit-result.js";
 import { renderToolCall } from "../src/tools/render.js";
 import type { Theme } from "../src/tools/theme.js";
@@ -244,7 +244,7 @@ describe("renderToolCall", () => {
   });
 });
 
-describe("apply_anchored_edits call chip (override-mode `edit`)", () => {
+describe("apply_anchored call chip (override-mode `edit`)", () => {
   const theme = { fg: (_k: string, s: string) => s, bold: (s: string) => s };
 
   it("shows the target file name in the suffix", async () => {
@@ -258,8 +258,8 @@ describe("apply_anchored_edits call chip (override-mode `edit`)", () => {
       } as any,
       { requireAnchorLines: false },
     );
-    const def = tools.get("apply_anchored_edits");
-    if (!def) throw new Error("apply_anchored_edits not registered");
+    const def = tools.get("apply_anchored");
+    if (!def) throw new Error("apply_anchored not registered");
     const renderCall = def.renderCall as (
       args: Record<string, unknown>,
       theme: Record<string, (k: string, s: string) => string>,
@@ -296,7 +296,7 @@ describe("apply_anchored_edits call chip (override-mode `edit`)", () => {
 });
 
 it("glues a range suffix to the path (read path:1-2) without extra spaces", () => {
-  const renderer = renderToolCall("read_anchored_file", (args, t) =>
+  const renderer = renderToolCall("read_anchored", (args, t) =>
     t.fg(
       "warning",
       `:${args.startLine ?? 1}${args.endLine === undefined ? "" : `-${args.endLine}`}`,
@@ -304,15 +304,15 @@ it("glues a range suffix to the path (read path:1-2) without extra spaces", () =
   );
   const component = renderer({ path: "x.md", startLine: 1, endLine: 2 }, theme, noContext);
   const text = textOf(component).trim();
-  expect(text).toBe("read_anchored_file x.md:1-2");
+  expect(text).toBe("read_anchored x.md:1-2");
 });
 
 it("keeps a target-name suffix's own single leading space (edit a.ts)", () => {
-  const renderer = renderToolCall("apply_anchored_edits", (args, t) =>
+  const renderer = renderToolCall("apply_anchored", (args, t) =>
     t.fg("warning", ` ${args.display}`),
   );
   const component = renderer({ display: "a.ts" }, theme, noContext);
   const text = textOf(component).trim();
-  expect(text).toBe("apply_anchored_edits a.ts");
+  expect(text).toBe("apply_anchored a.ts");
   expect(text).not.toContain("  ");
 });

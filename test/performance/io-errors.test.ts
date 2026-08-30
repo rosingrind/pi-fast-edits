@@ -35,7 +35,7 @@ describe("I/O errors on the reconcile/read path", () => {
     const tools = await loadTools();
 
     const read = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "disappear.txt" }, undefined, undefined, { cwd });
     const revision = read.details.revision as string;
 
@@ -44,7 +44,7 @@ describe("I/O errors on the reconcile/read path", () => {
 
     // Editing with the (now unusable) revision must fail without recreating the file.
     await expect(
-      tools.get("apply_anchored_edits")!.execute(
+      tools.get("apply_anchored")!.execute(
         "2",
         {
           edits: [
@@ -76,7 +76,7 @@ describe("I/O errors on the reconcile/read path", () => {
 
     // First read populates the session cache.
     await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "gone.txt" }, undefined, undefined, {
         cwd,
       });
@@ -85,7 +85,7 @@ describe("I/O errors on the reconcile/read path", () => {
 
     // Re-reading a deleted file must surface an I/O error, not stale cached anchors.
     await expect(
-      tools.get("read_anchored_file")!.execute("2", { path: "gone.txt" }, undefined, undefined, {
+      tools.get("read_anchored")!.execute("2", { path: "gone.txt" }, undefined, undefined, {
         cwd,
       }),
     ).rejects.toThrow(/ENOENT|no such file/i);
@@ -113,12 +113,12 @@ describe("atomic-write failure cleanup", () => {
 
         // Read to get anchors.
         await tools
-          .get("read_anchored_file")!
+          .get("read_anchored")!
           .execute("1", { path: "readonly-dir/atomic.txt" }, undefined, undefined, { cwd });
 
         // Edit should fail because atomic write can't create temp file.
         await expect(
-          tools.get("apply_anchored_edits")!.execute(
+          tools.get("apply_anchored")!.execute(
             "2",
             {
               edits: [

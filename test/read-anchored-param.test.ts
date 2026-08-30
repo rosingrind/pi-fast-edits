@@ -27,14 +27,14 @@ async function workspace() {
   return mkdtemp(join(tmpdir(), "pi-fast-edits-"));
 }
 
-describe("read_anchored_file anchored param", () => {
+describe("read_anchored anchored param", () => {
   it("anchored:false renders plain numbered lines without anchor prefixes or revision header", async () => {
     const cwd = await workspace();
     const file = join(cwd, "plain.txt");
     await writeFile(file, "alpha\nbeta\n", "utf8");
     const tools = await loadTools();
     const read = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "plain.txt", anchored: false }, undefined, undefined, { cwd });
     const text = read.content[0].text as string;
     expect(text).toContain("1: alpha");
@@ -51,13 +51,13 @@ describe("read_anchored_file anchored param", () => {
     });
   });
 
-  it("read_anchored_file defaults to anchored output", async () => {
+  it("read_anchored defaults to anchored output", async () => {
     const cwd = await workspace();
     const file = join(cwd, "plain.txt");
     await writeFile(file, "alpha\n", "utf8");
     const tools = await loadTools();
     const read = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "plain.txt" }, undefined, undefined, { cwd });
     expect(read.content[0].text).toMatch(/\w+§ alpha/);
     expect(read.content[0].text).toContain("Revision:");
@@ -69,7 +69,7 @@ describe("read_anchored_file anchored param", () => {
     await writeFile(file, "alpha\nbeta\ngamma\ndelta\n", "utf8");
     const tools = await loadTools();
     const read = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute(
         "1",
         { path: "plain-range.txt", anchored: false, startLine: 2, endLine: 3 },
@@ -94,7 +94,7 @@ describe("read_anchored_file anchored param", () => {
     await writeFile(file, "alpha\nbeta\ngamma\n", "utf8");
     const tools = await loadTools();
     const read = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute(
         "1",
         { path: "plain-skel.txt", anchored: false, mode: "skeleton" },
@@ -118,7 +118,7 @@ describe("read_anchored_file anchored param", () => {
     await writeFile(file, "x".repeat(85 * 1024) + "\n", "utf8");
     const tools = await loadTools();
     const read = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "plain-large.txt", anchored: false }, undefined, undefined, { cwd });
     const text = read.content[0].text as string;
     expect(text).toContain("Mode: skeleton");
@@ -132,11 +132,11 @@ describe("read_anchored_file anchored param", () => {
     await writeFile(file, "alpha\nbeta\n", "utf8");
     const tools = await loadTools();
     const read = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "plain-edit.txt", anchored: false }, undefined, undefined, { cwd });
     const { revision, lines } = read.details;
 
-    await tools.get("apply_anchored_edits")!.execute(
+    await tools.get("apply_anchored")!.execute(
       "2",
       {
         edits: [

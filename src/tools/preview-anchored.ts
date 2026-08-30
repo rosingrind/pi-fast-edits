@@ -13,13 +13,13 @@ import { renderEditResult } from "./render-edit-result.js";
 import { renderToolCall } from "./render.js";
 import { replaceEditSchema, type ReplaceEditParams } from "./schemas.js";
 
-export function registerPreviewAnchoredEdit(
+export function registerPreviewAnchored(
   pi: ExtensionAPI,
   session: SessionState,
   config: PiFastEditsConfig,
 ): void {
   pi.registerTool({
-    name: "preview_anchored_edit",
+    name: "preview_anchored",
     label: "Preview Anchored Edit",
     description: "Preview a replacement edit between two anchors without writing files.",
     promptSnippet: "Preview a replacement edit between two anchors without writing",
@@ -29,7 +29,7 @@ export function registerPreviewAnchoredEdit(
     ],
     renderShell: "default",
     executionMode: "parallel",
-    renderCall: renderToolCall("preview_anchored_edit"),
+    renderCall: renderToolCall("preview_anchored"),
     renderResult: renderEditResult,
     parameters: replaceEditSchema(config.requireAnchorLines),
     async execute(

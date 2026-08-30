@@ -37,7 +37,7 @@ async function workspace() {
 
 async function readAnchored(tools: Map<string, ToolDef>, cwd: string, path: string) {
   const read = await tools
-    .get("read_anchored_file")!
+    .get("read_anchored")!
     .execute("1", { path }, undefined, undefined, { cwd });
   const details = read.details as {
     revision: string;
@@ -82,21 +82,21 @@ describe("anchor line args", () => {
 
   it("registered tool definitions follow the live requireAnchorLines setting", async () => {
     const strict = await loadTools();
-    expect((strict.get("preview_anchored_edit")!.parameters as any).required).toContain(
+    expect((strict.get("preview_anchored")!.parameters as any).required).toContain(
       "endAnchorLine",
     );
     // Batch: the outer object requires `edits`; strictness lives on each
     // per-edit variant.
-    const strictBatchTool = strict.get("apply_anchored_edits")!.parameters as any;
+    const strictBatchTool = strict.get("apply_anchored")!.parameters as any;
     expect(strictBatchTool.required).toEqual(["edits"]);
     const strictVariant = strictBatchTool.properties.edits.items.anyOf[0];
     expect(strictVariant.allOf.flatMap((t: any) => t.required ?? [])).toContain("startAnchorLine");
 
     const lenient = await loadTools({ requireAnchorLines: false });
-    expect((lenient.get("preview_anchored_edit")!.parameters as any).required).not.toContain(
+    expect((lenient.get("preview_anchored")!.parameters as any).required).not.toContain(
       "endAnchorLine",
     );
-    const lenientBatchTool = lenient.get("apply_anchored_edits")!.parameters as any;
+    const lenientBatchTool = lenient.get("apply_anchored")!.parameters as any;
     expect(
       lenientBatchTool.properties.edits.items.anyOf[0].allOf.flatMap((t: any) => t.required ?? []),
     ).not.toContain("startAnchorLine");
@@ -116,7 +116,7 @@ describe("anchor line args", () => {
 
     // Missing line args in one batch edit rejects the whole batch.
     await expect(
-      tools.get("apply_anchored_edits")!.execute(
+      tools.get("apply_anchored")!.execute(
         "1",
         {
           edits: [
@@ -138,7 +138,7 @@ describe("anchor line args", () => {
 
     // A mismatched line arg in one edit aborts the whole batch.
     await expect(
-      tools.get("apply_anchored_edits")!.execute(
+      tools.get("apply_anchored")!.execute(
         "2",
         {
           edits: [
@@ -169,7 +169,7 @@ describe("anchor line args", () => {
     await expect(readFile(file, "utf8")).resolves.toBe("alpha\nbeta\ngamma\n");
 
     // All-correct batch succeeds.
-    const result = await tools.get("apply_anchored_edits")!.execute(
+    const result = await tools.get("apply_anchored")!.execute(
       "3",
       {
         edits: [
@@ -217,12 +217,12 @@ describe("anchor line args", () => {
     await writeFile(file, "one\ntwo\n", "utf8");
     const tools = await loadTools();
     const read = await tools
-      .get("read_anchored_file")!
+      .get("read_anchored")!
       .execute("1", { path: "batch.ts" }, undefined, undefined, { cwd });
     const lines = read.details.lines as Array<{ anchor: string; text: string }>;
 
     await expect(
-      tools.get("apply_anchored_edits")!.execute(
+      tools.get("apply_anchored")!.execute(
         "2",
         {
           edits: [

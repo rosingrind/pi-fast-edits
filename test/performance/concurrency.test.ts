@@ -51,17 +51,17 @@ describe("concurrency: parallel subagent scenarios", () => {
 
       // Read both
       const rA = await tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("1", { path: "partial-a.txt" }, undefined, undefined, { cwd });
       const rB = await tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("2", { path: "partial-b.txt" }, undefined, undefined, { cwd });
       const revA = (rA.details as any)?.revision;
       const revB = (rB.details as any)?.revision;
       const linesA = (rA.details as any)?.lines as any[];
       const linesB = (rB.details as any)?.lines as any[];
 
-      const result = await tools.get("apply_anchored_edits")!.execute(
+      const result = await tools.get("apply_anchored")!.execute(
         "3",
         {
           edits: [
@@ -119,16 +119,16 @@ describe("concurrency: parallel subagent scenarios", () => {
         try {
           const tools = await loadTools();
           const rA = await tools
-            .get("read_anchored_file")!
+            .get("read_anchored")!
             .execute("1", { path: "partial-write-a.txt" }, undefined, undefined, { cwd });
           const rB = await tools
-            .get("read_anchored_file")!
+            .get("read_anchored")!
             .execute("2", { path: "partial-b/b.txt" }, undefined, undefined, { cwd });
 
           // fileA writes first (writable), fileB write then fails. The batch
           // rejects, but fileA is already persisted (partial application).
           await expect(
-            tools.get("apply_anchored_edits")!.execute(
+            tools.get("apply_anchored")!.execute(
               "3",
               {
                 edits: [
@@ -181,7 +181,7 @@ describe("concurrency: parallel subagent scenarios", () => {
 
       // Read first to obtain the line-1 anchor for the concurrent edit.
       const pre = await tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("1", { path: "read-edit-concurrent.txt" }, undefined, undefined, { cwd });
       const line1Anchor = (pre.details as any)?.lines[0].anchor as string;
       const line1Text = (pre.details as any)?.lines[0].text as string;
@@ -189,9 +189,9 @@ describe("concurrency: parallel subagent scenarios", () => {
       // Concurrent read and edit
       const [readResult, editResult] = await Promise.all([
         tools
-          .get("read_anchored_file")!
+          .get("read_anchored")!
           .execute("2", { path: "read-edit-concurrent.txt" }, undefined, undefined, { cwd }),
-        tools.get("apply_anchored_edits")!.execute(
+        tools.get("apply_anchored")!.execute(
           "3",
           {
             edits: [
@@ -231,10 +231,10 @@ describe("concurrency: parallel subagent scenarios", () => {
 
       // Session A reads both files.
       const rA = await toolsA
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("1", { path: "batch-a.txt" }, undefined, undefined, { cwd });
       const rB = await toolsA
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("2", { path: "batch-b.txt" }, undefined, undefined, { cwd });
       const revA = (rA.details as any)?.revision;
       const revB = (rB.details as any)?.revision;
@@ -246,7 +246,7 @@ describe("concurrency: parallel subagent scenarios", () => {
       // Session A runs a batch where file-b's revision is now stale. The whole
       // batch aborts before any write (all-or-nothing).
       await expect(
-        toolsA.get("apply_anchored_edits")!.execute(
+        toolsA.get("apply_anchored")!.execute(
           "3",
           {
             edits: [
@@ -293,10 +293,10 @@ describe("concurrency: parallel subagent scenarios", () => {
 
       const [r1, r2] = await Promise.all([
         tools
-          .get("read_anchored_file")!
+          .get("read_anchored")!
           .execute("1", { path: "concurrent-read.txt" }, undefined, undefined, { cwd }),
         tools
-          .get("read_anchored_file")!
+          .get("read_anchored")!
           .execute("2", { path: "concurrent-read.txt" }, undefined, undefined, { cwd }),
       ]);
 
@@ -317,7 +317,7 @@ describe("concurrency: parallel subagent scenarios", () => {
       const toolsY = await loadTools();
 
       const rY = await toolsY
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("2", { path: "file-y.txt" }, undefined, undefined, { cwd });
 
       const linesY = (rY.details as any)?.lines as any[];
@@ -325,7 +325,7 @@ describe("concurrency: parallel subagent scenarios", () => {
       // Anchors live in per-file namespaces: each file assigns its own
       // (randomized) anchor words, and an anchor always refers to its own file.
       // Editing file-y via its own line-1 anchor must change only file-y.
-      await toolsY.get("apply_anchored_edits")!.execute(
+      await toolsY.get("apply_anchored")!.execute(
         "3",
         {
           edits: [
@@ -370,16 +370,16 @@ describe("concurrency: parallel subagent scenarios", () => {
       // wins deterministically, mirroring the C1 single-edit contract for
       // batches.
       const rA = await toolsA
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("1", { path: "batch-concurrent.txt" }, undefined, undefined, { cwd });
       const rB = await toolsB
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("2", { path: "batch-concurrent.txt" }, undefined, undefined, { cwd });
       const linesA = (rA.details as any)?.lines as any[];
       const linesB = (rB.details as any)?.lines as any[];
 
       const [resultA, resultB] = await Promise.all([
-        toolsA.get("apply_anchored_edits")!.execute(
+        toolsA.get("apply_anchored")!.execute(
           "3",
           {
             edits: [
@@ -398,7 +398,7 @@ describe("concurrency: parallel subagent scenarios", () => {
           undefined,
           { cwd },
         ),
-        toolsB.get("apply_anchored_edits")!.execute(
+        toolsB.get("apply_anchored")!.execute(
           "4",
           {
             edits: [
@@ -444,10 +444,10 @@ describe("concurrency: parallel subagent scenarios", () => {
       // Pre-read both files so the batch can target their (randomized)
       // per-file anchors. The raw readFile below still races the batch writes.
       const rA = await tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("1", { path: "torn-a.txt" }, undefined, undefined, { cwd });
       const rB = await tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("2", { path: "torn-b.txt" }, undefined, undefined, { cwd });
       const linesA = (rA.details as any)?.lines as any[];
       const linesB = (rB.details as any)?.lines as any[];
@@ -459,7 +459,7 @@ describe("concurrency: parallel subagent scenarios", () => {
       // converge to the final state. This documents the non-transactional
       // multi-file batch contract.
       const [batchResult, observed] = await Promise.all([
-        tools.get("apply_anchored_edits")!.execute(
+        tools.get("apply_anchored")!.execute(
           "3",
           {
             edits: [
@@ -513,7 +513,7 @@ describe("concurrency: parallel subagent scenarios", () => {
       const controller = new AbortController();
       controller.abort();
 
-      const result = await tools.get("apply_anchored_edits")!.execute(
+      const result = await tools.get("apply_anchored")!.execute(
         "1",
         {
           edits: [
@@ -562,10 +562,10 @@ describe("concurrency: parallel subagent scenarios", () => {
       // Pre-read both files so the batch can target their (randomized)
       // per-file anchors.
       const rA = await tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("1", { path: "abort-mid-a.txt" }, undefined, undefined, { cwd });
       const rB = await tools
-        .get("read_anchored_file")!
+        .get("read_anchored")!
         .execute("2", { path: "abort-mid-b.txt" }, undefined, undefined, { cwd });
       const linesA = (rA.details as any)?.lines as any[];
       const linesB = (rB.details as any)?.lines as any[];
@@ -583,7 +583,7 @@ describe("concurrency: parallel subagent scenarios", () => {
         },
       } as AbortSignal;
 
-      const result = await tools.get("apply_anchored_edits")!.execute(
+      const result = await tools.get("apply_anchored")!.execute(
         "3",
         {
           edits: [
