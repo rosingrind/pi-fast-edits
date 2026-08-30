@@ -150,67 +150,6 @@ describe("concurrency: parallel read + edit races", () => {
     });
   });
 
-  describe("PR3 — Skeleton mode under concurrent modification", () => {
-    it("skeleton read during concurrent edit sees consistent anchor state", async () => {
-      const cwd = await workspace();
-      const file = join(cwd, "skeleton-race.txt");
-      await writeFile(file, "function a() {}\nfunction b() {}\nfunction c() {}\n", "utf8");
-
-      const tools = await loadTools();
-
-      // Pre-read so the edit can target the (randomized) line-1 anchor.
-      const pre = await tools
-        .get("read_anchored")!
-        .execute("0", { path: "skeleton-race.txt" }, undefined, undefined, { cwd });
-      const line1Anchor = (pre.details as any)?.lines[0].anchor as string;
-      const line1Text = (pre.details as any)?.lines[0].text as string;
-
-      // Fire skeleton read and edit in parallel
-      const [skeletonResult, editResult] = await Promise.all([
-        tools
-          .get("read_anchored")!
-          .execute("1", { path: "skeleton-race.txt", mode: "skeleton" }, undefined, undefined, {
-            cwd,
-          }),
-        tools.get("edit_anchored")!.execute(
-          "2",
-          {
-            edits: [
-              {
-                type: "replace",
-                path: "skeleton-race.txt",
-                startAnchor: line1Anchor,
-                startAnchorLine: line1Text,
-                endAnchor: line1Anchor,
-                endAnchorLine: line1Text,
-                replacement: "function B() {}\n",
-              },
-            ],
-          },
-          undefined,
-          undefined,
-          { cwd },
-        ),
-      ]);
-
-      // Both should succeed
-      expect(skeletonResult.content[0].text).toContain("function");
-      expect(editResult.content[0].text).toMatch(/^[+-]/m);
-
-      // Skeleton should have anchors - they might be from before or after edit
-      // but must be internally consistent (all from same revision)
-      const lines = (skeletonResult.details as any)?.lines || [];
-      if (lines.length > 0) {
-        // Check all anchors are valid format
-        lines.forEach((l: any) => {
-          if (l.anchor) {
-            expect(l.anchor).toMatch(/^[A-Z][a-z]+$/);
-          }
-        });
-      }
-    });
-  });
-
   describe("PR4 — Sequential edits with revision tracking", () => {
     it("sequential edits with expectedRevision succeed and stale edit is rejected", async () => {
       const cwd = await workspace();

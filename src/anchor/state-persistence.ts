@@ -59,7 +59,6 @@ export function hydrateAnchorState(session: SessionState, data: unknown): void {
         hadBom: file.hadBom === true,
         lines,
         retiredAnchors: new Set(file.retiredAnchors ?? []),
-        skeletonCache: new Map(),
       };
       session.files.set(file.path, state);
     }

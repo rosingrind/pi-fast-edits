@@ -24,7 +24,6 @@ export function createFileAnchorState(
     hadBom,
     lines: anchored,
     retiredAnchors: new Set<string>(),
-    skeletonCache: new Map(),
   };
 }
 

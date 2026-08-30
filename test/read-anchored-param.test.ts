@@ -88,7 +88,7 @@ describe("read_anchored anchored param", () => {
     expect(read.details.lines[0]).toMatchObject({ text: "beta", lineNo: 2 });
   });
 
-  it("anchored:false skeleton mode renders a plain line list", async () => {
+  it("anchored:false full mode renders a plain line list", async () => {
     const cwd = await workspace();
     const file = join(cwd, "plain-skel.txt");
     await writeFile(file, "alpha\nbeta\ngamma\n", "utf8");
@@ -97,13 +97,13 @@ describe("read_anchored anchored param", () => {
       .get("read_anchored")!
       .execute(
         "1",
-        { path: "plain-skel.txt", anchored: false, mode: "skeleton" },
+        { path: "plain-skel.txt", anchored: false, mode: "full" },
         undefined,
         undefined,
         { cwd },
       );
     const text = read.content[0].text as string;
-    expect(text).toContain("Mode: skeleton");
+    expect(text).toContain("Lines: 3");
     expect(text).toContain("1: alpha");
     expect(text).not.toMatch(/\w+§ /);
     expect(text).not.toContain("Revision:");
@@ -111,19 +111,20 @@ describe("read_anchored anchored param", () => {
     expect(read.details.lines).toHaveLength(3);
   });
 
-  it("anchored:false auto mode still selects skeleton for large files (same caps)", async () => {
+  it("anchored:false auto mode renders plain full content for large files", async () => {
     const cwd = await workspace();
     const file = join(cwd, "plain-large.txt");
-    // Exceed DEFAULT_CONFIG.maxFullReadBytes (80KB) so auto mode picks skeleton.
+    // Auto mode on an 85KB file — no skeleton anymore, full mode renders the whole line.
     await writeFile(file, "x".repeat(85 * 1024) + "\n", "utf8");
     const tools = await loadTools();
     const read = await tools
       .get("read_anchored")!
       .execute("1", { path: "plain-large.txt", anchored: false }, undefined, undefined, { cwd });
     const text = read.content[0].text as string;
-    expect(text).toContain("Mode: skeleton");
+    expect(read.details.mode).toBe("full");
+    expect(text).not.toContain("Mode: skeleton");
     expect(text).not.toMatch(/\w+§ /);
-    expect(text).toMatch(/^1: x+\.\.\.$/m);
+    expect(text).toMatch(/^1: x+$/m);
   });
 
   it("details from anchored:false read remain usable for anchored edits", async () => {

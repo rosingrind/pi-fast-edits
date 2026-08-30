@@ -23,7 +23,7 @@ The agent can then replace the `Cider..Eagle` range with new code. The extension
 - Anchor names (e.g., `Cider`) are used in tool parameters to reference lines
 - Anchor parameters take the bare anchor word copied from `read_anchored`/`grep_anchored` output
 - With `requireAnchorLines` on (the default), every edit must also pass the exact current source line at each anchor — `startAnchorLine`/`endAnchorLine` (or `anchorLine` for inserts) — copied verbatim from read/grep output. The line is verified against the file before editing; a mismatch rejects the edit with a corrective message
-- Rendered lines end with a `line N` (grep) or `lines N` (skeleton) positional suffix — it is metadata, not part of the line, and must NOT be copied into `startAnchorLine`/`endAnchorLine`/`anchorLine` values
+- Rendered `grep_anchored` lines end with a `line N` positional suffix — it is metadata, not part of the line, and must NOT be copied into `startAnchorLine`/`endAnchorLine`/`anchorLine` values
 - When `requireAnchorLines` is off, the line args are optional but still verified whenever they are provided
 - The `§` marker shown in file output is internal metadata only — it is NOT part of the actual file content
 - When providing `replacement` or `content`, use raw text only — anchor-marked text (`Word§...`, i.e. a rendered anchored line) is rejected by default; if the `§` is genuine content, pass `allowAnchoredLines: true`
@@ -67,7 +67,7 @@ Reads a text file with stable word anchors.
 }
 ```
 
-For large files, `auto` mode returns a heuristic skeleton instead of dumping the whole file. Use `startLine` and `endLine` for focused range reads.
+For large files, use `startLine` and `endLine` for focused range reads (`auto` resolves to `range` when a window is given, otherwise `full`). For orientation in an unknown file, `grep_anchored` a declaration regex — see the skill.
 
 - `anchored` — set to `false` for plain `lineNo: text` lines without anchor prefixes or the revision header (default: anchored, edit-ready output); `details` still carries `revision` and `lines` in both modes
 
@@ -171,10 +171,7 @@ If the safety check fails (e.g. pi redesigns a built-in), the extension falls ba
   "overrideBuiltInEditTools": false,
   "confirmation": "protected-paths",
   "requireAnchorLines": true,
-  "maxFullReadBytes": 80000,
-  "maxFullReadLines": 1500,
   "maxRangeReadLines": 400,
-  "maxSkeletonItems": 120,
   "protectedPaths": [
     ".env",
     ".env.*",

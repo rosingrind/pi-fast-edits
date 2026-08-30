@@ -229,34 +229,20 @@ describe("anchored tools", () => {
     ).rejects.toThrow(/binary file/);
   });
 
-  it("read_anchored skeleton mode for large files", async () => {
-    const cwd = await workspace();
-    const lines = Array.from({ length: 200 }, (_, i) => `line ${i + 1}`);
-    const file = join(cwd, "large.txt");
-    await writeFile(file, lines.join("\n") + "\n", "utf8");
-    const tools = await loadTools();
-
-    const result = await tools
-      .get("read_anchored")!
-      .execute("1", { path: "large.txt", mode: "skeleton" }, undefined, undefined, { cwd });
-
-    const text = result.content[0].text as string;
-    expect(text).toContain("Mode: skeleton");
-    expect(text).toContain(`${anchorOf(text, "line 1")}§ line 1`);
-  });
-
-  it("auto mode selects skeleton for large files (by byte threshold)", async () => {
+  it("auto mode returns full content for large files (skeleton removed)", async () => {
     const cwd = await workspace();
     const file = join(cwd, "large-bytes.txt");
-    // Exceed DEFAULT_CONFIG.maxFullReadBytes (80KB) so auto mode picks skeleton.
+    // Auto mode on an 85KB file — no skeleton anymore, full mode returns it all.
     const content = "x".repeat(85 * 1024) + "\n";
     await writeFile(file, content, "utf8");
     const tools = await loadTools();
     const result = await tools
       .get("read_anchored")!
       .execute("1", { path: "large-bytes.txt" }, undefined, undefined, { cwd });
+    expect(result.details.mode).toBe("full");
     const text = result.content[0].text as string;
-    expect(text).toContain("Mode: skeleton");
+    expect(text).toContain("Lines: 1");
+    expect(text).not.toContain("Mode: skeleton");
   });
 
   it("read_anchored range mode with clamping", async () => {
@@ -1228,7 +1214,7 @@ describe("anchored read range modes", () => {
     ).rejects.toThrow(/Invalid range/);
   });
 
-  it("auto mode selects skeleton for large files by line count", async () => {
+  it("auto mode returns full content for large files regardless of line count", async () => {
     const cwd = await workspace();
     const lines = Array.from({ length: 1600 }, (_, i) => `line ${i + 1}`);
     const file = join(cwd, "large-lines.txt");
@@ -1237,7 +1223,9 @@ describe("anchored read range modes", () => {
     const result = await tools
       .get("read_anchored")!
       .execute("1", { path: "large-lines.txt" }, undefined, undefined, { cwd });
-    expect(result.content[0].text).toContain("Mode: skeleton");
+    expect(result.details.mode).toBe("full");
+    expect(result.content[0].text).toContain("line 1600");
+    expect(result.content[0].text).not.toContain("Mode: skeleton");
   });
 });
 

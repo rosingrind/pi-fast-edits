@@ -2,11 +2,7 @@ import { Text, type Component } from "@earendil-works/pi-tui";
 import type { PiFastEditsConfig, ReadMode, SessionState } from "../types.js";
 import { Type, type Static } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import {
-  ANCHOR_DELIMITER,
-  renderAnchoredLines,
-  stripAnchorPrefix,
-} from "../anchor/anchor-renderer.js";
+import { renderAnchoredLines, stripAnchorPrefix } from "../anchor/anchor-renderer.js";
 import {
   renderToolCall,
   type ToolResult,
@@ -27,15 +23,8 @@ const readSchema = Type.Object({
     }),
   ),
   mode: Type.Optional(
-    Type.Union(
-      [Type.Literal("auto"), Type.Literal("full"), Type.Literal("range"), Type.Literal("skeleton")],
-      { description: "auto, full, range, or skeleton." },
-    ),
-  ),
-  maxBytes: Type.Optional(
-    Type.Number({
-      description:
-        "Auto-mode threshold: files over this many bytes read as a skeleton unless mode is 'full' or a range is given.",
+    Type.Union([Type.Literal("auto"), Type.Literal("full"), Type.Literal("range")], {
+      description: "auto, full, or range.",
     }),
   ),
   anchored: Type.Optional(
@@ -56,7 +45,7 @@ export function registerReadAnchored(
     name: "read_anchored",
     label: "Read Anchored File",
     description:
-      "Read a text file with stable word anchors for fast subsequent edits. For large files, returns a skeleton unless a range is requested. Set anchored:false to read plain line-numbered output.",
+      "Read a text file with stable word anchors for fast subsequent edits. Use mode:'range' for windows of large files. Set anchored:false to read plain line-numbered output.",
     renderCall: renderToolCall("read_anchored", (args, theme) => {
       const startLine = args.startLine as number | undefined;
       const endLine = args.endLine as number | undefined;
@@ -69,9 +58,8 @@ export function registerReadAnchored(
     promptSnippet: "Read a file with stable word anchors for future edits",
     promptGuidelines: [
       "Use the returned anchors to reference specific lines in subsequent edits",
-      "For large files, use mode:'skeleton' or mode:'range' to focus on specific sections",
+      "For large files, use mode:'range' to focus on specific sections",
       "Pass the revision hash from this result as expectedRevision in edit tools",
-      "The `    line N` / `    lines N` suffix after each rendered line is positional metadata, not part of the line — do NOT include it in startAnchorLine/endAnchorLine/anchorLine values",
     ],
     renderShell: "default" as const,
     executionMode: "parallel" as const,
@@ -89,13 +77,9 @@ export function registerReadAnchored(
       const anchored = params.anchored ?? true;
       const requestedMode = (params.mode ?? "auto") as ReadMode;
       const hasRange = typeof params.startLine === "number" || typeof params.endLine === "number";
-      const maxBytes = params.maxBytes ?? config.maxFullReadBytes;
       let mode: ReadMode = requestedMode;
       if (mode === "auto") {
-        if (hasRange) mode = "range";
-        else if (snapshot.byteLength > maxBytes || state.lines.length > config.maxFullReadLines)
-          mode = "skeleton";
-        else mode = "full";
+        mode = hasRange ? "range" : "full";
       }
 
       if (mode === "range") {
@@ -125,24 +109,6 @@ export function registerReadAnchored(
             })),
           },
         );
-      }
-
-      if (mode === "skeleton") {
-        let items = state.skeletonCache.get(state.revisionHash);
-        if (!items) {
-          items = selectSkeletonItems(state, config.maxSkeletonItems);
-          state.skeletonCache.set(state.revisionHash, items);
-        }
-        return textResult(renderSkeleton(relativePath, state, items, anchored), {
-          path: relativePath,
-          mode,
-          revision: state.revisionHash,
-          lines: items.map((line) => ({
-            anchor: line.anchor,
-            text: line.text,
-            lineNo: line.lineNo,
-          })),
-        });
       }
 
       return textResult(
@@ -199,48 +165,6 @@ export function renderReadAnchoredResult(
     return new Text("", 0, 0);
   }
   return new Text(cleaned.join("\n"), 0, 0);
-}
-
-function selectSkeletonItems(
-  state: {
-    lines: Array<{ anchor: string; text: string; lineNo: number }>;
-  },
-  maxItems: number,
-): Array<{ anchor: string; text: string; lineNo: number }> {
-  const items: Array<{ anchor: string; text: string; lineNo: number }> = [];
-  const interesting =
-    /^(\s*(import\s|from\s|export\s|async\s+function\s|function\s|class\s|interface\s|type\s|const\s+\w+\s*=|let\s+\w+\s*=|var\s+\w+\s*=|def\s|#|\/\/|\/\*|\*))/;
-  for (const line of state.lines) {
-    const lowIndent = /^\s{0,2}\S/.test(line.text);
-    if ((interesting.test(line.text) && lowIndent) || line.lineNo <= 30) {
-      items.push(line);
-    }
-    if (items.length >= maxItems) break;
-  }
-  if (items.length === 0) {
-    for (const line of state.lines.slice(0, Math.min(maxItems, 50))) {
-      items.push(line);
-    }
-  }
-  return items;
-}
-
-function renderSkeleton(
-  relativePath: string,
-  state: {
-    lines: Array<{ anchor: string; text: string; lineNo: number }>;
-    revisionHash: string;
-  },
-  items: Array<{ anchor: string; text: string; lineNo: number }>,
-  anchored: boolean,
-): string {
-  const rendered = items.map((line) => {
-    const display = line.text.length > 140 ? `${line.text.slice(0, 137)}...` : line.text;
-    return anchored
-      ? `${line.anchor}${ANCHOR_DELIMITER} ${display}    lines ${line.lineNo}`
-      : `${line.lineNo}: ${display}`;
-  });
-  return `File: ${relativePath}\nLines: ${state.lines.length}\nMode: skeleton${revisionLine(state, anchored)}\n\n${rendered.join("\n")}`;
 }
 
 function revisionLine(state: { revisionHash: string }, anchored: boolean): string {

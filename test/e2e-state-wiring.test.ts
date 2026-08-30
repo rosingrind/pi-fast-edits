@@ -63,7 +63,6 @@ describe("session event wiring (e2e)", () => {
     ]);
     expect(state.lines.map((l) => l.text)).toEqual(["one", "two"]);
     expect(state.revisionHash).toMatch(/^[a-f0-9]{16}$/);
-    expect(state.skeletonCache.size).toBe(0);
 
     // Corrupt file must not throw on session_start of a fresh instance.
     writeFileSync(path, "{ not json");

@@ -54,7 +54,6 @@ export function reconcileState(
   state.lineEnding = lineEnding;
   state.hadFinalNewline = hadFinalNewline;
   state.hadBom = hadBom;
-  state.skeletonCache.clear();
   state.revisionHash = snapshotHash ?? hashText(joinLines(newLines, lineEnding, hadFinalNewline));
   trimRetiredAnchors(state);
   return state;

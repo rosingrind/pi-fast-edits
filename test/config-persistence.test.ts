@@ -26,8 +26,6 @@ describe("config persistence round-trip", () => {
 
     const mutated = {
       ...DEFAULT_CONFIG,
-      maxFullReadBytes: 123_456,
-      maxFullReadLines: 777,
       confirmation: "never" as const,
       protectedPaths: ["custom.txt", ".git/**"],
     };

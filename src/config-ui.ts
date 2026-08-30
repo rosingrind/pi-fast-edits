@@ -15,7 +15,7 @@ const SUBMENU_LAYOUT = { minPrimaryColumnWidth: 12, maxPrimaryColumnWidth: 40 };
 const ADD_PATTERN = "__add__";
 
 /** Parse a positive integer. Returns undefined for empty, zero, negative, or non-integer input.
- * Zero breaks read tools (forces skeleton mode, invalid range, or returns 1 line). */
+ * Zero breaks read tools (invalid range, or returns 1 line). */
 function parsePositiveInt(value: string): number | undefined {
   const n = Number(value.trim());
   return Number.isInteger(n) && n > 0 ? n : undefined;
@@ -255,28 +255,10 @@ function buildItems(
       values: ["on", "off"],
     },
     numeric(
-      "maxFullReadBytes",
-      "Max full-read bytes",
-      "Files larger than this (in bytes) fall back to range or skeleton reads",
-      config.maxFullReadBytes,
-    ),
-    numeric(
-      "maxFullReadLines",
-      "Max full-read lines",
-      "Files with more lines than this are read as range or skeleton",
-      config.maxFullReadLines,
-    ),
-    numeric(
       "maxRangeReadLines",
       "Max range-read lines",
-      "Files with more lines than this fall back to skeleton reads",
+      "Maximum lines returned by a range read (longer windows are clamped)",
       config.maxRangeReadLines,
-    ),
-    numeric(
-      "maxSkeletonItems",
-      "Max skeleton items",
-      "Maximum number of lines included in a skeleton read",
-      config.maxSkeletonItems,
     ),
     {
       id: "protectedPaths",
@@ -323,17 +305,8 @@ export async function showConfigMenu(
         case "requireAnchorLines":
           config.requireAnchorLines = newValue === "on";
           break;
-        case "maxFullReadBytes":
-          config.maxFullReadBytes = toPositiveInt(newValue, config.maxFullReadBytes);
-          break;
-        case "maxFullReadLines":
-          config.maxFullReadLines = toPositiveInt(newValue, config.maxFullReadLines);
-          break;
         case "maxRangeReadLines":
           config.maxRangeReadLines = toPositiveInt(newValue, config.maxRangeReadLines);
-          break;
-        case "maxSkeletonItems":
-          config.maxSkeletonItems = toPositiveInt(newValue, config.maxSkeletonItems);
           break;
         // "protectedPaths" is handled by its own submenu; no main-list change.
       }

@@ -3,10 +3,7 @@ import { DEFAULT_CONFIG, formatConfig, parseConfirmationMode } from "../src/conf
 
 describe("DEFAULT_CONFIG", () => {
   it("has correct defaults", () => {
-    expect(DEFAULT_CONFIG.maxFullReadLines).toBe(1500);
-    expect(DEFAULT_CONFIG.maxFullReadBytes).toBe(80_000);
     expect(DEFAULT_CONFIG.maxRangeReadLines).toBe(400);
-    expect(DEFAULT_CONFIG.maxSkeletonItems).toBe(120);
     expect(DEFAULT_CONFIG.confirmation).toBe("protected-paths");
     expect(DEFAULT_CONFIG.overrideBuiltInEditTools).toBe(false);
     expect(DEFAULT_CONFIG.protectedPaths).toContain(".env");
@@ -33,8 +30,8 @@ describe("parseConfirmationMode", () => {
 describe("formatConfig", () => {
   it("formats config as a readable string", () => {
     const formatted = formatConfig(DEFAULT_CONFIG);
-    expect(formatted).toContain("maxFullReadLines");
-    expect(formatted).toContain("1500");
+    expect(formatted).toContain("maxRangeReadLines");
+    expect(formatted).toContain("400");
     expect(formatted).toContain("protectedPaths");
   });
 });

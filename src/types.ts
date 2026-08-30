@@ -5,10 +5,7 @@ export type PiFastEditsConfig = {
   confirmation: ConfirmationMode;
   /** When true (default), edit tools require the exact anchor line content (startAnchorLine/endAnchorLine/anchorLine) on every edit. */
   requireAnchorLines: boolean;
-  maxFullReadBytes: number;
-  maxFullReadLines: number;
   maxRangeReadLines: number;
-  maxSkeletonItems: number;
   protectedPaths: string[];
 };
 
@@ -28,11 +25,6 @@ export type FileAnchorState = {
   hadBom: boolean;
   lines: AnchoredLine[];
   retiredAnchors: Set<string>;
-  /**
-   * Cache of selected skeleton items keyed by `revisionHash`, so repeated
-   * skeleton reads of an unchanged file skip re-scanning every line.
-   */
-  skeletonCache: Map<string, AnchoredLine[]>;
 };
 
 /**
@@ -90,7 +82,7 @@ export type SessionState = {
   files: LRUMap<string, FileAnchorState>;
 };
 
-export type ReadMode = "auto" | "full" | "range" | "skeleton";
+export type ReadMode = "auto" | "full" | "range";
 
 type RevisionGuard = {
   /** Optional read_anchored revision hash. If provided, edits fail when the file changed since the read. */

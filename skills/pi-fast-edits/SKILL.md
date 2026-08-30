@@ -9,7 +9,7 @@ Anchored tools map every line to a stable random **anchor word** and guard edits
 
 ## Decode the rendered form
 
-Tool output renders lines as `Tunnel§ target alpha one` — `grep` appends `line N` per line, `skeleton` reads append `lines N`, `range`/`full` reads append no suffix. The `AnchorWord§` prefix and any trailing `line N` / `lines N` are **display metadata only** — never part of the file, never valid parameter content:
+Tool output renders lines as `Tunnel§ target alpha one` — `grep` appends `line N` per line; `range`/`full` reads append no suffix. The `AnchorWord§` prefix and any trailing `line N` are **display metadata only** — never part of the file, never valid parameter content:
 
 - `startAnchorLine` / `endAnchorLine` / `anchorLine` = the bare source line, copied verbatim: `target alpha one`. The mismatch error appends a drop-the-suffix hint only when your value ends in that rendered shape.
 - Blank lines render as `Dragon§` but their content is the **empty string** — pass `""`.
@@ -29,7 +29,8 @@ Every file read/edited carries a `Revision:` hash — the first 16 hex chars of 
 | Need                                                      | Tool                                                                                          |
 | --------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | Find anchors for target lines                             | `grep_anchored` (edit-ready output)                                                           |
-| Big file, only a region matters                           | `read_anchored` mode `range`, or `skeleton` for a capped pass over comment/declaration lines  |
+| Big file, only a region matters                           | `read_anchored` mode `range`                                                                  |
+| Orientation in an unknown file                            | `grep_anchored` a declaration regex — the on-demand skeleton                                  |
 | Verbatim lines without anchors                            | `read_anchored` with `anchored: false`                                                        |
 | One change                                                | `edit_anchored` with a single edit — range replace; same anchor for start + end = single line |
 | Several changes (same or **multiple files**)              | `edit_anchored` with a batch — atomic: any failure rejects everything, zero partial writes    |

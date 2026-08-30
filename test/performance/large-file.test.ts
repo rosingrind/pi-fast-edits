@@ -28,26 +28,6 @@ async function workspace() {
 }
 
 describe("large file end-to-end (10k+ lines)", () => {
-  it("skeleton mode caps the rendered anchors at maxSkeletonItems", async () => {
-    const cwd = await workspace();
-    // Unique, "interesting" (top-level const) lines so every line qualifies.
-    const lines = Array.from({ length: 10_000 }, (_, i) => `const value${i} = ${i};`);
-    await writeFile(join(cwd, "big.ts"), lines.join("\n") + "\n", "utf8");
-    const tools = await loadTools();
-
-    const result = await tools
-      .get("read_anchored")!
-      .execute("1", { path: "big.ts", mode: "skeleton" }, undefined, undefined, { cwd });
-
-    const text = result.content[0].text as string;
-    expect(text).toContain("Mode: skeleton");
-    const rendered = text.split("\n").filter((l) => l.includes("§"));
-    // Capped by maxSkeletonItems (120).
-    expect(rendered.length).toBe(120);
-    // details carries only the skeleton items, not the full file.
-    expect((result.details.lines as unknown[]).length).toBe(120);
-  });
-
   it("range mode returns the requested window with correct metadata", async () => {
     const cwd = await workspace();
     const lines = Array.from({ length: 10_000 }, (_, i) => `const value${i} = ${i};`);
