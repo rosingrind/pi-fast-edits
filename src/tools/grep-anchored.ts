@@ -5,6 +5,7 @@ import type { PiFastEditsConfig, SessionState } from "../types.js";
 import { Type, type Static } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { ANCHOR_DELIMITER } from "../anchor/anchor-renderer.js";
+import { resolveToolDisplayName } from "./render.js";
 import { DEFAULT_PROTECTED_SKIP, isProtectedPath } from "../fs/path-safety.js";
 import { resolveRg } from "../fs/rg-resolver.js";
 import { runRg, type RgHit } from "../fs/rg-search.js";
@@ -74,14 +75,23 @@ export function registerGrepAnchoredFiles(
       "Search file contents with a regex and get matching lines back with stable word anchors and revision hashes, " +
       "exactly as read_anchored_file renders them. Results can be fed straight into the anchored edit tools " +
       "(use the per-file Revision as expectedRevision). Searches the workspace or a subpath; skips .git, node_modules, protected paths, and binary files.",
-    renderCall: renderToolCall("grep_anchored_files", (args, theme) => {
+    renderCall: (args: Record<string, unknown>, theme: Theme, context: RenderContext) => {
+      // Mirrors pi's built-in grep call title (name + /pattern/ in path), with
+      // the name resolved through override-mode display names.
       const pattern = args.pattern as string | undefined;
-      if (pattern === undefined) return "";
       const glob = args.glob as string | undefined;
       const path = args.path as string | undefined;
-      const suffix = [path ? path : "", glob ? ` ${glob}` : ""].join("").trim();
-      return theme.fg("warning", ` /${pattern}/${suffix ? ` in ${suffix}` : ""}`);
-    }),
+      const text =
+        theme.fg("toolTitle", theme.bold(resolveToolDisplayName("grep_anchored_files"))) +
+        " " +
+        theme.fg("accent", pattern === undefined ? "..." : `/${pattern}/`) +
+        theme.fg("toolOutput", ` in ${path ?? "..."}`) +
+        (glob ? theme.fg("toolOutput", ` (${glob})`) : "");
+      const base =
+        context.lastComponent instanceof Text ? context.lastComponent : new Text("", 0, 0);
+      base.setText(text);
+      return base;
+    },
     renderResult: renderGrepResult,
     promptSnippet: "Search files with a regex and get anchored, editable results",
     promptGuidelines: [

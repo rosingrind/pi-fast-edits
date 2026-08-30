@@ -235,10 +235,12 @@ describe("renderToolCall", () => {
     expect(textOf(component)).toContain("(skeleton)");
   });
 
-  it("shows '...' when no path", () => {
-    const renderer = renderToolCall("test_tool");
+  it("omits the path slot entirely when no path (suffix carries it)", () => {
+    const renderer = renderToolCall("test_tool", () => " (skeleton)");
     const component = renderer({}, theme, noContext);
-    expect(textOf(component)).toContain("...");
+    const text = textOf(component);
+    expect(text).not.toContain("...");
+    expect(text).toContain("(skeleton)");
   });
 });
 

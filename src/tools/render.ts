@@ -15,6 +15,11 @@ export function setToolNameOverrides(map: Record<string, string>): void {
 export function clearToolNameOverrides(): void {
   toolNameOverrides.clear();
 }
+
+/** Resolve a registration name to its override-mode display name (if any). */
+export function resolveToolDisplayName(toolName: string): string {
+  return toolNameOverrides.get(toolName) ?? toolName;
+}
 import type { Component } from "@earendil-works/pi-tui";
 import type { Theme } from "./theme.js";
 
@@ -48,7 +53,9 @@ export function renderToolCall(
     const text = context.lastComponent instanceof Text ? context.lastComponent : new Text("", 0, 0);
     const displayName = toolNameOverrides.get(toolName) ?? toolName;
     const path = (args as { path?: string }).path;
-    const pathDisplay = path ? theme.fg("accent", path) : theme.fg("toolOutput", "...");
+    // No "..." fallback: tools whose path lives in a nested arg (batch edits)
+    // carry it in their suffix instead — a bare "..." reads as noise.
+    const pathDisplay = path ? theme.fg("accent", path) : "";
     const suffix = getSuffix ? getSuffix(args, theme) : "";
     text.setText(theme.fg("toolTitle", theme.bold(displayName)) + " " + pathDisplay + suffix);
     return text;
