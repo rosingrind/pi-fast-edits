@@ -53,13 +53,11 @@ export function registerApplyAnchoredEdits(
       "Apply multiple anchored edits in a single batch, validating all anchors before writing and reconciling lazily with Myers diff.",
     promptSnippet: "Apply multiple anchored edits in a single batch operation",
     promptGuidelines: [
-      "Copy anchor words verbatim from a prior read_anchored_file or grep_anchored_files result",
-      "Pass the exact current source line at each anchor as startAnchorLine/endAnchorLine/anchorLine, copied verbatim from read/grep output — the line content is verified before editing",
-      "The `    line N` suffix after each rendered line is positional metadata, not part of the line — do NOT include it in startAnchorLine/endAnchorLine/anchorLine values",
-      "Each edit references anchors from a prior read_anchored_file result",
-      "Edits are validated for overlaps before any writes occur",
-      "Pass revision hashes from read_anchored_file as expectedRevision per edit",
+      "Pass the exact current source line at each anchor as startAnchorLine/endAnchorLine/anchorLine — verified against the file; mismatch rejects the whole batch",
+      "Edits are validated for overlaps before any writes occur — one failure rejects everything, zero partial writes",
+      "Pass each file's current revision hash as expectedRevision",
       "Use raw text only in replacement/content — anchor-marked text (`Word§...`) is rejected; set allowAnchoredLines: true only if the § is genuine content",
+      "Workflows, multi-file batches, failure recovery: the pi-fast-edits skill (/skill:pi-fast-edits)",
     ],
     renderShell: "default" as const,
     executionMode: "sequential" as const,
@@ -86,6 +84,28 @@ export function registerApplyAnchoredEdits(
         }
       } else if (isSingleEdit(edits)) {
         edits = [edits];
+      }
+      // Field-name rescue: models alternating insert/replace in one batch
+      // sometimes use `content` for replace edits (or `replacement` for
+      // inserts). Move the text to the field the variant actually takes.
+      if (Array.isArray(edits)) {
+        for (const e of edits as Array<Record<string, unknown>>) {
+          if (
+            e.type === "replace" &&
+            e.replacement === undefined &&
+            typeof e.content === "string"
+          ) {
+            e.replacement = e.content;
+            delete e.content;
+          } else if (
+            e.type === "insert" &&
+            e.content === undefined &&
+            typeof e.replacement === "string"
+          ) {
+            e.content = e.replacement;
+            delete e.replacement;
+          }
+        }
       }
       return { edits: edits as BatchStatic["edits"] } as BatchStatic;
     },

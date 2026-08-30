@@ -53,7 +53,7 @@ export type BatchEditsParams = { edits: BatchEditParams[] };
 /** The anchor's `*Line` companion: required (strict) or optional (lenient). */
 function anchorLineSchema(requireAnchorLines: boolean, at: string) {
   const description = requireAnchorLines
-    ? `The exact current source line at ${at}, copied verbatim from read_anchored_file or grep_anchored_files output. Verified before editing; mismatch rejects the edit.`
+    ? `The exact current source line at ${at}, copied verbatim from read/grep output. Verified before editing; mismatch rejects the edit.`
     : `Optional. When provided, verified against the anchor's current line; mismatch rejects the edit.`;
   return requireAnchorLines
     ? Type.String({ description })
@@ -64,23 +64,23 @@ export function replaceEditSchema(requireAnchorLines: boolean) {
   return Type.Object({
     path: Type.String({ description: "Path to the file to edit." }),
     startAnchor: Type.String({
-      description:
-        "Start anchor of the range to replace. Copy the anchor word verbatim from read_anchored_file or grep_anchored_files output.",
+      description: "Start anchor of the range to replace (anchor word from read/grep output).",
     }),
     endAnchor: Type.String({
-      description:
-        "End anchor of the range to replace. Copy the anchor word verbatim from read_anchored_file or grep_anchored_files output.",
+      description: "End anchor of the range to replace (anchor word from read/grep output).",
     }),
     startAnchorLine: anchorLineSchema(requireAnchorLines, "startAnchor"),
     endAnchorLine: anchorLineSchema(requireAnchorLines, "endAnchor"),
     replacement: Type.String({
       description:
-        "New content to replace the anchor range. Use raw text only — anchor-marked text (`Word§...`) is rejected unless allowAnchoredLines is true.",
+        "New content to replace the anchor range. Raw text only — anchor-marked text (`Word§...`) is rejected unless allowAnchoredLines is true.",
     }),
     includeStart: Type.Optional(Type.Boolean({ description: "Include the start anchor line." })),
     includeEnd: Type.Optional(Type.Boolean({ description: "Include the end anchor line." })),
     expectedRevision: Type.Optional(
-      Type.String({ description: "Revision hash from read_anchored_file to prevent stale edits." }),
+      Type.String({
+        description: "Current revision hash for the file; a stale value rejects the edit.",
+      }),
     ),
   });
 }
@@ -89,8 +89,7 @@ export function insertEditSchema(requireAnchorLines: boolean) {
   return Type.Object({
     path: Type.String({ description: "Path to the file to edit." }),
     anchor: Type.String({
-      description:
-        "Anchor to insert before or after. Copy the anchor word verbatim from read_anchored_file or grep_anchored_files output.",
+      description: "Anchor to insert before or after (anchor word from read/grep output).",
     }),
     anchorLine: anchorLineSchema(requireAnchorLines, "anchor"),
     position: Type.Union([Type.Literal("before"), Type.Literal("after")], {
@@ -98,7 +97,7 @@ export function insertEditSchema(requireAnchorLines: boolean) {
     }),
     content: Type.String({
       description:
-        "Content to insert. Use raw text only — anchor-marked text (`Word§...`) is rejected unless allowAnchoredLines is true.",
+        "Content to insert. Raw text only — anchor-marked text (`Word§...`) is rejected unless allowAnchoredLines is true.",
     }),
     allowAnchoredLines: Type.Optional(
       Type.Boolean({
@@ -107,7 +106,9 @@ export function insertEditSchema(requireAnchorLines: boolean) {
       }),
     ),
     expectedRevision: Type.Optional(
-      Type.String({ description: "Revision hash from read_anchored_file to prevent stale edits." }),
+      Type.String({
+        description: "Current revision hash for the file; a stale value rejects the edit.",
+      }),
     ),
   });
 }
@@ -116,17 +117,17 @@ export function deleteEditSchema(requireAnchorLines: boolean) {
   return Type.Object({
     path: Type.String({ description: "Path to the file to edit." }),
     startAnchor: Type.String({
-      description:
-        "Start anchor of the range to delete. Copy the anchor word verbatim from read_anchored_file or grep_anchored_files output.",
+      description: "Start anchor of the range to delete (anchor word from read/grep output).",
     }),
     endAnchor: Type.String({
-      description:
-        "End anchor of the range to delete. Copy the anchor word verbatim from read_anchored_file or grep_anchored_files output.",
+      description: "End anchor of the range to delete (anchor word from read/grep output).",
     }),
     startAnchorLine: anchorLineSchema(requireAnchorLines, "startAnchor"),
     endAnchorLine: anchorLineSchema(requireAnchorLines, "endAnchor"),
     expectedRevision: Type.Optional(
-      Type.String({ description: "Revision hash from read_anchored_file to prevent stale edits." }),
+      Type.String({
+        description: "Current revision hash for the file; a stale value rejects the edit.",
+      }),
     ),
   });
 }

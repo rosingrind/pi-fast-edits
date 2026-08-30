@@ -48,10 +48,8 @@ export function registerWriteAnchored(
     renderResult: renderWriteResult,
     promptSnippet: "Write a file and get anchors for immediate edits",
     promptGuidelines: [
-      "The result carries the revision hash and anchored preview lines — pass them straight to the anchored edit tools",
-      "Use the returned anchors to reference specific lines in subsequent edits",
-      "Pass the revision hash from this result as expectedRevision in edit tools",
-      "The `    line N` suffix after each rendered line is positional metadata, not part of the line — do NOT include it in startAnchorLine/endAnchorLine/anchorLine values",
+      "The result carries the revision hash and anchored preview — edit with those anchors immediately, no read needed",
+      "If a notice says the file was modified after this write (e.g. lint autofix), re-read before editing",
     ],
     renderShell: "default" as const,
     executionMode: "sequential" as const,
