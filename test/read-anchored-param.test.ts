@@ -136,16 +136,21 @@ describe("read_anchored_file anchored param", () => {
       .execute("1", { path: "plain-edit.txt", anchored: false }, undefined, undefined, { cwd });
     const { revision, lines } = read.details;
 
-    await tools.get("edit_anchored_range")!.execute(
+    await tools.get("apply_anchored_edits")!.execute(
       "2",
       {
-        path: "plain-edit.txt",
-        startAnchor: lines[0].anchor,
-        startAnchorLine: lines[0].text,
-        endAnchor: lines[0].anchor,
-        endAnchorLine: lines[0].text,
-        replacement: "ALPHA",
-        expectedRevision: revision,
+        edits: [
+          {
+            type: "replace",
+            path: "plain-edit.txt",
+            startAnchor: lines[0].anchor,
+            startAnchorLine: lines[0].text,
+            endAnchor: lines[0].anchor,
+            endAnchorLine: lines[0].text,
+            replacement: "ALPHA",
+            expectedRevision: revision,
+          },
+        ],
       },
       undefined,
       undefined,

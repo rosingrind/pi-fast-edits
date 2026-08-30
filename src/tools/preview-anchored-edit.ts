@@ -9,7 +9,7 @@ import {
   type PiContext,
 } from "./shared.js";
 import { applyPlansToLines, planEdit } from "./edit-core.js";
-import { renderEditResult } from "./single-edit-runner.js";
+import { renderEditResult } from "./render-edit-result.js";
 import { renderToolCall } from "./render.js";
 import { replaceEditSchema, type ReplaceEditParams } from "./schemas.js";
 
@@ -24,12 +24,8 @@ export function registerPreviewAnchoredEdit(
     description: "Preview a replacement edit between two anchors without writing files.",
     promptSnippet: "Preview a replacement edit between two anchors without writing",
     promptGuidelines: [
-      "Copy anchor words verbatim from a prior read_anchored_file or grep_anchored_files result",
       "Pass the exact current source line at each anchor as startAnchorLine/endAnchorLine, copied verbatim from read/grep output — the line content is verified before editing",
-      "The `    line N` suffix after each rendered line is positional metadata, not part of the line — do NOT include it in startAnchorLine/endAnchorLine values",
-      "Returns a diff showing what the edit would produce",
-      "Does not modify the file — use edit_anchored_range to apply",
-      "Pass the revision hash from read_anchored_file as expectedRevision",
+      "Dry-run only: no write; apply with edit. Pass the file's current revision hash as expectedRevision",
     ],
     renderShell: "default",
     executionMode: "parallel",

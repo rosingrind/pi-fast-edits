@@ -12,9 +12,6 @@ import { registerCommands } from "./commands/register.js";
 import { registerReadAnchoredFile } from "./tools/read-anchored-file.js";
 import { registerGrepAnchoredFiles } from "./tools/grep-anchored.js";
 import { registerWriteAnchored } from "./tools/write-anchored.js";
-import { registerEditAnchoredRange } from "./tools/edit-anchored-range.js";
-import { registerInsertAtAnchor } from "./tools/insert-at-anchor.js";
-import { registerDeleteAnchorRange } from "./tools/delete-anchor-range.js";
 import { registerPreviewAnchoredEdit } from "./tools/preview-anchored-edit.js";
 import { registerApplyAnchoredEdits } from "./tools/apply-anchored-edits.js";
 import {
@@ -46,9 +43,6 @@ export default async function piFastEdits(
   // `requireAnchorLines` setting. pi.replace semantics: registering the same
   // tool name refreshes it in-session.
   const registerAnchoredEditTools = () => {
-    registerEditAnchoredRange(pi, session, config);
-    registerInsertAtAnchor(pi, session, config);
-    registerDeleteAnchorRange(pi, session, config);
     registerPreviewAnchoredEdit(pi, session, config);
     registerApplyAnchoredEdits(pi, session, config);
   };

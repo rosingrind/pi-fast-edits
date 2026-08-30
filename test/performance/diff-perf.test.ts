@@ -50,16 +50,21 @@ describe("Myers diff performance edge cases", () => {
 
     const start = Date.now();
     // Replace entire old file content with new file content.
-    const editResult = await tools.get("edit_anchored_range")!.execute(
+    const editResult = await tools.get("apply_anchored_edits")!.execute(
       "3",
       {
-        path: "old.txt",
-        startAnchor: firstAnchor,
-        startAnchorLine: firstAnchorLine,
-        endAnchor: lastAnchor,
-        endAnchorLine: lastAnchorLine,
-        replacement: newLines.join("\n"),
-        expectedRevision: oldRevision,
+        edits: [
+          {
+            type: "replace",
+            path: "old.txt",
+            startAnchor: firstAnchor,
+            startAnchorLine: firstAnchorLine,
+            endAnchor: lastAnchor,
+            endAnchorLine: lastAnchorLine,
+            replacement: newLines.join("\n"),
+            expectedRevision: oldRevision,
+          },
+        ],
       },
       undefined,
       undefined,
@@ -93,16 +98,21 @@ describe("Myers diff performance edge cases", () => {
     const lastAnchorLine = linesData[linesData.length - 1].text;
 
     const start = Date.now();
-    const editResult = await tools.get("edit_anchored_range")!.execute(
+    const editResult = await tools.get("apply_anchored_edits")!.execute(
       "2",
       {
-        path: "rewrite.txt",
-        startAnchor: firstAnchor,
-        startAnchorLine: firstAnchorLine,
-        endAnchor: lastAnchor,
-        endAnchorLine: lastAnchorLine,
-        replacement: newLines.join("\n"),
-        expectedRevision: revision,
+        edits: [
+          {
+            type: "replace",
+            path: "rewrite.txt",
+            startAnchor: firstAnchor,
+            startAnchorLine: firstAnchorLine,
+            endAnchor: lastAnchor,
+            endAnchorLine: lastAnchorLine,
+            replacement: newLines.join("\n"),
+            expectedRevision: revision,
+          },
+        ],
       },
       undefined,
       undefined,
@@ -141,16 +151,21 @@ describe("Myers diff performance edge cases", () => {
     const lastAnchorLine = linesData[linesData.length - 1].text;
 
     // Replace with identical content — edit succeeds, file unchanged.
-    const editResult = await tools.get("edit_anchored_range")!.execute(
+    const editResult = await tools.get("apply_anchored_edits")!.execute(
       "2",
       {
-        path: "same.txt",
-        startAnchor: firstAnchor,
-        startAnchorLine: firstAnchorLine,
-        endAnchor: lastAnchor,
-        endAnchorLine: lastAnchorLine,
-        replacement: lines.join("\n"),
-        expectedRevision: revision,
+        edits: [
+          {
+            type: "replace",
+            path: "same.txt",
+            startAnchor: firstAnchor,
+            startAnchorLine: firstAnchorLine,
+            endAnchor: lastAnchor,
+            endAnchorLine: lastAnchorLine,
+            replacement: lines.join("\n"),
+            expectedRevision: revision,
+          },
+        ],
       },
       undefined,
       undefined,
@@ -244,16 +259,21 @@ describe("unicode and emoji in anchors", () => {
     const lines = readResult.details.lines as Array<{ anchor: string; text: string }>;
     const firstAnchor = lines[0].anchor;
 
-    const editResult = await tools.get("edit_anchored_range")!.execute(
+    const editResult = await tools.get("apply_anchored_edits")!.execute(
       "2",
       {
-        path: "unicode-edit.txt",
-        startAnchor: firstAnchor,
-        startAnchorLine: lines[0].text,
-        endAnchor: lines[1].anchor,
-        endAnchorLine: lines[1].text,
-        replacement: "const 苹果 = 99;\n",
-        expectedRevision: revision,
+        edits: [
+          {
+            type: "replace",
+            path: "unicode-edit.txt",
+            startAnchor: firstAnchor,
+            startAnchorLine: lines[0].text,
+            endAnchor: lines[1].anchor,
+            endAnchorLine: lines[1].text,
+            replacement: "const 苹果 = 99;\n",
+            expectedRevision: revision,
+          },
+        ],
       },
       undefined,
       undefined,
@@ -292,15 +312,20 @@ describe("anchor churn under rapid edits", () => {
       const anchor = lines[targetLine].anchor;
       const anchorLineText = lines[targetLine].text;
 
-      const result = await tools.get("edit_anchored_range")!.execute(
+      const result = await tools.get("apply_anchored_edits")!.execute(
         String(i * 2 + 1),
         {
-          path: "churn.txt",
-          startAnchor: anchor,
-          startAnchorLine: anchorLineText,
-          endAnchor: anchor,
-          endAnchorLine: anchorLineText,
-          replacement: `edited-${i}\n`,
+          edits: [
+            {
+              type: "replace",
+              path: "churn.txt",
+              startAnchor: anchor,
+              startAnchorLine: anchorLineText,
+              endAnchor: anchor,
+              endAnchorLine: anchorLineText,
+              replacement: `edited-${i}\n`,
+            },
+          ],
         },
         undefined,
         undefined,
@@ -349,16 +374,21 @@ describe("Myers fallback branch (n + m >= 4000)", () => {
     const lastAnchorLine = linesData[linesData.length - 1].text;
 
     // Replace the whole file content with the new lines.
-    const editResult = await tools.get("edit_anchored_range")!.execute(
+    const editResult = await tools.get("apply_anchored_edits")!.execute(
       "2",
       {
-        path: "fallback.txt",
-        startAnchor: firstAnchor,
-        startAnchorLine: firstAnchorLine,
-        endAnchor: lastAnchor,
-        endAnchorLine: lastAnchorLine,
-        replacement: newLines.join("\n"),
-        expectedRevision: revision,
+        edits: [
+          {
+            type: "replace",
+            path: "fallback.txt",
+            startAnchor: firstAnchor,
+            startAnchorLine: firstAnchorLine,
+            endAnchor: lastAnchor,
+            endAnchorLine: lastAnchorLine,
+            replacement: newLines.join("\n"),
+            expectedRevision: revision,
+          },
+        ],
       },
       undefined,
       undefined,

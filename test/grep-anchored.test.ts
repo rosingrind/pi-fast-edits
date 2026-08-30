@@ -180,16 +180,21 @@ describe("grep_anchored_files", () => {
     const alphaLine = lineTextFrom(grepText, "export function alpha() {");
 
     // The grep result's revision must satisfy the edit tool's revision guard.
-    const edit = await tools.get("edit_anchored_range")!.execute(
+    const edit = await tools.get("apply_anchored_edits")!.execute(
       "2",
       {
-        path: "src/a.ts",
-        startAnchor: alphaAnchor,
-        startAnchorLine: alphaLine,
-        endAnchor: alphaAnchor,
-        endAnchorLine: alphaLine,
-        replacement: "export function alpha2() {\n  return 2;\n}",
-        expectedRevision: revision,
+        edits: [
+          {
+            type: "replace",
+            path: "src/a.ts",
+            startAnchor: alphaAnchor,
+            startAnchorLine: alphaLine,
+            endAnchor: alphaAnchor,
+            endAnchorLine: alphaLine,
+            replacement: "export function alpha2() {\n  return 2;\n}",
+            expectedRevision: revision,
+          },
+        ],
       },
       undefined,
       undefined,

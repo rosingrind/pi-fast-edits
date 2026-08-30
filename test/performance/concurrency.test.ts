@@ -36,280 +36,8 @@ async function workspace() {
 const isRoot = typeof process.getuid === "function" && process.getuid() === 0;
 
 describe("concurrency: parallel subagent scenarios", () => {
-  describe("C1 — Silent lost update: two sessions edit same file concurrently", () => {
-    it("last-writer-wins: concurrent edits both succeed, one silently drops", async () => {
-      const cwd = await workspace();
-      const file = join(cwd, "concurrent.txt");
-      await writeFile(file, "alpha\nbeta\ngamma\n", "utf8");
 
-      // Two independent sessions (simulating two subagents).
-      const toolsA = await loadTools();
-      const toolsB = await loadTools();
 
-      // Both sessions read the same file. Each session derives its own
-      // (randomized) per-file anchors, so an anchor from session A's read is
-      // never valid inside session B's fresh state.
-      const rA = await toolsA
-        .get("read_anchored_file")!
-        .execute("1", { path: "concurrent.txt" }, undefined, undefined, { cwd });
-      const rB = await toolsB
-        .get("read_anchored_file")!
-        .execute("2", { path: "concurrent.txt" }, undefined, undefined, { cwd });
-      const revisionA = (rA.details as any)?.revision;
-      const revisionB = (rB.details as any)?.revision;
-      const linesA = (rA.details as any)?.lines as any[];
-      const linesB = (rB.details as any)?.lines as any[];
-
-      // Both edit in parallel with the revisions from their own reads — both
-      // reads happen before either write, so both revision guards pass. The
-      // contract is last-writer-wins: no lock, no merge.
-      const [resultA, resultB] = await Promise.all([
-        toolsA.get("edit_anchored_range")!.execute(
-          "3",
-          {
-            path: "concurrent.txt",
-            startAnchor: linesA[0].anchor,
-            startAnchorLine: linesA[0].text,
-            endAnchor: linesA[0].anchor,
-            endAnchorLine: linesA[0].text,
-            replacement: "ALPHA\n",
-            expectedRevision: revisionA,
-          },
-          undefined,
-          undefined,
-          { cwd },
-        ),
-        toolsB.get("edit_anchored_range")!.execute(
-          "4",
-          {
-            path: "concurrent.txt",
-            startAnchor: linesB[2].anchor,
-            startAnchorLine: linesB[2].text,
-            endAnchor: linesB[2].anchor,
-            endAnchorLine: linesB[2].text,
-            replacement: "GAMMA\n",
-            expectedRevision: revisionB,
-          },
-          undefined,
-          undefined,
-          { cwd },
-        ),
-      ]);
-
-      // Both succeed (last-writer-wins; the revision guard passes for both).
-      expect(resultA.content[0].text).toMatch(/^[+-]/m);
-      expect(resultB.content[0].text).toMatch(/^[+-]/m);
-
-      // The file holds exactly one of the two outcomes (plus the untouched
-      // middle line). This documents the last-writer-wins contract: no error,
-      // no merge — the final writer silently clobbers the other.
-      const content = await readFile(file, "utf8");
-      expect(content).toContain("beta"); // middle line preserved
-      expect(["ALPHA\nbeta\ngamma\n", "alpha\nbeta\nGAMMA\n"]).toContain(content);
-    });
-  });
-
-  describe("C2 — TOCTOU: file changes between revision guard and write", () => {
-    it("concurrent modification during edit window is caught by the stale revision guard", async () => {
-      const cwd = await workspace();
-      const file = join(cwd, "toctou.txt");
-      await writeFile(file, "alpha\nbeta\n", "utf8");
-
-      const tools = await loadTools();
-
-      // Read to get revision.
-      const r = await tools
-        .get("read_anchored_file")!
-        .execute("1", { path: "toctou.txt" }, undefined, undefined, { cwd });
-      const revision = (r.details as any)?.revision;
-
-      // Simulate concurrent modification: another session writes to the file
-      // between the read and the edit.
-      await writeFile(file, "external\nchange\n", "utf8");
-
-      // The edit re-reads the file at execution time, so the stale revision is
-      // caught by the revision guard rather than silently clobbered.
-      await expect(
-        tools.get("edit_anchored_range")!.execute(
-          "2",
-          {
-            path: "toctou.txt",
-            startAnchor: "Apple",
-            endAnchor: "Apple",
-            replacement: "ALPHA\n",
-            expectedRevision: revision,
-          },
-          undefined,
-          undefined,
-          { cwd },
-        ),
-      ).rejects.toThrow("Revision mismatch");
-    });
-  });
-
-  describe("H1 — Intra-session serialization: concurrent same-session edits", () => {
-    it("two concurrent edits in same session: last-writer-wins", async () => {
-      const cwd = await workspace();
-      const file = join(cwd, "intra-session.txt");
-      await writeFile(file, "alpha\nbeta\ngamma\n", "utf8");
-
-      const tools = await loadTools();
-
-      const r = await tools
-        .get("read_anchored_file")!
-        .execute("1", { path: "intra-session.txt" }, undefined, undefined, { cwd });
-      const revision = (r.details as any)?.revision;
-      const lines = (r.details as any)?.lines as any[];
-
-      const [resultA, resultB] = await Promise.all([
-        tools.get("edit_anchored_range")!.execute(
-          "2",
-          {
-            path: "intra-session.txt",
-            startAnchor: lines[0].anchor,
-            startAnchorLine: lines[0].text,
-            endAnchor: lines[0].anchor,
-            endAnchorLine: lines[0].text,
-            replacement: "ALPHA\n",
-            expectedRevision: revision,
-          },
-          undefined,
-          undefined,
-          { cwd },
-        ),
-        tools.get("edit_anchored_range")!.execute(
-          "3",
-          {
-            path: "intra-session.txt",
-            startAnchor: lines[2].anchor,
-            startAnchorLine: lines[2].text,
-            endAnchor: lines[2].anchor,
-            endAnchorLine: lines[2].text,
-            replacement: "GAMMA\n",
-            expectedRevision: revision,
-          },
-          undefined,
-          undefined,
-          { cwd },
-        ),
-      ]);
-
-      expect(resultA.content[0].text).toMatch(/^[+-]/m);
-      expect(resultB.content[0].text).toMatch(/^[+-]/m);
-
-      const content = await readFile(file, "utf8");
-      expect(content).toContain("beta"); // middle line preserved
-      expect(["ALPHA\nbeta\ngamma\n", "alpha\nbeta\nGAMMA\n"]).toContain(content);
-    });
-
-    it("serialized edits in same session: second edit rejects stale revision", async () => {
-      const cwd = await workspace();
-      const file = join(cwd, "serialized.txt");
-      await writeFile(file, "alpha\nbeta\ngamma\n", "utf8");
-
-      const tools = await loadTools();
-
-      // Read once
-      const r = await tools
-        .get("read_anchored_file")!
-        .execute("1", { path: "serialized.txt" }, undefined, undefined, { cwd });
-      const revision = (r.details as any)?.revision;
-      const lines = (r.details as any)?.lines as any[];
-
-      // First edit succeeds
-      await tools.get("edit_anchored_range")!.execute(
-        "2",
-        {
-          path: "serialized.txt",
-          startAnchor: lines[0].anchor,
-          startAnchorLine: lines[0].text,
-          endAnchor: lines[0].anchor,
-          endAnchorLine: lines[0].text,
-          replacement: "ALPHA\n",
-          expectedRevision: revision,
-        },
-        undefined,
-        undefined,
-        { cwd },
-      );
-
-      // Second edit with the SAME revision — should fail because the file changed
-      await expect(
-        tools.get("edit_anchored_range")!.execute(
-          "3",
-          {
-            path: "serialized.txt",
-            startAnchor: lines[1].anchor,
-            startAnchorLine: lines[1].text,
-            endAnchor: lines[1].anchor,
-            endAnchorLine: lines[1].text,
-            replacement: "BETA\n",
-            expectedRevision: revision, // stale
-          },
-          undefined,
-          undefined,
-          { cwd },
-        ),
-      ).rejects.toThrow("Revision mismatch");
-    });
-
-    it("concurrent edits to different files in same session", async () => {
-      const cwd = await workspace();
-      const fileA = join(cwd, "concurrent-diff-a.txt");
-      const fileB = join(cwd, "concurrent-diff-b.txt");
-      await writeFile(fileA, "alpha\n", "utf8");
-      await writeFile(fileB, "beta\n", "utf8");
-
-      const tools = await loadTools();
-
-      const [rA, rB] = await Promise.all([
-        tools
-          .get("read_anchored_file")!
-          .execute("1", { path: "concurrent-diff-a.txt" }, undefined, undefined, { cwd }),
-        tools
-          .get("read_anchored_file")!
-          .execute("2", { path: "concurrent-diff-b.txt" }, undefined, undefined, { cwd }),
-      ]);
-      const linesA = (rA.details as any)?.lines as any[];
-      const linesB = (rB.details as any)?.lines as any[];
-
-      const [resultA, resultB] = await Promise.all([
-        tools.get("edit_anchored_range")!.execute(
-          "3",
-          {
-            path: "concurrent-diff-a.txt",
-            startAnchor: linesA[0].anchor,
-            startAnchorLine: linesA[0].text,
-            endAnchor: linesA[0].anchor,
-            endAnchorLine: linesA[0].text,
-            replacement: "ALPHA\n",
-          },
-          undefined,
-          undefined,
-          { cwd },
-        ),
-        tools.get("edit_anchored_range")!.execute(
-          "4",
-          {
-            path: "concurrent-diff-b.txt",
-            startAnchor: linesB[0].anchor,
-            startAnchorLine: linesB[0].text,
-            endAnchor: linesB[0].anchor,
-            endAnchorLine: linesB[0].text,
-            replacement: "BETA\n",
-          },
-          undefined,
-          undefined,
-          { cwd },
-        ),
-      ]);
-
-      expect(resultA.content[0].text).toMatch(/^[+-]/m);
-      expect(resultB.content[0].text).toMatch(/^[+-]/m);
-      expect(await readFile(fileA, "utf8")).toBe("ALPHA\n");
-      expect(await readFile(fileB, "utf8")).toBe("BETA\n");
-    });
-  });
 
   describe("H1b — Batch partial application on write failure", () => {
     it("batch applies multiple files atomically on the happy path", async () => {
@@ -463,15 +191,20 @@ describe("concurrency: parallel subagent scenarios", () => {
         tools
           .get("read_anchored_file")!
           .execute("2", { path: "read-edit-concurrent.txt" }, undefined, undefined, { cwd }),
-        tools.get("edit_anchored_range")!.execute(
+        tools.get("apply_anchored_edits")!.execute(
           "3",
           {
-            path: "read-edit-concurrent.txt",
-            startAnchor: line1Anchor,
-            startAnchorLine: line1Text,
-            endAnchor: line1Anchor,
-            endAnchorLine: line1Text,
-            replacement: "ALPHA\n",
+            edits: [
+              {
+                type: "replace",
+                path: "read-edit-concurrent.txt",
+                startAnchor: line1Anchor,
+                startAnchorLine: line1Text,
+                endAnchor: line1Anchor,
+                endAnchorLine: line1Text,
+                replacement: "ALPHA\n",
+              },
+            ],
           },
           undefined,
           undefined,
@@ -485,61 +218,6 @@ describe("concurrency: parallel subagent scenarios", () => {
     });
   });
 
-  describe("H2 — Cross-session stale anchor rejection", () => {
-    it("session B edits deleted anchor after session A deletes it", async () => {
-      const cwd = await workspace();
-      const file = join(cwd, "cross-session.txt");
-      await writeFile(file, "alpha\nbeta\ngamma\n", "utf8");
-
-      const toolsA = await loadTools();
-      const toolsB = await loadTools();
-
-      const rA = await toolsA
-        .get("read_anchored_file")!
-        .execute("1", { path: "cross-session.txt" }, undefined, undefined, { cwd });
-      const rB = await toolsB
-        .get("read_anchored_file")!
-        .execute("2", { path: "cross-session.txt" }, undefined, undefined, { cwd });
-      const linesA = (rA.details as any)?.lines as any[];
-      const linesB = (rB.details as any)?.lines as any[];
-
-      // Session A deletes "beta".
-      await toolsA.get("delete_anchor_range")!.execute(
-        "3",
-        {
-          path: "cross-session.txt",
-          startAnchor: linesA[1].anchor,
-          startAnchorLine: linesA[1].text,
-          endAnchor: linesA[1].anchor,
-          endAnchorLine: linesA[1].text,
-          expectedRevision: (rA.details as any)?.revision,
-        },
-        undefined,
-        undefined,
-        { cwd },
-      );
-
-      // Session B tries to edit "beta" (now deleted). Its session re-reads the
-      // file at edit time and reconciles — the anchor no longer exists, so the
-      // edit is rejected rather than applied to the wrong line.
-      await expect(
-        toolsB.get("edit_anchored_range")!.execute(
-          "4",
-          {
-            path: "cross-session.txt",
-            startAnchor: linesB[1].anchor,
-            startAnchorLine: linesB[1].text,
-            endAnchor: linesB[1].anchor,
-            endAnchorLine: linesB[1].text,
-            replacement: "NEW\n",
-          },
-          undefined,
-          undefined,
-          { cwd },
-        ),
-      ).rejects.toThrow("Could not find");
-    });
-  });
 
   describe("H3 — Concurrent batch write clobbers", () => {
     it("batch writes clobber concurrent external modification", async () => {
@@ -647,16 +325,21 @@ describe("concurrency: parallel subagent scenarios", () => {
       // Anchors live in per-file namespaces: each file assigns its own
       // (randomized) anchor words, and an anchor always refers to its own file.
       // Editing file-y via its own line-1 anchor must change only file-y.
-      await toolsY.get("edit_anchored_range")!.execute(
+      await toolsY.get("apply_anchored_edits")!.execute(
         "3",
         {
-          path: "file-y.txt",
-          startAnchor: linesY[0].anchor,
-          startAnchorLine: linesY[0].text,
-          endAnchor: linesY[0].anchor,
-          endAnchorLine: linesY[0].text,
-          replacement: "CHANGED\n",
-          expectedRevision: (rY.details as any)?.revision,
+          edits: [
+            {
+              type: "replace",
+              path: "file-y.txt",
+              startAnchor: linesY[0].anchor,
+              startAnchorLine: linesY[0].text,
+              endAnchor: linesY[0].anchor,
+              endAnchorLine: linesY[0].text,
+              replacement: "CHANGED\n",
+              expectedRevision: (rY.details as any)?.revision,
+            },
+          ],
         },
         undefined,
         undefined,
@@ -670,52 +353,6 @@ describe("concurrency: parallel subagent scenarios", () => {
     });
   });
 
-  describe("L1 — Empty-file concurrent create race", () => {
-    it("two sessions create content in same empty file: last-writer-wins", async () => {
-      const cwd = await workspace();
-      const file = join(cwd, "empty-create.txt");
-      await writeFile(file, "", "utf8");
-
-      const toolsA = await loadTools();
-      const toolsB = await loadTools();
-
-      // Both edit the empty file (any anchor works; the file has no anchors
-      // yet and is created from scratch). No revision guard applies, so both
-      // succeed and the last write wins.
-      const [resultA, resultB] = await Promise.all([
-        toolsA.get("edit_anchored_range")!.execute(
-          "1",
-          {
-            path: "empty-create.txt",
-            startAnchor: "first",
-            endAnchor: "first",
-            replacement: "from-A\n",
-          },
-          undefined,
-          undefined,
-          { cwd },
-        ),
-        toolsB.get("edit_anchored_range")!.execute(
-          "2",
-          {
-            path: "empty-create.txt",
-            startAnchor: "first",
-            endAnchor: "first",
-            replacement: "from-B\n",
-          },
-          undefined,
-          undefined,
-          { cwd },
-        ),
-      ]);
-
-      expect(resultA.content[0].text).toMatch(/^[+-]/m);
-      expect(resultB.content[0].text).toMatch(/^[+-]/m);
-
-      const content = await readFile(file, "utf8");
-      expect(["from-A\n", "from-B\n"]).toContain(content);
-    });
-  });
 
   describe("H3b — Cross-session concurrent batch writes", () => {
     it("concurrent batch writes from two sessions: last-writer-wins", async () => {

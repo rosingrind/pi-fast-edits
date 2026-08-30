@@ -32,9 +32,6 @@ export const SUFFIXED_TOOL_NAMES = [
   "read_anchored_file",
   "grep_anchored_files",
   "write_anchored",
-  "edit_anchored_range",
-  "insert_at_anchor",
-  "delete_anchor_range",
   "preview_anchored_edit",
   "apply_anchored_edits",
 ] as const;

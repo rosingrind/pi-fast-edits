@@ -79,16 +79,21 @@ describe("write_anchored", () => {
     };
 
     // No read_anchored_file call: the write itself seeded the session state.
-    const edit = await tools.get("edit_anchored_range")!.execute(
+    const edit = await tools.get("apply_anchored_edits")!.execute(
       "2",
       {
-        path: "seed.txt",
-        startAnchor: details.lines[1].anchor,
-        startAnchorLine: details.lines[1].text,
-        endAnchor: details.lines[1].anchor,
-        endAnchorLine: details.lines[1].text,
-        replacement: "TWO",
-        expectedRevision: details.revision,
+        edits: [
+          {
+            type: "replace",
+            path: "seed.txt",
+            startAnchor: details.lines[1].anchor,
+            startAnchorLine: details.lines[1].text,
+            endAnchor: details.lines[1].anchor,
+            endAnchorLine: details.lines[1].text,
+            replacement: "TWO",
+            expectedRevision: details.revision,
+          },
+        ],
       },
       undefined,
       undefined,

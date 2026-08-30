@@ -111,52 +111,6 @@ Searches file contents with a regex and returns matching lines with the same anc
 
 Searches skip `.git`, `node_modules`, protected paths, and binary files. Results are capped at 100KB with an explicit truncation note, and files that change during the search are omitted with a drift notice instead of returning stale coordinates. The search always runs through ripgrep, resolved from pi's tool cache (`~/.pi/agent/bin/rg`) or PATH; if ripgrep is missing the tool errors out rather than degrading.
 
-### `edit_anchored_range`
-
-Replaces a range between two anchors.
-
-```json
-{
-  "path": "src/run.ts",
-  "startAnchor": "Cider",
-  "startAnchorLine": "export function run() {",
-  "endAnchor": "Eagle",
-  "endAnchorLine": "}",
-  "replacement": "export function run() {\n  return foo({ fast: true });\n}",
-  "expectedRevision": "optional-revision-from-read_anchored_file"
-}
-```
-
-### `insert_at_anchor`
-
-Inserts content before or after an anchor.
-
-```json
-{
-  "path": "src/run.ts",
-  "anchor": "Cider",
-  "anchorLine": "export function run() {",
-  "position": "before",
-  "content": "// Added by pi-fast-edits"
-}
-```
-
-### `delete_anchor_range`
-
-Deletes a range from start anchor through end anchor.
-
-```json
-{
-  "path": "src/run.ts",
-  "startAnchor": "Cider",
-  "startAnchorLine": "export function run() {",
-  "endAnchor": "Eagle",
-  "endAnchorLine": "}"
-}
-```
-
-### `apply_anchored_edits`
-
 Batches multiple edits. This is the preferred tool for multi-file or multi-region changes.
 
 ```json
@@ -198,7 +152,7 @@ The four replaced names:
 - `write` — anchor-seeding write (`write_anchored`): full-file writes that seed anchor state and return the revision plus an anchored preview, so subsequent edits need no re-read. Protection checks (`protectedPaths`), workspace bounds, and atomic writes apply exactly as elsewhere.
 - `grep` — anchored search (`grep_anchored_files`) under the built-in name, edit-ready by construction.
 
-While override is on, the eight suffixed names (`read_anchored_file`, `grep_anchored_files`, `write_anchored`, `edit_anchored_range`, `insert_at_anchor`, `delete_anchor_range`, `preview_anchored_edit`, `apply_anchored_edits`) are deactivated via `setActiveTools` — the same behavior is never exposed under two names. Each overridden description carries a prefix ("Anchored read (default).", "Anchored edit (batch).", etc.) so the model can tell the definitions apart.
+While override is on, the five suffixed names (`read_anchored_file`, `grep_anchored_files`, `write_anchored`, `preview_anchored_edit`, `apply_anchored_edits`) are deactivated via `setActiveTools` — the same behavior is never exposed under two names. Each overridden description carries a prefix ("Anchored read (default).", "Anchored edit (batch).", etc.) so the model can tell the definitions apart.
 
 Toggling the setting from the config menu re-registers the surface immediately and injects a one-shot notice into the conversation announcing the change in both directions. On the disable direction, the overridden names keep their anchored definitions until pi reloads the extension (pi has no unregister API); the suffixed tools re-activate alongside, so the surface works immediately but is fully native only after a reload.
 

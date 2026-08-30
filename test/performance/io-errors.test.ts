@@ -44,14 +44,19 @@ describe("I/O errors on the reconcile/read path", () => {
 
     // Editing with the (now unusable) revision must fail without recreating the file.
     await expect(
-      tools.get("edit_anchored_range")!.execute(
+      tools.get("apply_anchored_edits")!.execute(
         "2",
         {
-          path: "disappear.txt",
-          startAnchor: "Apple",
-          endAnchor: "Apple",
-          replacement: "ALPHA\n",
-          expectedRevision: revision,
+          edits: [
+            {
+              type: "replace",
+              path: "disappear.txt",
+              startAnchor: "Apple",
+              endAnchor: "Apple",
+              replacement: "ALPHA\n",
+              expectedRevision: revision,
+            },
+          ],
         },
         undefined,
         undefined,
@@ -113,13 +118,18 @@ describe("atomic-write failure cleanup", () => {
 
         // Edit should fail because atomic write can't create temp file.
         await expect(
-          tools.get("edit_anchored_range")!.execute(
+          tools.get("apply_anchored_edits")!.execute(
             "2",
             {
-              path: "readonly-dir/atomic.txt",
-              startAnchor: "Apple",
-              endAnchor: "Apple",
-              replacement: "CHANGED\n",
+              edits: [
+                {
+                  type: "replace",
+                  path: "readonly-dir/atomic.txt",
+                  startAnchor: "Apple",
+                  endAnchor: "Apple",
+                  replacement: "CHANGED\n",
+                },
+              ],
             },
             undefined,
             undefined,

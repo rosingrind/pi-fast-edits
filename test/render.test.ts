@@ -3,7 +3,7 @@ import { initTheme } from "@earendil-works/pi-coding-agent";
 import { Container, Text } from "@earendil-works/pi-tui";
 import { renderReadAnchoredResult } from "../src/tools/read-anchored-file.js";
 import { renderBatchResult } from "../src/tools/apply-anchored-edits.js";
-import { renderEditResult } from "../src/tools/single-edit-runner.js";
+import { renderEditResult } from "../src/tools/render-edit-result.js";
 import { renderToolCall } from "../src/tools/render.js";
 import type { Theme } from "../src/tools/theme.js";
 

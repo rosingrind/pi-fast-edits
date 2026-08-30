@@ -32,7 +32,12 @@ const readSchema = Type.Object({
       { description: "auto, full, range, or skeleton." },
     ),
   ),
-  maxBytes: Type.Optional(Type.Number({ description: "Optional full-read byte cap." })),
+  maxBytes: Type.Optional(
+    Type.Number({
+      description:
+        "Auto-mode threshold: files over this many bytes read as a skeleton unless mode is 'full' or a range is given.",
+    }),
+  ),
   anchored: Type.Optional(
     Type.Boolean({
       description:

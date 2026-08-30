@@ -27,42 +27,6 @@ async function workspace() {
 }
 
 describe("structured tool output", () => {
-  it("single replace returns structured anchorChanges", async () => {
-    const cwd = await workspace();
-    await writeFile(join(cwd, "sample.ts"), "one\ntwo\nthree\n", "utf8");
-    const tools = await loadTools();
-
-    const read = await tools
-      .get("read_anchored_file")!
-      .execute("1", { path: "sample.ts" }, undefined, undefined, { cwd });
-    const lines = (read.details as any).lines as Array<{ anchor: string; text: string }>;
-    const removed = [lines[0].anchor, lines[1].anchor];
-
-    const result = await tools.get("edit_anchored_range")!.execute(
-      "2",
-      {
-        path: "sample.ts",
-        startAnchor: lines[0].anchor,
-        startAnchorLine: lines[0].text,
-        endAnchor: lines[1].anchor,
-        endAnchorLine: lines[1].text,
-        replacement: "ONE",
-      },
-      undefined,
-      undefined,
-      { cwd },
-    );
-
-    expect(result.content[0].text).toContain("-1 one");
-    expect(result.content[0].text).toContain("+1 ONE");
-    expect(result.details.editType).toBe("replace");
-    expect(Array.isArray(result.details.anchorChanges.removed)).toBe(true);
-    expect(Array.isArray(result.details.anchorChanges.added)).toBe(true);
-    expect(Array.isArray(result.details.anchorChanges.preserved)).toBe(true);
-    for (const anchor of removed) {
-      expect(result.details.anchorChanges.removed).toContain(anchor);
-    }
-  });
 
   it("batch edits return per-edit anchor details", async () => {
     const cwd = await workspace();

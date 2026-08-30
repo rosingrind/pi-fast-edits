@@ -30,7 +30,7 @@ function makeConfig(overrideBuiltInEditTools: boolean): PiFastEditsConfig {
 
 /** The approved notice copy (task-4 brief, review-fix); pinned verbatim so copy edits are intentional. */
 const ANCHORED_LIST =
-  "read_anchored_file, grep_anchored_files, edit_anchored_range, insert_at_anchor, delete_anchor_range, preview_anchored_edit, apply_anchored_edits, write_anchored";
+  "read_anchored_file, grep_anchored_files, preview_anchored_edit, apply_anchored_edits, write_anchored";
 
 describe("override toggle notice", () => {
   it("notice copy matches the approved contract exactly", () => {
