@@ -148,7 +148,7 @@ The four replaced names:
 - `write` — anchor-seeding write (`write_anchored`): full-file writes that seed anchor state and return the revision plus an anchored preview, so subsequent edits need no re-read. Protection checks (`protectedPaths`), workspace bounds, and atomic writes apply exactly as elsewhere.
 - `grep` — anchored search (`grep_anchored`) under the built-in name, edit-ready by construction.
 
-While override is on, the five suffixed names (`read_anchored`, `grep_anchored`, `write_anchored`, `preview_anchored`, `edit_anchored`) are deactivated via `setActiveTools` — the same behavior is never exposed under two names. Each overridden description carries a prefix ("Anchored read (default).", "Anchored edit (batch).", etc.) so the model can tell the definitions apart.
+While override is on, the four suffixed names (`read_anchored`, `grep_anchored`, `write_anchored`, `edit_anchored`) are deactivated via `setActiveTools` — the same behavior is never exposed under two names. Each overridden description carries a prefix ("Anchored read (default).", "Anchored edit (batch).", etc.) so the model can tell the definitions apart.
 
 Toggling the setting from the config menu re-registers the surface immediately and injects a one-shot notice into the conversation announcing the change in both directions. On the disable direction, the overridden names keep their anchored definitions until pi reloads the extension (pi has no unregister API); the suffixed tools re-activate alongside, so the surface works immediately but is fully native only after a reload.
 
