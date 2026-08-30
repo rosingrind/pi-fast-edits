@@ -129,10 +129,6 @@ Batches multiple edits. This is the preferred tool for multi-file or multi-regio
 }
 ```
 
-### `preview_anchored`
-
-Returns a diff for a replacement edit without writing files.
-
 ## Override mode
 
 `overrideBuiltInEditTools` (default `false`) controls whether pi's built-in `read`, `edit`, `write`, and `grep` are **replaced** by the anchored implementations under the same names, instead of coexisting with the suffixed tools.

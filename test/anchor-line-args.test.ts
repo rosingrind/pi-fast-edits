@@ -82,7 +82,6 @@ describe("anchor line args", () => {
 
   it("registered tool definitions follow the live requireAnchorLines setting", async () => {
     const strict = await loadTools();
-    expect((strict.get("preview_anchored")!.parameters as any).required).toContain("endAnchorLine");
     // Batch: the outer object requires `edits`; strictness lives on each
     // per-edit variant.
     const strictBatchTool = strict.get("edit_anchored")!.parameters as any;
@@ -91,9 +90,6 @@ describe("anchor line args", () => {
     expect(strictVariant.allOf.flatMap((t: any) => t.required ?? [])).toContain("startAnchorLine");
 
     const lenient = await loadTools({ requireAnchorLines: false });
-    expect((lenient.get("preview_anchored")!.parameters as any).required).not.toContain(
-      "endAnchorLine",
-    );
     const lenientBatchTool = lenient.get("edit_anchored")!.parameters as any;
     expect(
       lenientBatchTool.properties.edits.items.anyOf[0].allOf.flatMap((t: any) => t.required ?? []),

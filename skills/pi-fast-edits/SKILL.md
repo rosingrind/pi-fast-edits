@@ -1,6 +1,6 @@
 ---
 name: pi-fast-edits
-description: Use when editing files with pi-fast-edits anchored tools (`read_anchored`, `edit_anchored`, `write_anchored`, `grep_anchored`, `preview_anchored`), or when tool output or rejections mention anchor words (like `Tunnel§`), `Revision mismatch`, `anchorLine mismatch`, `Overlapping edits`, `expectedRevision`, `allowAnchoredLines`, or `line N` suffixes — including when plain read/edit/write/grep tools behave this way because override mode is on.
+description: Use when editing files with pi-fast-edits anchored tools (`read_anchored`, `edit_anchored`, `write_anchored`, `grep_anchored`), or when tool output or rejections mention anchor words (like `Tunnel§`), `Revision mismatch`, `anchorLine mismatch`, `Overlapping edits`, `expectedRevision`, `allowAnchoredLines`, or `line N` suffixes — including when plain read/edit/write/grep tools behave this way because override mode is on.
 ---
 
 # pi-fast-edits — anchored file editing
@@ -34,7 +34,6 @@ Every file read/edited carries a `Revision:` hash — the first 16 hex chars of 
 | One change                                                | `edit_anchored` with a single edit — range replace; same anchor for start + end = single line |
 | Several changes (same or **multiple files**)              | `edit_anchored` with a batch — atomic: any failure rejects everything, zero partial writes    |
 | Insert between two adjacent lines without touching either | zero-width `replace`: adjacent anchors, `includeStart`/`includeEnd` both `false`              |
-| Dry-run a replacement                                     | `preview_anchored` — a replace's params, no write; apply with `edit_anchored`                 |
 
 `write_anchored` seeds anchors and returns the revision + preview, so a fresh write is editable with no read.
 

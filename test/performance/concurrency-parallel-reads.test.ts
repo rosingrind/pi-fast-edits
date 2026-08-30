@@ -308,69 +308,6 @@ describe("concurrency: parallel read + edit races", () => {
       expect(content).toBe("LINE1\nLINE2\nline3\n");
     });
   });
-  describe("PR5 — Same file preview + edit race", () => {
-    it("preview and edit on SAME file and anchors in parallel: deterministic outcome", async () => {
-      const cwd = await workspace();
-      const file = join(cwd, "preview-edit-same.txt");
-      await writeFile(file, "original\ncontent\n", "utf8");
-
-      const tools = await loadTools();
-
-      // Pre-read so both tools can target the (randomized) line-1 anchor.
-      const pre = await tools
-        .get("read_anchored")!
-        .execute("0", { path: "preview-edit-same.txt" }, undefined, undefined, { cwd });
-      const line1Anchor = (pre.details as any)?.lines[0].anchor as string;
-      const line1Text = (pre.details as any)?.lines[0].text as string;
-
-      // Both tools target the SAME file with SAME anchors - this is the real race
-      const [previewResult, editResult] = await Promise.all([
-        tools.get("preview_anchored")!.execute(
-          "1",
-          {
-            path: "preview-edit-same.txt",
-            startAnchor: line1Anchor,
-            startAnchorLine: line1Text,
-            endAnchor: line1Anchor,
-            endAnchorLine: line1Text,
-            replacement: "NEW\n",
-          },
-          undefined,
-          undefined,
-          { cwd },
-        ),
-        tools.get("edit_anchored")!.execute(
-          "2",
-          {
-            edits: [
-              {
-                type: "replace",
-                path: "preview-edit-same.txt",
-                startAnchor: line1Anchor,
-                startAnchorLine: line1Text,
-                endAnchor: line1Anchor,
-                endAnchorLine: line1Text,
-                replacement: "CHANGED\n",
-              },
-            ],
-          },
-          undefined,
-          undefined,
-          { cwd },
-        ),
-      ]);
-
-      // Preview shows what WOULD happen
-      expect(previewResult.content[0].text).toContain("NEW");
-      // Edit actually changes the file
-      expect(editResult.content[0].text).toMatch(/^[+-]/m);
-
-      // Verify actual file content
-      const finalContent = await readFile(file, "utf8");
-      expect(finalContent).toContain("CHANGED");
-    });
-  });
-
   describe("PR6 — Session revision invalidation", () => {
     it("edit invalidates session revision - subsequent read gets new revision", async () => {
       const cwd = await workspace();

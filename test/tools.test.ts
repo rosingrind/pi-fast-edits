@@ -229,34 +229,6 @@ describe("anchored tools", () => {
     ).rejects.toThrow(/binary file/);
   });
 
-  it("preview_anchored shows diff without writing", async () => {
-    const cwd = await workspace();
-    const file = join(cwd, "sample.txt");
-    await writeFile(file, "alpha\nbeta\ngamma\n", "utf8");
-    const tools = await loadTools();
-
-    const { lines } = await readAnchored(tools, cwd, "sample.txt");
-
-    const result = await tools.get("preview_anchored")!.execute(
-      "1",
-      {
-        path: "sample.txt",
-        startAnchor: lines[0].anchor,
-        startAnchorLine: lines[0].text,
-        endAnchor: lines[1].anchor,
-        endAnchorLine: lines[1].text,
-        replacement: "ALPHA_NEW",
-      },
-      undefined,
-      undefined,
-      { cwd },
-    );
-
-    expect(result.content[0].text).toContain("ALPHA_NEW");
-    expect(result.content[0].text).toContain("-1 alpha");
-    // File should be unchanged
-    await expect(readFile(file, "utf8")).resolves.toBe("alpha\nbeta\ngamma\n");
-  });
 
   it("read_anchored skeleton mode for large files", async () => {
     const cwd = await workspace();
@@ -616,46 +588,7 @@ describe("error paths", () => {
     ).rejects.toThrow();
   });
 
-  it("preview_anchored rejects a stale revision", async () => {
-    const cwd = await workspace();
-    await writeFile(join(cwd, "preview.txt"), "alpha\nbeta\n", "utf8");
-    const tools = await loadTools();
-    await expect(
-      tools.get("preview_anchored")!.execute(
-        "1",
-        {
-          path: "preview.txt",
-          startAnchor: "Apple",
-          endAnchor: "Apple",
-          replacement: "X",
-          expectedRevision: "stale-revision",
-        },
-        undefined,
-        undefined,
-        { cwd },
-      ),
-    ).rejects.toThrow(/Revision mismatch/);
-  });
 
-  it("preview_anchored rejects an invalid anchor", async () => {
-    const cwd = await workspace();
-    await writeFile(join(cwd, "preview2.txt"), "alpha\nbeta\n", "utf8");
-    const tools = await loadTools();
-    await expect(
-      tools.get("preview_anchored")!.execute(
-        "1",
-        {
-          path: "preview2.txt",
-          startAnchor: "NonExistent",
-          endAnchor: "NonExistent",
-          replacement: "X",
-        },
-        undefined,
-        undefined,
-        { cwd },
-      ),
-    ).rejects.toThrow(/Could not find start anchor/);
-  });
 
   it("edit_anchored rejects batch with invalid anchor", async () => {
     const cwd = await workspace();
@@ -799,33 +732,6 @@ describe("error paths", () => {
     expect(content).toBe("hello\n");
   });
 
-  it("preview_anchored rejects a mismatched anchorLine", async () => {
-    const cwd = await workspace();
-    const file = join(cwd, "preview-coord.txt");
-    await writeFile(file, "alpha\nbeta\n", "utf8");
-    const tools = await loadTools();
-
-    const { lines } = await readAnchored(tools, cwd, "preview-coord.txt");
-
-    await expect(
-      tools.get("preview_anchored")!.execute(
-        "1",
-        {
-          path: "preview-coord.txt",
-          startAnchor: lines[0].anchor,
-          startAnchorLine: "wrong text",
-          endAnchor: lines[1].anchor,
-          endAnchorLine: lines[1].text,
-          replacement: "X",
-        },
-        undefined,
-        undefined,
-        { cwd },
-      ),
-    ).rejects.toThrow(/startAnchorLine mismatch/);
-
-    await expect(readFile(file, "utf8")).resolves.toBe("alpha\nbeta\n");
-  });
 
   it("edit_anchored rejects a mismatched anchorLine before writing", async () => {
     const cwd = await workspace();
@@ -872,36 +778,6 @@ describe("error paths", () => {
 });
 
 describe("edge cases", () => {
-  it("preview_anchored with includeStart=false works", async () => {
-    const cwd = await workspace();
-    const file = join(cwd, "preview-asym.txt");
-    await writeFile(file, "alpha\nbeta\ngamma\n", "utf8");
-    const tools = await loadTools();
-    const readResult = await tools
-      .get("read_anchored")!
-      .execute("1", { path: "preview-asym.txt" }, undefined, undefined, { cwd });
-    const lines = (readResult.details as any)?.lines as any[];
-
-    const result = await tools.get("preview_anchored")!.execute(
-      "2",
-      {
-        path: "preview-asym.txt",
-        startAnchor: lines[0].anchor,
-        startAnchorLine: lines[0].text,
-        endAnchor: lines[1].anchor,
-        endAnchorLine: lines[1].text,
-        includeStart: false,
-        includeEnd: true,
-        replacement: "NEW\n",
-      },
-      undefined,
-      undefined,
-      { cwd },
-    );
-
-    expect(result.content[0].text).toContain("+");
-    expect(result.content[0].text).toContain("-");
-  });
 
   it("anchors whitespace-only lines", async () => {
     const cwd = await workspace();
@@ -953,28 +829,6 @@ describe("edge cases", () => {
     expect(result.content[0].text).toContain("No changes");
   });
 
-  it("preview_anchored on empty file succeeds", async () => {
-    const cwd = await workspace();
-    const file = join(cwd, "preview-empty.txt");
-    await writeFile(file, "", "utf8");
-    const tools = await loadTools();
-    const result = await tools.get("preview_anchored")!.execute(
-      "1",
-      {
-        path: "preview-empty.txt",
-        startAnchor: "first",
-        endAnchor: "first",
-        replacement: "hello\n",
-      },
-      undefined,
-      undefined,
-      { cwd },
-    );
-    // Preview returns the would-be diff without touching the file.
-    expect(result.content[0].text).toContain("+1 hello");
-    const content = await readFile(file, "utf8");
-    expect(content).toBe("");
-  });
 });
 
 describe("integration chains", () => {

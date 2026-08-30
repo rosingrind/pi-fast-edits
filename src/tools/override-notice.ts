@@ -11,7 +11,6 @@ import type { PiFastEditsConfig } from "../types.js";
 export const ANCHORED_TOOL_NAMES = [
   "read_anchored",
   "grep_anchored",
-  "preview_anchored",
   "edit_anchored",
   "write_anchored",
 ] as const;

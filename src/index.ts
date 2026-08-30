@@ -12,7 +12,6 @@ import { registerCommands } from "./commands/register.js";
 import { registerReadAnchored } from "./tools/read-anchored.js";
 import { registerGrepAnchored } from "./tools/grep-anchored.js";
 import { registerWriteAnchored } from "./tools/write-anchored.js";
-import { registerPreviewAnchored } from "./tools/preview-anchored.js";
 import { registerEditAnchored } from "./tools/edit-anchored.js";
 import {
   applyOverrideMode,
@@ -43,7 +42,6 @@ export default async function piFastEdits(
   // `requireAnchorLines` setting. pi.replace semantics: registering the same
   // tool name refreshes it in-session.
   const registerAnchoredEditTools = () => {
-    registerPreviewAnchored(pi, session, config);
     registerEditAnchored(pi, session, config);
   };
   registerAnchoredEditTools();
