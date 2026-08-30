@@ -9,7 +9,7 @@ Anchored tools map every line to a stable random **anchor word** and guard edits
 
 ## Decode the rendered form
 
-Tool output renders lines as `Tunnel§ target alpha one` — `grep` appends `    line N` per line, `skeleton` reads append `    lines N`, `range`/`full` reads append no suffix. The `AnchorWord§` prefix and any trailing `line N` / `lines N` are **display metadata only** — never part of the file, never valid parameter content:
+Tool output renders lines as `Tunnel§ target alpha one` — `grep` appends `line N` per line, `skeleton` reads append `lines N`, `range`/`full` reads append no suffix. The `AnchorWord§` prefix and any trailing `line N` / `lines N` are **display metadata only** — never part of the file, never valid parameter content:
 
 - `startAnchorLine` / `endAnchorLine` / `anchorLine` = the bare source line, copied verbatim: `target alpha one`. The mismatch error appends a drop-the-suffix hint only when your value ends in that rendered shape.
 - Blank lines render as `Dragon§` but their content is the **empty string** — pass `""`.
