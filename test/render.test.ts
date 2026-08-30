@@ -241,3 +241,54 @@ describe("renderToolCall", () => {
     expect(textOf(component)).toContain("...");
   });
 });
+
+describe("apply_anchored_edits call chip (override-mode `edit`)", () => {
+  const theme = { fg: (_k: string, s: string) => s, bold: (s: string) => s };
+
+  it("shows the target file name in the suffix", async () => {
+    const tools = new Map<string, any>();
+    const { default: piFastEdits } = await import("../src/index.js");
+    await piFastEdits(
+      {
+        registerTool: (t: any) => tools.set(t.name, t),
+        registerCommand: () => {},
+        on: () => {},
+      } as any,
+      { requireAnchorLines: false },
+    );
+    const def = tools.get("apply_anchored_edits");
+    if (!def) throw new Error("apply_anchored_edits not registered");
+    const renderCall = def.renderCall as (
+      args: Record<string, unknown>,
+      theme: Record<string, (k: string, s: string) => string>,
+      context: Record<string, unknown>,
+    ) => unknown;
+    const ctx = { lastComponent: undefined, isPartial: false, isError: false };
+
+    const single = renderCall(
+      {
+        edits: [
+          { type: "replace", path: "a.ts", startAnchor: "A", endAnchor: "A", replacement: "x" },
+        ],
+      },
+      theme,
+      ctx,
+    );
+    expect((single as any).render(200).join("\n")).toContain("a.ts");
+
+    const multi = renderCall(
+      {
+        edits: [
+          { type: "replace", path: "a.ts", startAnchor: "A", endAnchor: "A", replacement: "x" },
+          { type: "insert", path: "b.ts", anchor: "A", position: "after", content: "y" },
+        ],
+      },
+      theme,
+      ctx,
+    );
+    expect((multi as any).render(200).join("\n")).toContain("a.ts (+1 more file)");
+
+    const empty = renderCall({ edits: [] }, theme, ctx);
+    expect((empty as any).render(200).join("\n")).not.toMatch(/\+\d+ more/);
+  });
+});

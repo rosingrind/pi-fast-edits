@@ -52,7 +52,18 @@ export function registerApplyAnchoredEdits(
     ],
     renderShell: "default" as const,
     executionMode: "sequential" as const,
-    renderCall: renderToolCall("apply_anchored_edits"),
+    renderCall: renderToolCall("apply_anchored_edits", (args, theme) => {
+      const edits = ((args.edits as Array<{ path?: string }> | undefined) ?? []).filter(
+        (e) => typeof e.path === "string" && e.path,
+      );
+      if (edits.length === 0) return "";
+      const paths = [...new Set(edits.map((e) => e.path as string))];
+      const display =
+        paths.length === 1
+          ? paths[0]
+          : `${paths[0]} (+${paths.length - 1} more file${paths.length > 2 ? "s" : ""})`;
+      return theme.fg("warning", ` ${display}`);
+    }),
     renderResult: renderBatchResult,
     parameters: batchEditsSchema(config.requireAnchorLines),
     async execute(
