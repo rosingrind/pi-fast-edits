@@ -27,8 +27,19 @@ import {
 import { Container, Spacer, Text, type Component } from "@earendil-works/pi-tui";
 import type { Theme } from "./theme.js";
 import { batchEditsSchema, type BatchEditsParams } from "./schemas.js";
+import type { Static } from "typebox";
 
 type BatchParams = BatchEditsParams;
+
+/** True when the value looks like a single batch edit object (has anchor/path fields). */
+function isSingleEdit(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.path === "string" &&
+    (typeof v.startAnchor === "string" || typeof v.anchor === "string")
+  );
+}
 
 export function registerApplyAnchoredEdits(
   pi: ExtensionAPI,
@@ -52,12 +63,41 @@ export function registerApplyAnchoredEdits(
     ],
     renderShell: "default" as const,
     executionMode: "sequential" as const,
+    // Models sometimes send edits as a JSON string or a single edit object
+    // instead of an array (the same quirk pi's built-in edit handles in its
+    // prepareArguments). Normalize before render and execute so the chip
+    // suffix and the executor see the same well-formed shape.
+    prepareArguments(input: unknown) {
+      // The schema's static type (strict/lenient variants) is the contract pi
+      // type-checks against; cast through it since normalization is shape-only.
+      type BatchStatic = Static<ReturnType<typeof batchEditsSchema>>;
+      if (!input || typeof input !== "object" || Array.isArray(input)) {
+        return input as BatchStatic;
+      }
+      const raw = input as { edits?: unknown };
+      let edits = raw.edits;
+      if (typeof edits === "string") {
+        try {
+          const parsed = JSON.parse(edits);
+          if (Array.isArray(parsed)) edits = parsed;
+          else if (isSingleEdit(parsed)) edits = [parsed];
+        } catch {
+          // leave as-is; schema validation reports the malformed value
+        }
+      } else if (isSingleEdit(edits)) {
+        edits = [edits];
+      }
+      return { edits: edits as BatchStatic["edits"] } as BatchStatic;
+    },
     renderCall: renderToolCall("apply_anchored_edits", (args, theme) => {
-      const edits = ((args.edits as Array<{ path?: string }> | undefined) ?? []).filter(
-        (e) => typeof e.path === "string" && e.path,
-      );
+      const edits = Array.isArray(args.edits)
+        ? args.edits.filter(
+            (e) =>
+              typeof (e as { path?: string })?.path === "string" && (e as { path: string }).path,
+          )
+        : [];
       if (edits.length === 0) return "";
-      const paths = [...new Set(edits.map((e) => e.path as string))];
+      const paths = [...new Set(edits.map((e) => (e as { path: string }).path))];
       const display =
         paths.length === 1
           ? paths[0]
