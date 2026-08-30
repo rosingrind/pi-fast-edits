@@ -57,7 +57,13 @@ export function renderToolCall(
     // carry it in their suffix instead — a bare "..." reads as noise.
     const pathDisplay = path ? theme.fg("accent", path) : "";
     const suffix = getSuffix ? getSuffix(args, theme) : "";
-    text.setText(theme.fg("toolTitle", theme.bold(displayName)) + " " + pathDisplay + suffix);
+    // Assemble without double spaces: pathDisplay/suffix may be empty (no
+    // top-level path) or carry their own leading space (suffix conventions).
+    const title =
+      displayName +
+      (pathDisplay ? ` ${pathDisplay}` : "") +
+      (suffix ? (suffix.startsWith(" ") ? suffix : ` ${suffix}`) : "");
+    text.setText(title);
     return text;
   };
 }
