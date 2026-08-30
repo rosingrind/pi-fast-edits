@@ -1,4 +1,6 @@
-import { stat } from "node:fs/promises";
+import { stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { randomBytes } from "node:crypto";
 import { isAbsolute, relative, resolve } from "node:path";
 import { Text, type Component } from "@earendil-works/pi-tui";
 import type { PiFastEditsConfig, SessionState } from "../types.js";
@@ -218,6 +220,7 @@ async function grepWithRg(
   let filesWithMatches = 0;
   let omittedFiles = 0;
   let truncatedByBudget = false;
+  const droppedSections: string[] = [];
 
   for (const file of [...byFile.keys()].sort()) {
     if (totalMatches >= MAX_TOTAL_MATCHES) break;
@@ -297,7 +300,10 @@ async function grepWithRg(
 
     if (outputLength + section.length > MAX_OUTPUT_BYTES) {
       truncatedByBudget = true;
-      break;
+      // Switch to dump mode: keep rendering remaining files into the dropped
+      // log (unbounded by the budget) so the model can access the full output.
+      droppedSections.push(section);
+      continue;
     }
     sections.push(section);
     outputLength += section.length;
@@ -308,12 +314,14 @@ async function grepWithRg(
     }
   }
 
+  const droppedNote = await buildTruncationNote(droppedSections);
+
   if (sections.length === 0) {
     // Real hits existed but the byte budget cut the very first file's section.
     // Report the truncation (with hit counts) instead of a bogus "No matches".
     if (truncatedByBudget) {
       const header = `${filesWithMatches} file${filesWithMatches === 1 ? "" : "s"} matched, ${totalMatches} line${totalMatches === 1 ? "" : "s"} shown.`;
-      return textResult(`${header}\n\n... results truncated at 100KB — narrow the search.`, {
+      return textResult(`${header}\n\n... results truncated at 100KB${droppedNote}.`, {
         pattern: params.pattern,
         files: filesWithMatches,
         matches: totalMatches,
@@ -327,9 +335,7 @@ async function grepWithRg(
     omittedFiles > 0
       ? `\n... ${omittedFiles} file(s) omitted because they changed during search.`
       : "";
-  const budgetNote = truncatedByBudget
-    ? `\n... results truncated at 100KB — narrow the search.`
-    : "";
+  const budgetNote = truncatedByBudget ? `\n... results truncated at 100KB${droppedNote}.` : "";
   const header = `${filesWithMatches} file${filesWithMatches === 1 ? "" : "s"} matched, ${totalMatches} line${totalMatches === 1 ? "" : "s"} shown.`;
   return textResult(`${header}\n\n${sections.join("\n\n")}${omittedNote}${budgetNote}`, {
     pattern: params.pattern,
@@ -397,4 +403,28 @@ function stripAnchorPrefix(line: string): string {
   const idx = line.indexOf(ANCHOR_DELIMITER);
   if (idx === -1) return line;
   return line.slice(idx + ANCHOR_DELIMITER.length).trimStart();
+}
+
+/**
+ * Persist dropped sections to a temp log (pi's bash-truncation convention:
+ * the model gets a pointer to the full output instead of a dead-end note).
+ * Returns the ` — full output: <path> (N lines)` suffix, or "" when nothing
+ * was dropped.
+ */
+async function buildTruncationNote(dropped: string[]): Promise<string> {
+  if (dropped.length === 0) return "";
+  const text = dropped.join("\n\n") + "\n";
+  const path = joinPath(tmpdir(), `pi-fast-edits-grep-${randomBytes(6).toString("hex")}.log`);
+  try {
+    await writeFile(path, text, "utf8");
+    const lines = text.split("\n").length;
+    return ` — full output: ${path} (${lines} lines)`;
+  } catch {
+    return " — results truncated; full output could not be written";
+  }
+}
+
+function joinPath(a: string, b: string): string {
+  // local join to avoid importing node:path twice (path module already imported)
+  return a.endsWith("/") ? a + b : a + "/" + b;
 }

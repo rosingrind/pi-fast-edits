@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it, vi } from "vitest";
@@ -277,6 +277,12 @@ describe("grep_anchored_files (rg-backed)", () => {
       expect(text).toContain("1 file matched, 500 lines shown.");
       expect(text).toContain("truncated at 100KB");
       expect(text).not.toContain("No matches");
+      // pi-convention full-output pointer: the note names a log file that
+      // actually contains the dropped section content.
+      const m = /full output: ([^ )]+)/.exec(text);
+      expect(m).not.toBeNull();
+      const full = await readFile(m![1], "utf8");
+      expect(full).toContain("File: big.ts");
     },
   );
 
