@@ -25,7 +25,22 @@ export type ToolDef = {
   execute?: unknown;
 };
 
-export type SafetyCheck = { ok: boolean; reasons: string[] };
+/**
+ * Result of the override safety check.
+ *
+ * `eligible` — built-ins that are present and structurally clean; the
+ * override claims these names. `absent` — built-ins not registered at all,
+ * which in child sessions means the agent-type allowlist filtered them out;
+ * they are skipped (their suffixed anchored tools stay active) rather than
+ * treated as an incompatibility. `reasons` — genuine fingerprint/shape
+ * failures only.
+ */
+export type SafetyCheck = {
+  ok: boolean;
+  reasons: string[];
+  eligible: string[];
+  absent: string[];
+};
 
 /** Our tools whose behavior is replaced (and which are deactivated) in override mode. */
 export const SUFFIXED_TOOL_NAMES = [
@@ -33,6 +48,17 @@ export const SUFFIXED_TOOL_NAMES = [
   "grep_anchored",
   "write_anchored",
   "edit_anchored",
+] as const;
+/**
+ * Per-behavior override spec: the built-in name we claim, the suffixed tool
+ * that provides the behavior, and the built-in parameter properties whose
+ * presence the fingerprint check requires.
+ */
+const OVERRIDE_SPECS = [
+  { name: "read", suffixed: "read_anchored", requiredProps: [] },
+  { name: "edit", suffixed: "edit_anchored", requiredProps: ["edits"] },
+  { name: "grep", suffixed: "grep_anchored", requiredProps: [] },
+  { name: "write", suffixed: "write_anchored", requiredProps: ["path", "content"] },
 ] as const;
 
 const hasExecute = (def: ToolDef): boolean => typeof def.execute === "function";
@@ -50,65 +76,60 @@ const hasExecute = (def: ToolDef): boolean => typeof def.execute === "function";
  *
  * Our rules (full definitions, so `execute` is always enforceable):
  * - all four behaviors registered with non-empty `parameters.properties` and an `execute` handler
+ *
+ * A missing built-in is reported in `absent` (child-session allowlists
+ * filter tools per agent type) and is NOT a failure; `eligible` lists the
+ * built-ins that are present and clean, and only those need matching `ours`
+ * entries.
  */
 export function checkOverrideCompatibility(builtins: ToolDef[], ours: ToolDef[]): SafetyCheck {
   const reasons: string[] = [];
+  const eligible: string[] = [];
+  const absent: string[] = [];
   const builtin = (name: string) => builtins.find((def) => def.name === name);
-  const oursByName = (name: string) => ours.find((def) => def.name === name);
 
-  const edit = builtin("edit");
-  if (edit) {
-    if (!edit.parameters?.properties?.edits) {
-      reasons.push("Built-in 'edit' has no parameters.properties.edits.");
-    }
-    if (edit.execute !== undefined && !hasExecute(edit)) {
-      reasons.push("Built-in 'edit' has no execute handler.");
-    }
-  } else {
-    reasons.push("Built-in 'edit' tool is not registered.");
-  }
-
-  const write = builtin("write");
-  if (write) {
-    const props = write.parameters?.properties;
-    if (!props?.path) {
-      reasons.push("Built-in 'write' has no parameters.properties.path.");
-    }
-    if (!props?.content) {
-      reasons.push("Built-in 'write' has no parameters.properties.content.");
-    }
-    if (write.execute !== undefined && !hasExecute(write)) {
-      reasons.push("Built-in 'write' has no execute handler.");
-    }
-  } else {
-    reasons.push("Built-in 'write' tool is not registered.");
-  }
-
-  for (const name of ["read", "grep"]) {
-    const def = builtin(name);
+  // Built-ins: a missing name is an allowlist choice (child sessions filter
+  // tools per agent type), recorded in `absent` and skipped — NOT an
+  // incompatibility. A present-but-malformed definition stays a hard
+  // fingerprint failure.
+  for (const spec of OVERRIDE_SPECS) {
+    const def = builtin(spec.name);
     if (!def) {
-      reasons.push(`Built-in '${name}' tool is not registered.`);
-    } else if (def.execute !== undefined && !hasExecute(def)) {
-      reasons.push(`Built-in '${name}' has no execute handler.`);
+      absent.push(spec.name);
+      continue;
+    }
+    eligible.push(spec.name);
+    const props = def.parameters?.properties;
+    for (const prop of spec.requiredProps) {
+      if (!props?.[prop]) {
+        reasons.push(`Built-in '${spec.name}' has no parameters.properties.${prop}.`);
+      }
+    }
+    if (def.execute !== undefined && !hasExecute(def)) {
+      reasons.push(`Built-in '${spec.name}' has no execute handler.`);
     }
   }
 
-  for (const oursName of ["read_anchored", "edit_anchored", "grep_anchored", "write_anchored"]) {
-    const def = oursByName(oursName);
+  // Our definitions are only required for the behaviors actually being
+  // overridden (eligible built-ins); in a read-only child session nobody
+  // needs edit/write parity.
+  for (const spec of OVERRIDE_SPECS) {
+    if (!eligible.includes(spec.name)) continue;
+    const def = ours.find((d) => d.name === spec.suffixed);
     if (!def) {
-      reasons.push(`Our '${oursName}' tool is not registered.`);
+      reasons.push(`Our '${spec.suffixed}' tool is not registered.`);
       continue;
     }
     const props = def.parameters?.properties;
     if (!props || Object.keys(props).length === 0) {
-      reasons.push(`Our '${oursName}' tool has no parameters.properties.`);
+      reasons.push(`Our '${spec.suffixed}' tool has no parameters.properties.`);
     }
     if (!hasExecute(def)) {
-      reasons.push(`Our '${oursName}' tool has no execute handler.`);
+      reasons.push(`Our '${spec.suffixed}' tool has no execute handler.`);
     }
   }
 
-  return { ok: reasons.length === 0, reasons };
+  return { ok: reasons.length === 0, reasons, eligible, absent };
 }
 
 /**
@@ -172,11 +193,13 @@ const OVERRIDE_DESCRIPTIONS: Array<{ builtin: string; prefix: string }> = [
  * Apply the override mode matching `config.overrideBuiltInEditTools`:
  *
  * - Enabled → safety check first:
- *   - Pass → re-register our four behaviors under the built-in names (renamed
- *     defs, descriptions prefixed) and deactivate our suffixed names via
- *     `setActiveTools` (design D7).
- *   - Fail → install the interception fallback and surface a warning through
- *     `ctx.ui` — never silently do nothing.
+ *   - Pass → re-register our behaviors under each eligible built-in name
+ *     (present + structurally clean; renamed defs, descriptions prefixed)
+ *     and deactivate the matching suffixed names via `setActiveTools`
+ *     (design D7). Built-ins absent from the registry (child-session
+ *     allowlists) are skipped — not treated as failure.
+ *   - Genuine fingerprint/shape failure → install the interception fallback
+ *     and surface a warning through `ctx.ui` — never silently do nothing.
  * - Disabled → restore: the suffixed anchored tools remain registered (they
  *   are re-registered on every config change), so re-activate them via
  *   `setActiveTools`. The four override names keep our definitions — pi has no
@@ -237,47 +260,74 @@ export function applyOverrideMode(
     return;
   }
 
-  // Renamed registrations: same definition object, built-in name, prefixed
-  // description. constrainedSampling parity is skipped because pi's
-  // getAllTools() ToolInfo does not expose the field to copy from (verified
-  // against the .d.ts during Task 3).
-  pi.registerTool({
-    ...readDef,
-    name: "read",
-    description: OVERRIDE_DESCRIPTIONS[0].prefix + readDef.description,
-  });
-  pi.registerTool({
-    ...editDef,
-    name: "edit",
-    description: OVERRIDE_DESCRIPTIONS[1].prefix + editDef.description,
-  });
-  pi.registerTool({
-    ...grepDef,
-    name: "grep",
-    description: OVERRIDE_DESCRIPTIONS[2].prefix + grepDef.description,
-  });
-  pi.registerTool({
-    ...writeDef,
-    name: "write",
-    description: OVERRIDE_DESCRIPTIONS[3].prefix + writeDef.description,
-  });
+  // Renamed registrations for the eligible built-ins only: same definition
+  // object, built-in name, prefixed description. constrainedSampling parity
+  // is skipped because pi's getAllTools() ToolInfo does not expose the field
+  // to copy from (verified against the .d.ts during Task 3).
+  for (const name of check.eligible) {
+    // Concrete defs (not a union) so registerTool's parameter-schema generic
+    // instantiates per call, exactly as in the unconditional version.
+    switch (name) {
+      case "read":
+        pi.registerTool({
+          ...readDef,
+          name: "read",
+          description: OVERRIDE_DESCRIPTIONS[0].prefix + readDef.description,
+        });
+        break;
+      case "edit":
+        pi.registerTool({
+          ...editDef,
+          name: "edit",
+          description: OVERRIDE_DESCRIPTIONS[1].prefix + editDef.description,
+        });
+        break;
+      case "grep":
+        pi.registerTool({
+          ...grepDef,
+          name: "grep",
+          description: OVERRIDE_DESCRIPTIONS[2].prefix + grepDef.description,
+        });
+        break;
+      case "write":
+        pi.registerTool({
+          ...writeDef,
+          name: "write",
+          description: OVERRIDE_DESCRIPTIONS[3].prefix + writeDef.description,
+        });
+        break;
+      default:
+        // Unreachable: eligible names are validated by checkOverrideCompatibility.
+        break;
+    }
+  }
 
-  // setActiveTools replaces the whole active set: keep everything pi considers
-  // active today except our suffixed names, and always keep the four override
-  // names active. The union matters: pi's default active set is
-  // [read, bash, edit, write] — grep is registered-but-inactive, so without
-  // forcing the override names the model would have no search tool.
-  const suffixed = new Set<string>(SUFFIXED_TOOL_NAMES);
-  const keepActive = new Set(pi.getActiveTools().filter((name) => !suffixed.has(name)));
-  for (const name of ["read", "edit", "write", "grep"]) {
+  // setActiveTools replaces the whole active set: keep everything pi
+  // considers active today except the suffixed names whose built-in we now
+  // override, and force the eligible built-in names active. The union
+  // matters: pi's default active set is [read, bash, edit, write] — grep is
+  // registered-but-inactive, so without forcing the override names the model
+  // would have no search tool. Suffixed tools for absent built-ins (e.g.
+  // edit_anchored in a read-only child session) stay as the allowlist left
+  // them.
+  const suffixedToBuiltin = new Map<string, string>(
+    OVERRIDE_SPECS.map((s) => [s.suffixed, s.name] as const),
+  );
+  const overridden = new Set<string>(check.eligible);
+  const keepActive = new Set(
+    pi
+      .getActiveTools()
+      .filter(
+        (name) => !(suffixedToBuiltin.has(name) && overridden.has(suffixedToBuiltin.get(name)!)),
+      ),
+  );
+  for (const name of check.eligible) {
     keepActive.add(name);
   }
   pi.setActiveTools([...keepActive]);
-  // Rendered titles follow the built-in names the definitions now carry.
-  setToolNameOverrides({
-    read_anchored: "read",
-    edit_anchored: "edit",
-    grep_anchored: "grep",
-    write_anchored: "write",
-  });
+  // Rendered titles follow the built-in names the definitions now carry —
+  // only for the pairs actually claimed.
+  setToolNameOverrides(
+    Object.fromEntries([...suffixedToBuiltin].filter(([, builtin]) => overridden.has(builtin))),
+  );
 }

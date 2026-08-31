@@ -64,10 +64,33 @@ describe("checkOverrideCompatibility", () => {
     expect(check.reasons).toEqual([]);
   });
 
-  it("fails when built-in edit is missing", () => {
+  it("treats a missing built-in as absent (allowlist-filtered), not incompatible", () => {
     const check = checkOverrideCompatibility(withoutBuiltin(fullBuiltins(), "edit"), oursFull());
-    expect(check.ok).toBe(false);
-    expect(check.reasons).toContain("Built-in 'edit' tool is not registered.");
+    expect(check.ok).toBe(true);
+    expect(check.absent).toContain("edit");
+    expect(check.eligible).toContain("read");
+    expect(check.eligible).not.toContain("edit");
+    expect(check.reasons).toEqual([]);
+  });
+
+  it("treats all missing built-ins as absent across the board", () => {
+    let builtins = fullBuiltins();
+    for (const name of ["read", "edit", "write", "grep"]) builtins = withoutBuiltin(builtins, name);
+    const check = checkOverrideCompatibility(builtins, oursFull());
+    expect(check.ok).toBe(true);
+    expect(check.absent).toEqual(["read", "edit", "grep", "write"]);
+    expect(check.eligible).toEqual([]);
+  });
+
+  it("auditor-shaped child surface: read/grep eligible, edit/write absent", () => {
+    const builtins = fullBuiltins().filter((d) => d.name !== "edit" && d.name !== "write");
+    const ours = oursFull().filter(
+      (d) => d.name !== "edit_anchored" && d.name !== "write_anchored",
+    );
+    const check = checkOverrideCompatibility(builtins, ours);
+    expect(check.ok).toBe(true);
+    expect(check.eligible).toEqual(["read", "grep"]);
+    expect(check.absent).toEqual(["edit", "write"]);
   });
 
   it("fails when built-in edit lacks parameters.properties.edits", () => {
@@ -85,12 +108,6 @@ describe("checkOverrideCompatibility", () => {
     const check = checkOverrideCompatibility(builtins, oursFull());
     expect(check.ok).toBe(false);
     expect(check.reasons).toContain("Built-in 'edit' has no execute handler.");
-  });
-
-  it("fails when built-in write is missing", () => {
-    const check = checkOverrideCompatibility(withoutBuiltin(fullBuiltins(), "write"), oursFull());
-    expect(check.ok).toBe(false);
-    expect(check.reasons).toContain("Built-in 'write' tool is not registered.");
   });
 
   it("fails when built-in write lacks parameters.properties.path", () => {
@@ -111,18 +128,6 @@ describe("checkOverrideCompatibility", () => {
     const check = checkOverrideCompatibility(builtins, oursFull());
     expect(check.ok).toBe(false);
     expect(check.reasons).toContain("Built-in 'write' has no parameters.properties.content.");
-  });
-
-  it("fails when built-in read is missing", () => {
-    const check = checkOverrideCompatibility(withoutBuiltin(fullBuiltins(), "read"), oursFull());
-    expect(check.ok).toBe(false);
-    expect(check.reasons).toContain("Built-in 'read' tool is not registered.");
-  });
-
-  it("fails when built-in grep is missing", () => {
-    const check = checkOverrideCompatibility(withoutBuiltin(fullBuiltins(), "grep"), oursFull());
-    expect(check.ok).toBe(false);
-    expect(check.reasons).toContain("Built-in 'grep' tool is not registered.");
   });
 
   it("fails when built-in grep exposes no execute handler", () => {
@@ -164,13 +169,14 @@ type Handler = (event?: any, ctx?: any) => Promise<any> | any;
 async function loadOverride(
   overrides?: Partial<PiFastEditsConfig>,
   builtins: ToolDef[] = fullBuiltins(),
+  initialActive?: string[],
 ) {
   const registered = new Map<string, RegisteredTool>();
   const handlers: Record<string, Handler> = {};
   let toolCallInstallCount = 0;
   const setActiveToolsCalls: string[][] = [];
   // Mirrors pi's real default active set: grep is registered-but-inactive.
-  let activeTools = ["read", "bash", "edit", "write", ...SUFFIXED_TOOL_NAMES];
+  let activeTools = initialActive ?? ["read", "bash", "edit", "write", ...SUFFIXED_TOOL_NAMES];
   const pi = {
     registerTool(tool: RegisteredTool) {
       registered.set(tool.name, tool);
@@ -300,6 +306,67 @@ describe("applyOverrideMode wiring", () => {
     expect(registered.has("read")).toBe(false);
     expect(registered.has("edit")).toBe(false);
     expect(setActiveToolsCalls).toHaveLength(0);
+  });
+
+  it("partial child surface: replaces only present built-ins, no interception for absent ones", async () => {
+    const builtins = fullBuiltins().filter((d) => d.name !== "edit" && d.name !== "write");
+    const { registered, handlers, setActiveToolsCalls } = await loadOverride(
+      { overrideBuiltInEditTools: true },
+      builtins,
+      ["read", "bash", "read_anchored", "grep_anchored"],
+    );
+    await handlers.session_start!({}, {});
+
+    // Only the present built-ins are claimed.
+    expect(registered.has("read")).toBe(true);
+    expect(registered.has("grep")).toBe(true);
+    expect(registered.get("read")!.description).toContain("Anchored read (default).");
+    expect(registered.has("edit")).toBe(false);
+    expect(registered.has("write")).toBe(false);
+
+    // Active set keeps pre-existing tools, forces the eligible names, and
+    // does NOT resurrect the allowlisted-out ones.
+    const last = setActiveToolsCalls.at(-1)!;
+    expect(last).toContain("read");
+    expect(last).toContain("grep");
+    expect(last).toContain("bash");
+    expect(last).not.toContain("edit");
+    expect(last).not.toContain("write");
+    for (const suffixed of SUFFIXED_TOOL_NAMES) {
+      expect(last).not.toContain(suffixed);
+    }
+
+    // Absent built-ins are an allowlist choice, not an incompatibility —
+    // no interception fallback is installed.
+    expect(handlers.tool_call).toBeUndefined();
+  });
+
+  it("partial child surface: rendered titles remap only the eligible pairs", async () => {
+    const builtins = fullBuiltins().filter((d) => d.name !== "edit" && d.name !== "write");
+    const { handlers } = await loadOverride({ overrideBuiltInEditTools: true }, builtins, [
+      "read",
+      "bash",
+      "read_anchored",
+      "grep_anchored",
+    ]);
+    await handlers.session_start!({}, {});
+
+    const { renderToolCall, clearToolNameOverrides } = await import("../src/tools/render.js");
+    const { Text } = await import("@earendil-works/pi-tui");
+    const theme = { fg: (_k: string, s: string) => s, bold: (s: string) => s };
+    const ctx = { lastComponent: undefined, isPartial: false, isError: false } as any;
+
+    const renderRead = renderToolCall("read_anchored", () => "");
+    const readComp = renderRead({ path: "a.txt" }, theme as any, ctx);
+    expect((readComp as InstanceType<typeof Text>).render(200)[0]).toContain("read ");
+    expect((readComp as InstanceType<typeof Text>).render(200)[0]).not.toContain("read_anchored");
+
+    // edit_anchored stays unmapped: its built-in pair is absent in this child.
+    const renderEdit = renderToolCall("edit_anchored", () => "");
+    const editComp = renderEdit({ path: "a.txt" }, theme as any, ctx);
+    expect((editComp as InstanceType<typeof Text>).render(200)[0]).toContain("edit_anchored");
+
+    clearToolNameOverrides();
   });
 });
 
