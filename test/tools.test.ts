@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import piFastEdits from "../src/index.js";
 import type { PiFastEditsConfig } from "../src/types.js";
 import { anchorOf } from "./anchor-helpers.js";
@@ -795,6 +795,46 @@ describe("error paths", () => {
     expect(result.content[0].text).toContain("Edit cancelled");
     const content = await readFile(file, "utf8");
     expect(content).toBe("SECRET=1\n");
+  });
+
+  it("batch confirmation cancelled via UI returns the exact cancellation text", async () => {
+    const cwd = await workspace();
+    const file = join(cwd, "cancel-ui.txt");
+    await writeFile(file, "alpha\n", "utf8");
+    const tools = await loadTools({ confirmation: "always" });
+    const readResult = await tools
+      .get("read_anchored")!
+      .execute("1", { path: "cancel-ui.txt" }, undefined, undefined, { cwd });
+    const revision = (readResult.details as any)?.revision;
+
+    // A confirmation UI that declines must cancel the batch without writing and
+    // return the exact cancellation message (pinned for the renderer contract).
+    const confirm = vi.fn(async () => false);
+    const result = await tools.get("edit_anchored")!.execute(
+      "2",
+      {
+        edits: [
+          {
+            type: "replace" as const,
+            path: "cancel-ui.txt",
+            startAnchor: (readResult.details as any)?.lines[0].anchor,
+            startAnchorLine: (readResult.details as any)?.lines[0].text,
+            endAnchor: (readResult.details as any)?.lines[0].anchor,
+            endAnchorLine: (readResult.details as any)?.lines[0].text,
+            replacement: "beta\n",
+            expectedRevision: revision,
+          },
+        ],
+      },
+      undefined,
+      undefined,
+      { cwd, ui: { confirm } },
+    );
+
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(result.content[0].text).toBe("Edit cancelled. No files were changed.");
+    const content = await readFile(file, "utf8");
+    expect(content).toBe("alpha\n");
   });
 
   it("single insert into empty file in batch succeeds", async () => {

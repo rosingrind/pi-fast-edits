@@ -41,6 +41,53 @@ function isSingleEdit(value: unknown): boolean {
   );
 }
 
+/**
+ * Models sometimes send edits as a JSON string or a single edit object
+ * instead of an array (the same quirk pi's built-in edit handles in its
+ * prepareArguments). Normalize before render and execute so the chip
+ * suffix and the executor see the same well-formed shape.
+ */
+function normalizeEdits(input: unknown) {
+  // The schema's static type (strict/lenient variants) is the contract pi
+  // type-checks against; cast through it since normalization is shape-only.
+  type BatchStatic = Static<ReturnType<typeof batchEditsSchema>>;
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return input as BatchStatic;
+  }
+  const raw = input as { edits?: unknown };
+  let edits = raw.edits;
+  if (typeof edits === "string") {
+    try {
+      const parsed = JSON.parse(edits);
+      if (Array.isArray(parsed)) edits = parsed;
+      else if (isSingleEdit(parsed)) edits = [parsed];
+    } catch {
+      // leave as-is; schema validation reports the malformed value
+    }
+  } else if (isSingleEdit(edits)) {
+    edits = [edits];
+  }
+  // Field-name rescue: models alternating insert/replace in one batch
+  // sometimes use `content` for replace edits (or `replacement` for
+  // inserts). Move the text to the field the variant actually takes.
+  if (Array.isArray(edits)) {
+    for (const e of edits as Array<Record<string, unknown>>) {
+      if (e.type === "replace" && e.replacement === undefined && typeof e.content === "string") {
+        e.replacement = e.content;
+        delete e.content;
+      } else if (
+        e.type === "insert" &&
+        e.content === undefined &&
+        typeof e.replacement === "string"
+      ) {
+        e.content = e.replacement;
+        delete e.replacement;
+      }
+    }
+  }
+  return { edits: edits as BatchStatic["edits"] } as BatchStatic;
+}
+
 export function registerEditAnchored(
   pi: ExtensionAPI,
   session: SessionState,
@@ -59,53 +106,8 @@ export function registerEditAnchored(
     ],
     renderShell: "default" as const,
     executionMode: "sequential" as const,
-    // Models sometimes send edits as a JSON string or a single edit object
-    // instead of an array (the same quirk pi's built-in edit handles in its
-    // prepareArguments). Normalize before render and execute so the chip
-    // suffix and the executor see the same well-formed shape.
     prepareArguments(input: unknown) {
-      // The schema's static type (strict/lenient variants) is the contract pi
-      // type-checks against; cast through it since normalization is shape-only.
-      type BatchStatic = Static<ReturnType<typeof batchEditsSchema>>;
-      if (!input || typeof input !== "object" || Array.isArray(input)) {
-        return input as BatchStatic;
-      }
-      const raw = input as { edits?: unknown };
-      let edits = raw.edits;
-      if (typeof edits === "string") {
-        try {
-          const parsed = JSON.parse(edits);
-          if (Array.isArray(parsed)) edits = parsed;
-          else if (isSingleEdit(parsed)) edits = [parsed];
-        } catch {
-          // leave as-is; schema validation reports the malformed value
-        }
-      } else if (isSingleEdit(edits)) {
-        edits = [edits];
-      }
-      // Field-name rescue: models alternating insert/replace in one batch
-      // sometimes use `content` for replace edits (or `replacement` for
-      // inserts). Move the text to the field the variant actually takes.
-      if (Array.isArray(edits)) {
-        for (const e of edits as Array<Record<string, unknown>>) {
-          if (
-            e.type === "replace" &&
-            e.replacement === undefined &&
-            typeof e.content === "string"
-          ) {
-            e.replacement = e.content;
-            delete e.content;
-          } else if (
-            e.type === "insert" &&
-            e.content === undefined &&
-            typeof e.replacement === "string"
-          ) {
-            e.content = e.replacement;
-            delete e.replacement;
-          }
-        }
-      }
-      return { edits: edits as BatchStatic["edits"] } as BatchStatic;
+      return normalizeEdits(input);
     },
     renderCall: renderToolCall("edit_anchored", (args, theme) => {
       const edits = Array.isArray(args.edits)
@@ -127,158 +129,198 @@ export function registerEditAnchored(
     async execute(
       _toolCallId: string,
       params: BatchParams,
-      _signal: AbortSignal | undefined,
+      signal: AbortSignal | undefined,
       _onUpdate: unknown,
       ctx: PiContext,
     ) {
-      if (_signal?.aborted) return textResult("Edit cancelled (aborted).", []);
+      if (signal?.aborted) return textResult("Edit cancelled (aborted).", []);
       const cwd = getCwd(ctx);
       const edits = params.edits;
       if (edits.length === 0) return textResult("No edits to apply.", []);
 
-      // Resolve every edit to its absolute path, then load each unique file in
-      // parallel. Reads are I/O-bound, and each unique path is read exactly once.
-      const resolvedPaths = await Promise.all(
-        edits.map((edit) => resolveWorkspacePath(cwd, edit.path)),
-      );
-      const uniqueAbs = [...new Set(resolvedPaths)];
-      const loadedAll = await Promise.all(
-        uniqueAbs.map((absPath) => loadStateForPath(session, cwd, absPath)),
-      );
-      const loadedByPath = new Map(loadedAll.map((l) => [l.absPath, l]));
+      const byAbsPath = await loadEditsByPath(session, cwd, edits);
 
-      const byAbsPath = new Map<
-        string,
-        {
-          loaded: Awaited<ReturnType<typeof loadStateForPath>>;
-          edits: AnchoredEdit[];
-        }
-      >();
-      edits.forEach((edit, i) => {
-        const absPath = resolvedPaths[i];
-        const group = byAbsPath.get(absPath);
-        if (group) group.edits.push(edit);
-        else byAbsPath.set(absPath, { loaded: loadedByPath.get(absPath)!, edits: [edit] });
-      });
-
-      const planned: Array<{
-        absPath: string;
-        writePath: string;
-        relativePath: string;
-        state: Awaited<ReturnType<typeof loadStateForPath>>["state"];
-        beforeLines: string[];
-        beforeAnchors: string[];
-        afterLines: string[];
-        diffOps: DiffOp[];
-        diff: string;
-        plans: PlannedEdit[];
-      }> = [];
+      const planned: PlannedFile[] = [];
       for (const [absPath, { loaded, edits: pathEdits }] of byAbsPath) {
-        for (const edit of pathEdits) {
-          assertExpectedRevision(
-            loaded.relativePath,
-            loaded.state.revisionHash,
-            edit.expectedRevision,
-          );
-        }
-        const plans = pathEdits.map((edit) =>
-          planEdit(loaded.state, edit, config.requireAnchorLines),
-        );
-        assertNoOverlaps(plans);
-        const beforeLines = loaded.state.lines.map((line) => line.text);
-        const beforeAnchors = loaded.state.lines.map((line) => line.anchor);
-        const afterLines = applyPlansToLines(beforeLines, plans);
-        // Myers runs once here and is shared by both the preview diff and the
-        // post-write reconciliation (reconcileState skips its own re-run).
-        const diffOps = myersDiff(beforeLines, afterLines);
-        planned.push({
-          absPath,
-          writePath: loaded.writePath,
-          relativePath: loaded.relativePath,
-          state: loaded.state,
-          beforeLines,
-          beforeAnchors,
-          afterLines,
-          diffOps,
-          diff: unifiedDiff(beforeLines, afterLines, 4, diffOps),
-          plans,
-        });
+        planned.push(planEditsForFile(absPath, loaded, pathEdits, config.requireAnchorLines));
       }
 
-      const preview = planned.map((p) => p.diff).join("\n\n");
-      const ok = await confirmIfNeeded(
-        ctx,
-        config,
-        cwd,
-        planned.map((p) => p.absPath),
-        preview,
-      );
-      if (!ok) {
-        return textResult(
-          ctx?.ui?.confirm
-            ? "Edit cancelled. No files were changed."
-            : "Edit cancelled: this batch requires confirmation, but no confirmation UI is available in this environment (headless/CI). No files were changed.",
-        );
-      }
+      const cancelled = await confirmOrCancel(ctx, config, cwd, planned);
+      if (cancelled) return cancelled;
 
-      const groups: BatchGroup[] = [];
-      const totalFiles = planned.length;
-      for (const p of planned) {
-        const created = p.beforeLines.length === 0 && p.afterLines.length > 0;
-        // An empty result must not retain a trailing newline — a truly empty file.
-        const joined =
-          p.afterLines.length === 0
-            ? ""
-            : joinLines(p.afterLines, p.state.lineEnding, p.state.hadFinalNewline || created);
-        // Re-add a UTF-8 BOM stripped at read time so it survives edits to line 1.
-        const content = `${p.state.hadBom ? "\uFEFF" : ""}${joined}`;
-        await atomicWriteFile(p.writePath, content);
-        const snapshot = await readTextFile(p.absPath);
-        // Only reuse diffOps when the write→read round-trip is lossless. If it
-        // normalizes lines differently (e.g. a trailing newline is stripped),
-        // the ops built against afterLines no longer line up with
-        // snapshot.lines, so let reconcileState recompute its own diff.
-        const linesMatch =
-          p.afterLines.length === snapshot.lines.length &&
-          p.afterLines.every((line, i) => line === snapshot.lines[i]);
-        reconcileState(
-          p.state,
-          snapshot.lines,
-          snapshot.lineEnding,
-          snapshot.hadFinalNewline,
-          snapshot.hadBom,
-          snapshot.revisionHash,
-          linesMatch ? p.diffOps : undefined,
-        );
-        const afterAnchors = p.state.lines.map((line) => line.anchor);
-        groups.push({
-          relativePath: p.relativePath,
-          diff: p.diff,
-          plans: p.plans,
-          perEdit: _computePerEditChanges(p.plans, p.beforeAnchors, afterAnchors),
-        });
-
-        // An abort that fires after this file is written stops the batch here.
-        // Already-persisted files are reported as partial progress rather than
-        // rolled back: the multi-file batch is deliberately not transactional.
-        if (_signal?.aborted) {
-          const partial = _summarizeBatch(groups);
-          return {
-            ...textResult(
-              `Aborted after ${groups.length} of ${totalFiles} files.\n\n${partial.text}`,
-              partial.details,
-            ),
-            terminate: true,
-          } as AgentToolResult<unknown>;
-        }
-      }
-
-      const full = _summarizeBatch(groups);
-      return textResult(full.text, full.details);
+      return applyBatch(planned, signal, planned.length);
     },
   };
   pi.registerTool(tool);
   return tool;
+}
+
+type LoadedFile = Awaited<ReturnType<typeof loadStateForPath>>;
+
+/** One file's complete edit plan: what to preview, confirm, write, and reconcile. */
+type PlannedFile = {
+  absPath: string;
+  writePath: string;
+  relativePath: string;
+  state: LoadedFile["state"];
+  beforeLines: string[];
+  beforeAnchors: string[];
+  afterLines: string[];
+  diffOps: DiffOp[];
+  diff: string;
+  plans: PlannedEdit[];
+};
+
+/**
+ * Resolve every edit to its absolute path, then load each unique file in
+ * parallel. Reads are I/O-bound, and each unique path is read exactly once.
+ */
+async function loadEditsByPath(
+  session: SessionState,
+  cwd: string,
+  edits: AnchoredEdit[],
+): Promise<Map<string, { loaded: LoadedFile; edits: AnchoredEdit[] }>> {
+  const resolvedPaths = await Promise.all(
+    edits.map((edit) => resolveWorkspacePath(cwd, edit.path)),
+  );
+  const uniqueAbs = [...new Set(resolvedPaths)];
+  const loadedAll = await Promise.all(
+    uniqueAbs.map((absPath) => loadStateForPath(session, cwd, absPath)),
+  );
+  const loadedByPath = new Map(loadedAll.map((l) => [l.absPath, l]));
+
+  const byAbsPath = new Map<string, { loaded: LoadedFile; edits: AnchoredEdit[] }>();
+  edits.forEach((edit, i) => {
+    const absPath = resolvedPaths[i];
+    const group = byAbsPath.get(absPath);
+    if (group) group.edits.push(edit);
+    else byAbsPath.set(absPath, { loaded: loadedByPath.get(absPath)!, edits: [edit] });
+  });
+  return byAbsPath;
+}
+
+/** Validate, plan, and diff every edit for one already-loaded file. */
+function planEditsForFile(
+  absPath: string,
+  loaded: LoadedFile,
+  pathEdits: AnchoredEdit[],
+  requireAnchorLines: boolean,
+): PlannedFile {
+  for (const edit of pathEdits) {
+    assertExpectedRevision(loaded.relativePath, loaded.state.revisionHash, edit.expectedRevision);
+  }
+  const plans = pathEdits.map((edit) => planEdit(loaded.state, edit, requireAnchorLines));
+  assertNoOverlaps(plans);
+  const beforeLines = loaded.state.lines.map((line) => line.text);
+  const beforeAnchors = loaded.state.lines.map((line) => line.anchor);
+  const afterLines = applyPlansToLines(beforeLines, plans);
+  // Myers runs once here and is shared by both the preview diff and the
+  // post-write reconciliation (reconcileState skips its own re-run).
+  const diffOps = myersDiff(beforeLines, afterLines);
+  return {
+    absPath,
+    writePath: loaded.writePath,
+    relativePath: loaded.relativePath,
+    state: loaded.state,
+    beforeLines,
+    beforeAnchors,
+    afterLines,
+    diffOps,
+    diff: unifiedDiff(beforeLines, afterLines, 4, diffOps),
+    plans,
+  };
+}
+
+/**
+ * Prompt for confirmation when the config requires it. Returns the
+ * cancellation result, or null when the batch should proceed.
+ */
+async function confirmOrCancel(
+  ctx: PiContext,
+  config: PiFastEditsConfig,
+  cwd: string,
+  planned: PlannedFile[],
+): Promise<AgentToolResult<unknown> | null> {
+  const preview = planned.map((p) => p.diff).join("\n\n");
+  const ok = await confirmIfNeeded(
+    ctx,
+    config,
+    cwd,
+    planned.map((p) => p.absPath),
+    preview,
+  );
+  if (ok) return null;
+  return textResult(
+    ctx?.ui?.confirm
+      ? "Edit cancelled. No files were changed."
+      : "Edit cancelled: this batch requires confirmation, but no confirmation UI is available in this environment (headless/CI). No files were changed.",
+  );
+}
+
+/**
+ * Write every planned file, reconcile cached state, and summarize. An abort
+ * that fires mid-batch stops here; already-persisted files are reported as
+ * partial progress rather than rolled back: the multi-file batch is
+ * deliberately not transactional.
+ */
+async function applyBatch(
+  planned: PlannedFile[],
+  signal: AbortSignal | undefined,
+  totalFiles: number,
+): Promise<AgentToolResult<unknown>> {
+  const groups: BatchGroup[] = [];
+  for (const p of planned) {
+    const created = p.beforeLines.length === 0 && p.afterLines.length > 0;
+    // An empty result must not retain a trailing newline — a truly empty file.
+    const joined =
+      p.afterLines.length === 0
+        ? ""
+        : joinLines(p.afterLines, p.state.lineEnding, p.state.hadFinalNewline || created);
+    // Re-add a UTF-8 BOM stripped at read time so it survives edits to line 1.
+    const content = `${p.state.hadBom ? "\uFEFF" : ""}${joined}`;
+    await atomicWriteFile(p.writePath, content);
+    const snapshot = await readTextFile(p.absPath);
+    // Only reuse diffOps when the write→read round-trip is lossless. If it
+    // normalizes lines differently (e.g. a trailing newline is stripped),
+    // the ops built against afterLines no longer line up with
+    // snapshot.lines, so let reconcileState recompute its own diff.
+    const linesMatch =
+      p.afterLines.length === snapshot.lines.length &&
+      p.afterLines.every((line, i) => line === snapshot.lines[i]);
+    reconcileState(
+      p.state,
+      snapshot.lines,
+      snapshot.lineEnding,
+      snapshot.hadFinalNewline,
+      snapshot.hadBom,
+      snapshot.revisionHash,
+      linesMatch ? p.diffOps : undefined,
+    );
+    const afterAnchors = p.state.lines.map((line) => line.anchor);
+    groups.push({
+      relativePath: p.relativePath,
+      diff: p.diff,
+      plans: p.plans,
+      perEdit: _computePerEditChanges(p.plans, p.beforeAnchors, afterAnchors),
+    });
+
+    // An abort that fires after this file is written stops the batch here.
+    // Already-persisted files are reported as partial progress rather than
+    // rolled back: the multi-file batch is deliberately not transactional.
+    if (signal?.aborted) {
+      const partial = _summarizeBatch(groups);
+      return {
+        ...textResult(
+          `Aborted after ${groups.length} of ${totalFiles} files.\n\n${partial.text}`,
+          partial.details,
+        ),
+        terminate: true,
+      } as AgentToolResult<unknown>;
+    }
+  }
+
+  const full = _summarizeBatch(groups);
+  return textResult(full.text, full.details);
 }
 
 type BatchGroup = {
