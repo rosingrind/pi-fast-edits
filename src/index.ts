@@ -19,6 +19,7 @@ import {
   type OverrideDeps,
 } from "./tools/override.js";
 import { createOverrideNoticeHandler } from "./tools/override-notice.js";
+import { collectReadRoots, piDocsRoot, type SkillRef } from "./fs/read-roots.js";
 
 export default async function piFastEdits(
   pi: ExtensionAPI,
@@ -31,7 +32,7 @@ export default async function piFastEdits(
     protectedPaths: [...diskConfig.protectedPaths],
     ...overrides,
   };
-  const session: SessionState = { files: new LRUMap() };
+  const session: SessionState = { files: new LRUMap(), readRoots: [] };
 
   registerReadAnchored(pi, session, config);
   registerGrepAnchored(pi, session, config);
@@ -77,6 +78,15 @@ export default async function piFastEdits(
   // turn, so startup-when-on stays silent). Handler is a single boolean
   // read + compare per turn.
   pi.on("before_agent_start", createOverrideNoticeHandler(config));
+
+  // Host-sanctioned read roots: refreshed every turn from the skills pi has
+  // loaded (their baseDirs) plus pi's package docs root. Reads may target
+  // these outside-workspace roots; writes and greps stay workspace-bound.
+  pi.on("before_agent_start", (event) => {
+    const skills = (event as { systemPromptOptions?: { skills?: SkillRef[] } } | undefined)
+      ?.systemPromptOptions?.skills;
+    session.readRoots = collectReadRoots(skills, piDocsRoot());
+  });
 
   pi.on("session_start", async (_event, ctx) => {
     try {

@@ -1,8 +1,13 @@
-import { mkdtemp, writeFile, mkdir, symlink } from "node:fs/promises";
+import { mkdtemp, realpath, writeFile, mkdir, symlink } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
-import { assertRegularFile, isProtectedPath, resolveWorkspacePath } from "../src/fs/path-safety.js";
+import {
+  assertRegularFile,
+  isProtectedPath,
+  resolveReadPath,
+  resolveWorkspacePath,
+} from "../src/fs/path-safety.js";
 import { DEFAULT_CONFIG } from "../src/config.js";
 
 describe("resolveWorkspacePath", () => {
@@ -94,5 +99,62 @@ describe("isProtectedPath", () => {
     expect(isProtectedPath(".ENV", [".env"])).toBe(false);
     expect(isProtectedPath("Package-lock.json", ["package-lock.json"])).toBe(false);
     // This is a known limitation on case-insensitive filesystems.
+  });
+});
+
+describe("resolveReadPath", () => {
+  it("allows in-workspace paths (workspace stays the primary root)", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "pfe-read-ws-"));
+    const file = join(dir, "a.ts");
+    await writeFile(file, "one\n", "utf8");
+    await expect(resolveReadPath(dir, "a.ts", [])).resolves.toBe(file);
+  });
+
+  it("allows paths under a sanctioned extra root outside the workspace", async () => {
+    const ws = await mkdtemp(join(tmpdir(), "pfe-read-ws2-"));
+    const root = await mkdtemp(join(tmpdir(), "pfe-read-root-"));
+    const file = join(root, "skills", "my-skill", "SKILL.md");
+    await mkdir(join(root, "skills", "my-skill"), { recursive: true });
+    await writeFile(file, "alpha\n", "utf8");
+    // realpath: resolveReadPath returns the canonical form (macOS /var → /private/var).
+    await expect(resolveReadPath(ws, file, [root])).resolves.toBe(await realpath(file));
+  });
+
+  it("allows traversal that stays within an extra root", async () => {
+    const ws = await mkdtemp(join(tmpdir(), "pfe-read-ws3-"));
+    const root = await mkdtemp(join(tmpdir(), "pfe-read-root2-"));
+    const file = join(root, "deep", "nested.md");
+    await mkdir(join(root, "deep"), { recursive: true });
+    await writeFile(file, "x\n", "utf8");
+    await expect(
+      resolveReadPath(ws, join(root, "deep", "..", "deep", "nested.md"), [root]),
+    ).resolves.toBe(await realpath(file));
+  });
+
+  it("still rejects paths outside the workspace and every extra root", async () => {
+    const ws = await mkdtemp(join(tmpdir(), "pfe-read-ws4-"));
+    const root = await mkdtemp(join(tmpdir(), "pfe-read-root3-"));
+    await expect(resolveReadPath(ws, "/etc/passwd", [root])).rejects.toThrow(/outside workspace/);
+  });
+
+  it("resolves a symlinked extra root before comparing", async () => {
+    const ws = await mkdtemp(join(tmpdir(), "pfe-read-ws5-"));
+    const realRoot = await mkdtemp(join(tmpdir(), "pfe-read-real-"));
+    const file = join(realRoot, "SKILL.md");
+    await writeFile(file, "x\n", "utf8");
+    const linkRoot = join(await mkdtemp(join(tmpdir(), "pfe-read-link-")), "linked");
+    await symlink(realRoot, linkRoot);
+    // Canonical form: the request goes through the symlinked root, the answer
+    // is the realpath under the real root.
+    await expect(resolveReadPath(ws, join(linkRoot, "SKILL.md"), [linkRoot])).resolves.toBe(
+      await realpath(file),
+    );
+  });
+
+  it("ignores extra roots that do not exist", async () => {
+    const ws = await mkdtemp(join(tmpdir(), "pfe-read-ws6-"));
+    await expect(resolveReadPath(ws, "/etc/passwd", [join(ws, "does-not-exist")])).rejects.toThrow(
+      /outside workspace/,
+    );
   });
 });

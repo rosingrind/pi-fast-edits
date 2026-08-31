@@ -46,14 +46,18 @@ export function registerReadAnchored(
     label: "Read Anchored File",
     description:
       "Read a text file with stable word anchors for fast subsequent edits. Use mode:'range' for windows of large files. Set anchored:false to read plain line-numbered output.",
-    renderCall: renderToolCall("read_anchored", (args, theme) => {
-      const startLine = args.startLine as number | undefined;
-      const endLine = args.endLine as number | undefined;
-      if (startLine === undefined && endLine === undefined) return "";
-      const s = startLine ?? 1;
-      const e = endLine === undefined ? "" : `-${endLine}`;
-      return theme.fg("warning", `:${s}${e}`);
-    }),
+    renderCall: renderToolCall(
+      "read_anchored",
+      (args, theme) => {
+        const startLine = args.startLine as number | undefined;
+        const endLine = args.endLine as number | undefined;
+        if (startLine === undefined && endLine === undefined) return "";
+        const s = startLine ?? 1;
+        const e = endLine === undefined ? "" : `-${endLine}`;
+        return theme.fg("warning", `:${s}${e}`);
+      },
+      { skillClassification: true },
+    ),
     renderResult: renderReadAnchoredResult,
     promptSnippet: "Read a file with stable word anchors for future edits",
     promptGuidelines: [
@@ -73,7 +77,20 @@ export function registerReadAnchored(
     ) {
       if (_signal?.aborted) return textResult("Read cancelled (aborted).");
       const cwd = getCwd(ctx);
-      const { relativePath, state, snapshot } = await loadStateForPath(session, cwd, params.path);
+      let loaded;
+      try {
+        loaded = await loadStateForPath(session, cwd, params.path, {
+          extraReadRoots: session.readRoots,
+        });
+      } catch (error) {
+        if (error instanceof Error && /outside workspace/.test(error.message)) {
+          throw new Error(
+            `${error.message} Outside-workspace reads are limited to loaded skill directories and pi's docs — use bash cat for anything else.`,
+          );
+        }
+        throw error;
+      }
+      const { displayPath, state, snapshot } = loaded;
       const anchored = params.anchored ?? true;
       const requestedMode = (params.mode ?? "auto") as ReadMode;
       const hasRange = typeof params.startLine === "number" || typeof params.endLine === "number";
@@ -95,9 +112,9 @@ export function registerReadAnchored(
         }
         const selected = state.lines.slice(start - 1, end);
         return textResult(
-          `File: ${relativePath}\nLines: ${start}-${end} of ${state.lines.length}${revisionLine(state, anchored)}\n\n${renderLines(selected, anchored)}`,
+          `File: ${displayPath}\nLines: ${start}-${end} of ${state.lines.length}${revisionLine(state, anchored)}\n\n${renderLines(selected, anchored)}`,
           {
-            path: relativePath,
+            path: displayPath,
             mode,
             startLine: start,
             endLine: end,
@@ -112,9 +129,9 @@ export function registerReadAnchored(
       }
 
       return textResult(
-        `File: ${relativePath}\nLines: ${state.lines.length}${revisionLine(state, anchored)}\n\n${renderLines(state.lines, anchored)}`,
+        `File: ${displayPath}\nLines: ${state.lines.length}${revisionLine(state, anchored)}\n\n${renderLines(state.lines, anchored)}`,
         {
-          path: relativePath,
+          path: displayPath,
           mode: "full",
           revision: state.revisionHash,
           lines: state.lines.map((line) => ({
@@ -164,7 +181,9 @@ export function renderReadAnchoredResult(
   if (!options.expanded) {
     return new Text("", 0, 0);
   }
-  return new Text(cleaned.join("\n"), 0, 0);
+  // Match built-in read's spacing convention: a leading newline separates the
+  // title line from the body.
+  return new Text("\n" + cleaned.join("\n"), 0, 0);
 }
 
 function revisionLine(state: { revisionHash: string }, anchored: boolean): string {

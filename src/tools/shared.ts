@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 import { relative } from "node:path";
 import { lstat, realpath } from "node:fs/promises";
 import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
@@ -8,9 +9,11 @@ import { readTextFile } from "../fs/text-file.js";
 import {
   assertRegularFile,
   isProtectedPath,
+  resolveReadPath,
   resolveWorkspacePath,
   toWorkspaceRelative,
 } from "../fs/path-safety.js";
+import { displayPathFor } from "../fs/read-roots.js";
 
 /**
  * The subset of pi's `ExtensionContext` that pi-fast-edits reads. Kept local so
@@ -52,19 +55,25 @@ export async function loadStateForPath(
   session: SessionState,
   cwd: string,
   requestedPath: string,
+  opts?: { extraReadRoots?: string[] },
 ): Promise<{
   absPath: string;
   writePath: string;
   relativePath: string;
+  displayPath: string;
   state: FileAnchorState;
   snapshot: Awaited<ReturnType<typeof readTextFile>>;
 }> {
-  const absPath = await resolveWorkspacePath(cwd, requestedPath);
+  const absPath = opts?.extraReadRoots?.length
+    ? await resolveReadPath(cwd, requestedPath, opts.extraReadRoots)
+    : await resolveWorkspacePath(cwd, requestedPath);
   await assertRegularFile(absPath);
   // Resolve symlinks so atomic writes replace the target file, not the link.
   const writePath = await _resolveSymlink(absPath);
   const snapshot = await readTextFile(absPath);
   const relativePath = toWorkspaceRelative(cwd, absPath);
+  // Outside-workspace reads (sanctioned skill/docs files) get a readable
+  // display path; in-workspace files keep the relative form.
   let state = session.files.get(absPath);
   if (!state) {
     state = createFileAnchorState(
@@ -86,7 +95,14 @@ export async function loadStateForPath(
       snapshot.revisionHash,
     );
   }
-  return { absPath, writePath, relativePath, state, snapshot };
+  return {
+    absPath,
+    writePath,
+    relativePath,
+    displayPath: relativePath.startsWith("..") ? displayPathFor(absPath, homedir()) : relativePath,
+    state,
+    snapshot,
+  };
 }
 
 async function _resolveSymlink(absPath: string): Promise<string> {

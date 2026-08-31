@@ -1,3 +1,4 @@
+import { basename, dirname } from "node:path";
 import { Text } from "@earendil-works/pi-tui";
 
 /**
@@ -39,6 +40,8 @@ export type RenderOptions = {
 export type RenderContext = {
   lastComponent: Component | undefined;
   isError: boolean;
+  /** pi renders tool calls collapsed by default; true when the user expanded. */
+  expanded?: boolean;
 };
 
 /**
@@ -48,15 +51,31 @@ export type RenderContext = {
 export function renderToolCall(
   toolName: string,
   getSuffix?: (args: Record<string, unknown>, theme: Theme) => string,
+  opts?: { skillClassification?: boolean },
 ): (args: Record<string, unknown>, theme: Theme, context: RenderContext) => Component {
   return (args, theme, context) => {
     const text = context.lastComponent instanceof Text ? context.lastComponent : new Text("", 0, 0);
     const displayName = toolNameOverrides.get(toolName) ?? toolName;
     const path = (args as { path?: string }).path;
+    const suffix = getSuffix ? getSuffix(args, theme) : "";
+    // pi's built-in read renders a collapsed call on a SKILL.md as a purple
+    // `[skill] <name>` box (getCompactReadClassification in pi's read tool).
+    // Mirror it so the anchored read — including the overridden `read` — keeps
+    // that UI parity. Expanded calls keep the normal title, exactly like pi.
+    if (opts?.skillClassification && path && !context.expanded && basename(path) === "SKILL.md") {
+      const label = basename(dirname(path)) || "SKILL.md";
+      text.setText(
+        theme.fg("customMessageLabel", "\u001b[1m[skill]\u001b[22m ") +
+          theme.fg("customMessageText", label) +
+          suffix +
+          // pi's compact read call appends the expand hint; mirror it.
+          theme.fg("dim", " (ctrl+o to expand)"),
+      );
+      return text;
+    }
     // No "..." fallback: tools whose path lives in a nested arg (batch edits)
     // carry it in their suffix instead — a bare "..." reads as noise.
     const pathDisplay = path ? theme.fg("accent", path) : "";
-    const suffix = getSuffix ? getSuffix(args, theme) : "";
     // Suffixes own their spacing: a range suffix glues to the path
     // (`read path:1-2`), a target-name suffix carries its own leading space
     // (`edit a.ts`). Assembly never adds or removes spaces itself.

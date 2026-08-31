@@ -69,6 +69,8 @@ Reads a text file with stable word anchors.
 
 For large files, use `startLine` and `endLine` for focused range reads (`auto` resolves to `range` when a window is given, otherwise `full`). For orientation in an unknown file, `grep_anchored` a declaration regex — see the skill.
 
+Skill and pi-docs reads: `read_anchored` may also read files under **host-sanctioned roots** — the skill directories pi has loaded (announced each turn via `before_agent_start`) and pi's own package docs. Skill loading therefore works without the `-1`-turn `cat` fallback, while everything else outside the workspace stays rejected (the error suggests `bash cat`). A collapsed call on a `SKILL.md` renders pi's purple `[skill] <name>` box, matching the built-in read.
+
 - `anchored` — set to `false` for plain `lineNo: text` lines without anchor prefixes or the revision header (default: anchored, edit-ready output); `details` still carries `revision` and `lines` in both modes
 
 ### `write_anchored`
@@ -143,7 +145,7 @@ When enabled, a load-time safety check fingerprints pi's built-in tool definitio
 
 The four replaced names:
 
-- `read` — `read_anchored` under the built-in name, anchored by default. Pass `anchored: false` for plain `lineNo: text` output without anchors or the revision header; schema, caps, and `details` are unchanged.
+- `read` — `read_anchored` under the built-in name, anchored by default. Pass `anchored: false` for plain `lineNo: text` output without anchors or the revision header; schema, caps, and `details` are unchanged. Host-sanctioned skill/pi-docs reads and the collapsed `[skill]` box work identically under the overridden name.
 - `edit` — anchored multi-edit (`edit_anchored` behavior) under the built-in name.
 - `write` — anchor-seeding write (`write_anchored`): full-file writes that seed anchor state and return the revision plus an anchored preview, so subsequent edits need no re-read. Protection checks (`protectedPaths`), workspace bounds, and atomic writes apply exactly as elsewhere.
 - `grep` — anchored search (`grep_anchored`) under the built-in name, edit-ready by construction.
@@ -191,7 +193,7 @@ If the safety check fails (e.g. pi redesigns a built-in), the extension falls ba
 
 ## Safety
 
-- Rejects paths outside the workspace.
+- Rejects paths outside the workspace, with one evidence-based exception: reads (never writes or greps) may target host-sanctioned roots — the skill directories pi has loaded and pi's package docs, i.e. exactly the outside paths pi itself already sanctions.
 - Rejects likely binary files.
 - Writes atomically through a same-directory temporary file and rename.
 - Preserves line endings and final-newline behavior.

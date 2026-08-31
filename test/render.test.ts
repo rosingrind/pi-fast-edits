@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { initTheme } from "@earendil-works/pi-coding-agent";
 import { Container, Text } from "@earendil-works/pi-tui";
 import { renderReadAnchoredResult } from "../src/tools/read-anchored.js";
+import { renderGrepResult } from "../src/tools/grep-anchored.js";
 import { renderBatchResult } from "../src/tools/edit-anchored.js";
 import { renderEditResult } from "../src/tools/render-edit-result.js";
 import { renderToolCall } from "../src/tools/render.js";
@@ -43,7 +44,7 @@ describe("renderReadAnchoredResult", () => {
       theme,
       noContext,
     );
-    expect(textOf(component)).toBe('import fs from "node:fs"\nconst x = 1');
+    expect(textOf(component)).toBe('\nimport fs from "node:fs"\nconst x = 1');
   });
 
   it("shows nothing when not expanded", () => {
@@ -315,4 +316,55 @@ it("keeps a target-name suffix's own single leading space (edit a.ts)", () => {
   const text = textOf(component).trim();
   expect(text).toBe("edit_anchored a.ts");
   expect(text).not.toContain("  ");
+});
+
+describe("renderGrepResult", () => {
+  const result = (text: string) => ({ content: [{ type: "text", text }] });
+
+  it("expanded: keeps summary, strips headers/anchors, preserves indentation, drops the line-N suffix, leading newline", () => {
+    const raw = [
+      "1 file matched, 2 lines shown.",
+      "File: src/x.ts",
+      "Revision: abc123",
+      "Quartz§     return foo(    line 12",
+      "Robin§       bar,    line 13",
+    ].join("\n");
+    const component = renderGrepResult(
+      result(raw),
+      { expanded: true, isPartial: false },
+      theme,
+      noContext,
+    );
+    expect(textOf(component)).toBe("\n1 file matched, 2 lines shown.\n    return foo(\n      bar,");
+  });
+
+  it("collapsed: shows the first 15 lines plus a remaining-lines hint", () => {
+    const body = Array.from({ length: 20 }, (_, i) => `Apple§ line ${i + 1}    line ${i + 1}`).join(
+      "\n",
+    );
+    const raw = `summary line\nFile: a.ts\nRevision: abc\n${body}`;
+    const component = renderGrepResult(
+      result(raw),
+      { expanded: false, isPartial: false },
+      theme,
+      noContext,
+    );
+    const out = textOf(component);
+    const outLines = out.split("\n");
+    expect(outLines.length).toBe(16); // 15 shown + hint
+    expect(outLines[0]).toBe("summary line");
+    expect(outLines[14]).toBe("Apple§ line 12    line 12"); // 15 slots include summary + headers
+    expect(outLines[15]).toContain("... (8 more lines");
+    expect(outLines[15]).toContain("ctrl+o to expand");
+  });
+
+  it("collapsed: no hint when everything fits", () => {
+    const component = renderGrepResult(
+      result("1 file matched, 1 line shown.\nFile: a.ts\nRevision: abc\nApple§ one    line 1"),
+      { expanded: false, isPartial: false },
+      theme,
+      noContext,
+    );
+    expect(textOf(component)).not.toContain("more lines");
+  });
 });

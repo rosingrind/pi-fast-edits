@@ -16,6 +16,48 @@ export async function resolveWorkspacePath(cwd: string, requestedPath: string): 
   return abs;
 }
 
+/**
+ * Read-oriented resolution: the workspace stays the primary root, but reads may
+ * also target files under host-sanctioned extra roots (loaded skill dirs, pi's
+ * package docs — see fs/read-roots.ts). Everything else keeps the strict
+ * outside-workspace rejection. Writes/greps never use this function.
+ *
+ * Returns the realpath when allowed via an extra root (canonical state keying
+ * across symlinked roots); in-workspace paths keep resolveWorkspacePath's
+ * return convention.
+ */
+export async function resolveReadPath(
+  cwd: string,
+  requestedPath: string,
+  extraRoots: string[],
+): Promise<string> {
+  try {
+    return await resolveWorkspacePath(cwd, requestedPath);
+  } catch (error) {
+    const abs = isAbsolute(requestedPath) ? resolve(requestedPath) : resolve(cwd, requestedPath);
+    const absReal = await realpath(abs).catch(async () => {
+      const parent = resolve(abs, "..");
+      return resolve(await realpath(parent).catch(() => parent), abs.split(/[\\/]/).at(-1) ?? "");
+    });
+    for (const root of extraRoots) {
+      const rootReal = await realpath(root).catch(() => undefined);
+      if (!rootReal) continue;
+      const rel = relative(rootReal, absReal);
+      if (
+        rel === "" ||
+        rel.startsWith("..") ||
+        rel === ".." ||
+        rel.includes(`..${sep}`) ||
+        isAbsolute(rel)
+      ) {
+        continue;
+      }
+      return absReal;
+    }
+    throw error;
+  }
+}
+
 export async function assertRegularFile(path: string): Promise<void> {
   const lst = await lstat(path);
   if (lst.isSymbolicLink()) {

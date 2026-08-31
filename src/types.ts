@@ -80,6 +80,8 @@ export class LRUMap<K, V> extends Map<K, V> {
 
 export type SessionState = {
   files: LRUMap<string, FileAnchorState>;
+  /** Host-sanctioned outside-workspace read roots (loaded skill dirs + pi package docs). Refreshed each turn from before_agent_start. */
+  readRoots: string[];
 };
 
 export type ReadMode = "auto" | "full" | "range";

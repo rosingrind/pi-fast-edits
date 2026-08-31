@@ -6,7 +6,7 @@ import { Text, type Component } from "@earendil-works/pi-tui";
 import type { PiFastEditsConfig, SessionState } from "../types.js";
 import { Type, type Static } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { ANCHOR_DELIMITER } from "../anchor/anchor-renderer.js";
+import { ANCHOR_DELIMITER, stripAnchorPrefix } from "../anchor/anchor-renderer.js";
 import { resolveToolDisplayName } from "./render.js";
 import { DEFAULT_PROTECTED_SKIP, isProtectedPath } from "../fs/path-safety.js";
 import { resolveRg } from "../fs/rg-resolver.js";
@@ -373,6 +373,9 @@ function renderHitLine(line: { anchor: string; text: string }, lineNo: number): 
   return `${line.anchor}${ANCHOR_DELIMITER} ${text}    line ${lineNo}`;
 }
 
+/** Collapsed preview cap, matching pi's built-in grep rendering. */
+const MAX_COLLAPSED_LINES = 15;
+
 export function renderGrepResult(
   result: ToolResult,
   options: RenderOptions,
@@ -384,25 +387,32 @@ export function renderGrepResult(
     return new Text(theme.fg("error", raw), 0, 0);
   }
   if (!options.expanded) {
-    // Collapsed shows just the summary line (first line), matching the
-    // built-in tools' quiet collapsed rendering.
-    return new Text(theme.fg("muted", raw.split("\n")[0]), 0, 0);
+    // Collapsed: the first 15 lines of the raw output (the summary line comes
+    // first), then pi's "more lines" hint — matching built-in grep's preview.
+    const lines = raw.split("\n");
+    const shown = lines.slice(0, MAX_COLLAPSED_LINES);
+    let text = shown.join("\n");
+    const remaining = lines.length - shown.length;
+    if (remaining > 0) {
+      text += theme.fg("muted", `\n... (${remaining} more lines, ctrl+o to expand)`);
+    }
+    return new Text(text, 0, 0);
   }
-  // Expanded strips the File:/Revision: headers and anchor prefixes, leaving
-  // the matching content with its line numbers.
-  const lines = raw.split("\n");
+  // Expanded: leading newline (pi's spacing convention), File:/Revision:
+  // headers dropped, anchor prefixes stripped with indentation preserved
+  // (shared helper), and the model-facing `    line N` positional suffix
+  // removed for display. Model-facing text is untouched — presentation only.
   const cleaned: string[] = [];
-  for (const line of lines) {
+  for (const line of raw.split("\n")) {
     if (line.startsWith("File:") || line.startsWith("Revision:")) continue;
-    cleaned.push(stripAnchorPrefix(line));
+    cleaned.push(theme.fg("toolOutput", stripLineDisplay(stripAnchorPrefix(line))));
   }
-  return new Text(cleaned.join("\n"), 0, 0);
+  return new Text("\n" + cleaned.join("\n"), 0, 0);
 }
 
-function stripAnchorPrefix(line: string): string {
-  const idx = line.indexOf(ANCHOR_DELIMITER);
-  if (idx === -1) return line;
-  return line.slice(idx + ANCHOR_DELIMITER.length).trimStart();
+/** Drop the trailing positional `    line N` suffix for UI display only. */
+function stripLineDisplay(line: string): string {
+  return line.replace(/ {4}line \d+$/, "");
 }
 
 /**
