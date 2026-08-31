@@ -158,27 +158,45 @@ export function registerReadAnchored(
       let bytes = 0;
       let truncated = false;
       for (const line of state.lines) {
-        const rendered = `${line.anchor}§ ${truncateForDisplay(line.text)}`.length + 1;
-        if (shown.length >= config.maxReadLines || bytes + rendered > byteBudget) {
+        // Plain mode carries the full verbatim line (no 300-char cap), so its
+        // budget cost is the real length; anchored mode is display-capped.
+        const renderedLength = anchored
+          ? `${line.anchor}§ ${truncateForDisplay(line.text)}`.length + 1
+          : `${line.lineNo}: ${line.text}`.length + 1;
+        if (shown.length >= config.maxReadLines || bytes + renderedLength > byteBudget) {
           truncated = true;
           break;
         }
-        bytes += rendered;
+        bytes += renderedLength;
         shown.push(line);
+      }
+      if (shown.length === 0 && state.lines.length > 0) {
+        // A single line larger than the whole budget (e.g. a minified 2MB
+        // line read with anchored:false): show its head rather than an empty
+        // result with a nonsensical continuation.
+        const first = state.lines[0];
+        const head = first.text.slice(0, byteBudget);
+        shown.push({ ...first, text: anchored ? truncateForDisplay(first.text) : head });
+        truncated = true;
       }
       const header = truncated
         ? `File: ${displayPath}\nLines: 1-${shown.length} of ${state.lines.length}${revisionLine(state, anchored)}`
         : `File: ${displayPath}\nLines: ${state.lines.length}${revisionLine(state, anchored)}`;
-      const notice = truncated
-        ? `\n[${state.lines.length - shown.length} more lines in file. Use startLine=${shown.length + 1} to continue.]`
-        : "";
+      const remaining = state.lines.length - shown.length;
+      let notice = "";
+      if (truncated && remaining > 0) {
+        notice = `\n[${remaining} more lines in file. Use startLine=${shown.length + 1} to continue.]`;
+      } else if (truncated) {
+        notice =
+          "\n[line 1 exceeds the result budget and was truncated — use bash (sed/cut) to extract the exact text.]";
+      }
       return textResult(`${header}\n\n${renderLines(shown, anchored)}${notice}`, {
         path: displayPath,
         mode: "full",
         revision: state.revisionHash,
         lines: shown.map((line) => ({
           anchor: line.anchor,
-          text: truncateForDisplay(line.text),
+          text: anchored ? truncateForDisplay(line.text) : line.text,
           lineNo: line.lineNo,
         })),
       });
@@ -239,8 +257,12 @@ function renderLines(
   lines: Array<{ anchor: string; text: string; lineNo: number }>,
   anchored: boolean,
 ): string {
+  // anchored:false is the documented VERBATIM path — the anchorLine mismatch
+  // teaching sends models here to copy over-long lines exactly, so plain mode
+  // must never display-truncate. Anchored mode caps each line for display.
+  if (!anchored) {
+    return lines.map((l) => `${l.lineNo}: ${l.text}`).join("\n");
+  }
   const display = lines.map((l) => ({ ...l, text: truncateForDisplay(l.text) }));
-  return anchored
-    ? renderAnchoredLines(display)
-    : display.map((l) => `${l.lineNo}: ${l.text}`).join("\n");
+  return renderAnchoredLines(display);
 }

@@ -37,7 +37,7 @@ describe("read_anchored full-mode caps", () => {
   }
 
   it("caps a full read at maxReadLines with a continuation notice teaching startLine", async () => {
-    const { cwd, file } = await workspaceWithLines(20);
+    const { cwd } = await workspaceWithLines(20);
     const tools = await loadTools({ maxReadLines: 5 });
     const result = await tools
       .get("read_anchored")!
@@ -56,7 +56,6 @@ describe("read_anchored full-mode caps", () => {
       .get("read_anchored")!
       .execute("1", { path: "big.txt", startLine: 6, endLine: 20 }, undefined, undefined, { cwd });
     expect(rest.content[0].text).toContain("line 6");
-    void file;
   });
 
   it("applies the byte budget before the line cap for wide lines", async () => {
@@ -118,6 +117,50 @@ describe("read_anchored full-mode caps", () => {
         { cwd },
       ),
     ).rejects.toThrow(/display cap/);
-    void readFile;
+  });
+  it("anchored:false delivers verbatim over-cap lines, closing the mismatch recovery loop", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "pi-fast-edits-read-caps-"));
+    const file = join(cwd, "long.txt");
+    const monster = `const x = 1;${";".repeat(600)}`;
+    await writeFile(file, `${monster}\nregular line\n`, "utf8");
+    const tools = await loadTools();
+
+    // Anchored read truncates the display...
+    const anchoredRead = await tools
+      .get("read_anchored")!
+      .execute("1", { path: "long.txt" }, undefined, undefined, { cwd });
+    const shown = (anchoredRead.details as any).lines[0].text as string;
+    expect(shown.length).toBeLessThan(monster.length);
+
+    // ...the plain re-read delivers the FULL verbatim line (the taught fix)...
+    const plain = await tools
+      .get("read_anchored")!
+      .execute("1", { path: "long.txt", anchored: false }, undefined, undefined, { cwd });
+    const plainText = plain.content[0].text as string;
+    expect(plainText).toContain(monster);
+    expect((plain.details as any).lines[0].text).toBe(monster);
+    const verbatim = (plain.details as any).lines[0].text as string;
+
+    // ...and editing with the verbatim line now succeeds (loop closed).
+    await tools.get("edit_anchored")!.execute(
+      "1",
+      {
+        edits: [
+          {
+            type: "replace",
+            path: "long.txt",
+            startAnchor: (anchoredRead.details as any).lines[0].anchor,
+            startAnchorLine: verbatim,
+            endAnchor: (anchoredRead.details as any).lines[0].anchor,
+            endAnchorLine: verbatim,
+            replacement: "const x = 2;",
+          },
+        ],
+      },
+      undefined,
+      undefined,
+      { cwd },
+    );
+    expect(await readFile(file, "utf8")).toContain("const x = 2;");
   });
 });

@@ -283,9 +283,18 @@ async function grepWithRg(
       const refiltered = filterDrifted(freshHits, state.lines);
       if (!refiltered.drifted && refiltered.kept.length > 0) {
         kept = refiltered;
-      } else {
+      } else if (refiltered.drifted) {
         omittedFiles++;
         sections.push(`${relativePath}\n${DRIFT_MESSAGE}`);
+        outputLength += relativePath.length;
+        continue;
+      } else {
+        // The re-scan is stable but empty: the file changed and the pattern
+        // genuinely no longer matches. "Rerun" would misdirect — say so.
+        omittedFiles++;
+        sections.push(
+          `${relativePath}\n[changed during search — /${params.pattern}/ no longer matches this file.]`,
+        );
         outputLength += relativePath.length;
         continue;
       }

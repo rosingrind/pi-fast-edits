@@ -26,6 +26,7 @@ import {
 } from "./render.js";
 import { Container, Spacer, Text, type Component } from "@earendil-works/pi-tui";
 import { experimentalToolSampling } from "./experimental-sampling.js";
+import { toolResultText, errorResultComponent } from "./render.js";
 import type { Theme } from "./theme.js";
 import { batchEditsSchema, type BatchEditsParams } from "./schemas.js";
 import type { Static } from "typebox";
@@ -382,15 +383,13 @@ export function renderBatchResult(
   theme: Theme,
   context: RenderContext,
 ): Component {
-  if (context.isError) {
-    const text = result.content?.[0]?.text ?? "error";
-    return new Text(theme.fg("error", text), 0, 0);
-  }
+  const errorComponent = errorResultComponent(result, theme, context);
+  if (errorComponent) return errorComponent;
   // The diff is always visible regardless of collapse state, matching the
-  // built-in edit tool's rendering. Batch results carry a unified diff in their content text, matching the
-  // built-in tools. Color it line-by-line; non-diff messages (e.g. a
-  // cancellation notice) render as plain text.
-  const raw = result.content?.[0]?.text ?? "";
+  // built-in edit tool's rendering. Batch results carry a unified diff in
+  // their content text; non-diff messages (e.g. a cancellation notice) render
+  // as plain text.
+  const raw = toolResultText(result);
   const isDiff = raw.split("\n").some((line) => /^[+-]/.test(line));
   if (!isDiff) {
     return new Text(raw, 0, 0);

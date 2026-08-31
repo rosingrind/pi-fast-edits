@@ -77,6 +77,26 @@ describe("grep drift re-scan", () => {
     expect(text).toContain(`${betaAnchor}§ beta    line 1`);
   });
 
+  it("reports 'no longer matches' when the re-scan is stable but empty", async () => {
+    const absPath = join(cwd, "drift.txt");
+    // Call 1 (workspace scan): stale hit for old content. Call 2 (re-scan):
+    // stable but empty — the file changed and the pattern no longer matches.
+    const staleHit: RgHit = { file: absPath, lineNo: 2, content: "beta", isMatch: true };
+    runRgMock.mockImplementation((_rgPath, args) => {
+      const scoped = args.at(-1) === absPath;
+      return Promise.resolve(scoped ? [] : [staleHit]);
+    });
+
+    const tools = await loadTools();
+    const result = await tools
+      .get("grep_anchored")!
+      .execute("1", { pattern: "beta" }, undefined, undefined, { cwd });
+
+    const text = result.content[0].text as string;
+    expect(text).toContain("no longer matches this file");
+    expect(text).not.toContain(DRIFT_NOTICE);
+  });
+
   it("falls back to the drift notice when the re-scan drifts too", async () => {
     const absPath = join(cwd, "drift.txt");
     // Every scan reports the stale line — the file keeps changing.

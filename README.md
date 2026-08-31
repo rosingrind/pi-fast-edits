@@ -110,6 +110,7 @@ Searches file contents with a regex and returns matching lines with the same anc
 - `ignoreCase` — case-insensitive matching
 - `context` — anchored context lines around each match (default 0, max 10)
 - `maxMatches` — maximum matching lines shown per file (default 50)
+- `literal` — treat the pattern as a fixed string (`rg -F`) instead of a regular expression
 
 Searches skip `.git`, `node_modules`, protected paths, and binary files; explicitly targeting a protected file (e.g. `path: ".env"`) is refused with an error rather than searched. Results are capped at 100KB with an explicit truncation note, and files that change during the search are re-scanned once against their current content so you get fresh verified coordinates; only still-changing files are omitted with a drift notice. The `literal` parameter treats the pattern as a fixed string (`rg -F`), so regex metacharacters in paths or snippets match themselves. The search always runs through ripgrep, resolved from pi's tool cache (`~/.pi/agent/bin/rg`) or PATH; if ripgrep is missing the tool errors out rather than degrading.
 
@@ -145,7 +146,7 @@ When enabled, a load-time safety check fingerprints pi's built-in tool definitio
 
 The four replaced names:
 
-- `read` — `read_anchored` under the built-in name, anchored by default. Pass `anchored: false` for plain `lineNo: text` output without anchors or the revision header; schema, caps, and `details` are unchanged. Host-sanctioned skill/pi-docs reads and the collapsed `[skill]` box work identically under the overridden name.
+- `read` — `read_anchored` under the built-in name, anchored by default. Pass `anchored: false` for plain `lineNo: text` output without anchors or the revision header; schema, caps, and `details` are unchanged. Host-sanctioned skill/pi-docs reads and the collapsed `[skill]` box work identically under the overridden name. Full reads are capped at `maxReadLines` (default 2000) and a 50KB budget with a `[N more lines in file. Use startLine=X to continue.]` continuation notice; lines longer than 300 characters are display-truncated in anchored reads — `anchored: false` is the verbatim path (bounded only by the 50KB budget, with an explicit truncation marker).
 - `edit` — anchored multi-edit (`edit_anchored` behavior) under the built-in name.
 - `write` — anchor-seeding write (`write_anchored`): full-file writes that seed anchor state and return the revision plus an anchored preview, so subsequent edits need no re-read. Protection checks (`protectedPaths`), workspace bounds, and atomic writes apply exactly as elsewhere.
 - `grep` — anchored search (`grep_anchored`) under the built-in name, edit-ready by construction.
@@ -174,7 +175,7 @@ If the safety check fails (e.g. pi redesigns a built-in), the extension falls ba
   "confirmation": "protected-paths",
   "requireAnchorLines": true,
   "maxRangeReadLines": 400,
-  "maxReadLines": 400,
+  "maxReadLines": 2000,
   "protectedPaths": [
     ".env",
     ".env.*",

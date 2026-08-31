@@ -124,9 +124,14 @@ describe("read_anchored anchored param", () => {
     expect(read.details.mode).toBe("full");
     expect(text).not.toContain("Mode: skeleton");
     expect(text).not.toMatch(/\w+§ /);
-    // The 85KB single line is display-truncated at the 300-char cap.
-    expect(text).toMatch(/^1: x+\.\.\.$/m);
-    expect(text.length).toBeLessThan(2000);
+    // anchored:false is the verbatim path: the 85KB line is bounded only by
+    // the 50KB result budget, with an honest truncation marker (no anchor
+    // prefix, no per-line ellipsis).
+    expect(text).toMatch(/^1: x+$/m);
+    expect(text).toContain("line 1 exceeds the result budget");
+    expect(text.length).toBeGreaterThan(49_000);
+    expect(text.length).toBeLessThan(52_000);
+    expect((read.details as any).lines[0].text.length).toBe(50_000);
   });
 
   it("details from anchored:false read remain usable for anchored edits", async () => {
