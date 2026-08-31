@@ -2,6 +2,13 @@ import type { AnchoredEdit, FileAnchorState } from "../types.js";
 import { findAnchorIndex } from "../anchor/anchor-state.js";
 import { splitTextPreserveFinal } from "../fs/text-file.js";
 
+/**
+ * Display truncation cap shared by read/grep rendering. Lines longer than
+ * this are shown truncated (with `...`); the anchorLine mismatch error
+ * detects the resulting copy-the-truncation mistake and teaches the fix.
+ */
+export const DISPLAY_LINE_CAP = 300;
+
 export type PlannedEdit = {
   edit: AnchoredEdit;
   start: number;
@@ -53,6 +60,10 @@ function verifyAnchorLines(
       if (suffixOnly) {
         message +=
           " (if you copied the rendered `    line N` suffix from grep/read output, drop it — it is positional metadata, not part of the line)";
+      } else if (actual.length > DISPLAY_LINE_CAP) {
+        message +=
+          ` (the line exceeds the ${DISPLAY_LINE_CAP}-character display cap and was shown truncated — ` +
+          "re-read it with `anchored: false` plus startLine/endLine to copy it verbatim)";
       }
       throw new Error(message);
     }

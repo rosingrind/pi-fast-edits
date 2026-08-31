@@ -84,12 +84,18 @@ describe("Myers diff performance edge cases", () => {
     const oldLines = Array.from({ length: 3000 }, (_, i) => `old-line-${i}`);
     const newLines = Array.from({ length: 3000 }, (_, i) => `new-line-${i}`);
     await writeFile(join(cwd, "rewrite.txt"), oldLines.join("\n") + "\n", "utf8");
-    const tools = await loadTools();
+    const tools = await loadTools({ maxRangeReadLines: 5000, maxReadLines: 5000 });
 
-    // Full read gets the anchors and revision.
+    // Range read (explicit window) gets the anchors and revision.
     const readResult = await tools
       .get("read_anchored")!
-      .execute("1", { path: "rewrite.txt", mode: "full" }, undefined, undefined, { cwd });
+      .execute(
+        "1",
+        { path: "rewrite.txt", mode: "range", startLine: 1, endLine: 3000 },
+        undefined,
+        undefined,
+        { cwd },
+      );
     const revision = readResult.details.revision;
     const linesData = readResult.details.lines as Array<{ anchor: string; text: string }>;
     const firstAnchor = linesData[0].anchor;
@@ -360,11 +366,17 @@ describe("Myers fallback branch (n + m >= 4000)", () => {
     const oldLines = Array.from({ length: lineCount }, (_, i) => `old-line-${i}`);
     const newLines = Array.from({ length: lineCount }, (_, i) => `new-line-${i}`);
     await writeFile(join(cwd, "fallback.txt"), oldLines.join("\n") + "\n", "utf8");
-    const tools = await loadTools();
+    const tools = await loadTools({ maxRangeReadLines: 5000, maxReadLines: 5000 });
 
     const readResult = await tools
       .get("read_anchored")!
-      .execute("1", { path: "fallback.txt", mode: "full" }, undefined, undefined, { cwd });
+      .execute(
+        "1",
+        { path: "fallback.txt", mode: "range", startLine: 1, endLine: lineCount },
+        undefined,
+        undefined,
+        { cwd },
+      );
     const revision = readResult.details.revision;
     const linesData = readResult.details.lines as Array<{ anchor: string; text: string }>;
     expect(linesData).toHaveLength(lineCount);

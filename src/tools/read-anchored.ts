@@ -1,10 +1,11 @@
 import { Text, type Component } from "@earendil-works/pi-tui";
 import { basename } from "node:path";
 import { experimentalToolSampling } from "./experimental-sampling.js";
-import type { PiFastEditsConfig, ReadMode, SessionState } from "../types.js";
+import type { AnchoredLine, PiFastEditsConfig, ReadMode, SessionState } from "../types.js";
 import { Type, type Static } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { renderAnchoredLines, stripAnchorPrefix } from "../anchor/anchor-renderer.js";
+import { DISPLAY_LINE_CAP } from "./edit-core.js";
 import {
   renderToolCall,
   toolResultText,
@@ -16,6 +17,14 @@ import {
 } from "./render.js";
 import { getCwd, loadStateForPath, textResult, type PiContext } from "./shared.js";
 import type { Theme } from "./theme.js";
+
+/** Byte budget for a full read's model-facing text (pi's built-in read parity: 50KB). */
+const MAX_READ_BYTES = 50_000;
+
+/** Display truncation for one line: over-cap lines are cut with an ellipsis marker. */
+function truncateForDisplay(text: string): string {
+  return text.length > DISPLAY_LINE_CAP ? `${text.slice(0, DISPLAY_LINE_CAP)}...` : text;
+}
 
 const readSchema = Type.Object({
   path: Type.String({
@@ -134,19 +143,45 @@ export function registerReadAnchored(
         );
       }
 
-      return textResult(
-        `File: ${displayPath}\nLines: ${state.lines.length}${revisionLine(state, anchored)}\n\n${renderLines(state.lines, anchored)}`,
-        {
-          path: displayPath,
-          mode: "full",
-          revision: state.revisionHash,
-          lines: state.lines.map((line) => ({
-            anchor: line.anchor,
-            text: line.text,
-            lineNo: line.lineNo,
-          })),
-        },
+      // Full mode: cap lines (maxReadLines) and bytes (MAX_READ_BYTES) so a
+      // huge or minified file cannot dump megabytes into context — pi's
+      // built-in read applies the same 2000-line/50KB convention. The
+      // continuation notice teaches our range args for the rest.
+      // Byte budget scales proportionally when maxReadLines is raised above
+      // the 2000-line default (an explicit larger window implies a larger
+      // allowance); at the default it stays at pi's 50KB parity.
+      const byteBudget = Math.max(
+        MAX_READ_BYTES,
+        Math.ceil((MAX_READ_BYTES * config.maxReadLines) / 2000),
       );
+      const shown: AnchoredLine[] = [];
+      let bytes = 0;
+      let truncated = false;
+      for (const line of state.lines) {
+        const rendered = `${line.anchor}§ ${truncateForDisplay(line.text)}`.length + 1;
+        if (shown.length >= config.maxReadLines || bytes + rendered > byteBudget) {
+          truncated = true;
+          break;
+        }
+        bytes += rendered;
+        shown.push(line);
+      }
+      const header = truncated
+        ? `File: ${displayPath}\nLines: 1-${shown.length} of ${state.lines.length}${revisionLine(state, anchored)}`
+        : `File: ${displayPath}\nLines: ${state.lines.length}${revisionLine(state, anchored)}`;
+      const notice = truncated
+        ? `\n[${state.lines.length - shown.length} more lines in file. Use startLine=${shown.length + 1} to continue.]`
+        : "";
+      return textResult(`${header}\n\n${renderLines(shown, anchored)}${notice}`, {
+        path: displayPath,
+        mode: "full",
+        revision: state.revisionHash,
+        lines: shown.map((line) => ({
+          anchor: line.anchor,
+          text: truncateForDisplay(line.text),
+          lineNo: line.lineNo,
+        })),
+      });
     },
   };
   pi.registerTool(tool);
@@ -204,7 +239,8 @@ function renderLines(
   lines: Array<{ anchor: string; text: string; lineNo: number }>,
   anchored: boolean,
 ): string {
+  const display = lines.map((l) => ({ ...l, text: truncateForDisplay(l.text) }));
   return anchored
-    ? renderAnchoredLines(lines)
-    : lines.map((l) => `${l.lineNo}: ${l.text}`).join("\n");
+    ? renderAnchoredLines(display)
+    : display.map((l) => `${l.lineNo}: ${l.text}`).join("\n");
 }

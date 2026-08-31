@@ -124,7 +124,9 @@ describe("read_anchored anchored param", () => {
     expect(read.details.mode).toBe("full");
     expect(text).not.toContain("Mode: skeleton");
     expect(text).not.toMatch(/\w+§ /);
-    expect(text).toMatch(/^1: x+$/m);
+    // The 85KB single line is display-truncated at the 300-char cap.
+    expect(text).toMatch(/^1: x+\.\.\.$/m);
+    expect(text.length).toBeLessThan(2000);
   });
 
   it("details from anchored:false read remain usable for anchored edits", async () => {

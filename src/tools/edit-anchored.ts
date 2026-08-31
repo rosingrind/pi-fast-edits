@@ -55,10 +55,7 @@ export function registerEditAnchored(
       "Apply multiple anchored edits in a single batch, validating all anchors before writing and reconciling lazily with Myers diff.",
     promptSnippet: "Apply multiple anchored edits in a single batch operation",
     promptGuidelines: [
-      "Pass the exact current source line at each anchor as startAnchorLine/endAnchorLine/anchorLine — verified against the file; mismatch rejects the whole batch",
-      "Edits are validated for overlaps before any writes occur — one failure rejects everything, zero partial writes",
-      "Pass each file's current revision hash as expectedRevision",
-      "Use raw text only in replacement/content — anchor-marked text (`Word§...`) is rejected; set allowAnchoredLines: true only if the § is genuine content",
+      "startAnchorLine/endAnchorLine/anchorLine = the bare source line at each anchor — verified; a mismatch rejects the whole batch (drop any rendered `    line N` suffix)",
       "Workflows, multi-file batches, failure recovery: the pi-fast-edits skill (/skill:pi-fast-edits)",
     ],
     renderShell: "default" as const,
@@ -297,17 +294,30 @@ function _summarizeBatch(groups: BatchGroup[]): { text: string; details: unknown
   // colored by the renderer. Structured anchor data stays in `details`.
   // Prefix each group's diff with its relative path so multi-file batches
   // remain readable — the tool-call title only shows the first path.
-  const text = groups
+  //
+  // The combined text is byte-capped (grep parity): a huge rewrite must not
+  // dump megabytes of diff into context. Truncating mid-diff is safe here —
+  // the text is informational; every edit is already applied and the note
+  // teaches re-reading the edited files instead of implying data loss.
+  let text = groups
     .map((group) => (groups.length > 1 ? `${group.relativePath}\n${group.diff}` : group.diff))
     .join("\n\n");
+  if (text.length > MAX_RESULT_BYTES) {
+    text =
+      text.slice(0, MAX_RESULT_BYTES) +
+      "\n\n... result truncated at 100KB — all edits were applied; re-read the edited files for their current diffs.";
+  }
   const details = groups.map((group) => ({
     edits: group.plans.map((plan) => ({
       editType: plan.edit.type,
-      anchorChanges: group.perEdit.get(plan.edit)!,
+      anchorChanges: group.perEdit.get(plan.edit) ?? { removed: [], added: [], preserved: [] },
     })),
   }));
   return { text, details };
 }
+
+/** Byte budget for the model-facing batch result (grep parity). */
+const MAX_RESULT_BYTES = 100_000;
 
 function _computePerEditChanges(
   plans: PlannedEdit[],

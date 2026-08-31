@@ -1,5 +1,6 @@
 import { stat, writeFile } from "node:fs/promises";
 import { experimentalToolSampling } from "./experimental-sampling.js";
+import { DISPLAY_LINE_CAP } from "./edit-core.js";
 import { tmpdir } from "node:os";
 import { randomBytes } from "node:crypto";
 import { isAbsolute, relative, resolve } from "node:path";
@@ -29,7 +30,7 @@ const MAX_FILE_BYTES = 1024 * 1024;
 /** Hard cap on rendered output; sections beyond it are dropped. */
 const MAX_OUTPUT_BYTES = 100_000;
 /** Rendered match lines longer than this are truncated with an ellipsis. */
-const MAX_LINE_LENGTH = 300;
+const MAX_LINE_LENGTH = DISPLAY_LINE_CAP;
 
 /** Error thrown when the ripgrep binary cannot be resolved. */
 const RG_MISSING_ERROR =

@@ -5,6 +5,7 @@ export const DEFAULT_CONFIG: PiFastEditsConfig = {
   confirmation: "protected-paths",
   requireAnchorLines: true,
   maxRangeReadLines: 400,
+  maxReadLines: 2000,
   protectedPaths: [
     ".env",
     ".env.*",

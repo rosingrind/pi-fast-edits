@@ -541,6 +541,73 @@ describe("anchored tools", () => {
     await expect(readFile(file, "utf8")).resolves.toBe("ALPHA\nINSERTED\nbeta\n");
   });
 
+  it("caps the batch result text at 100KB and notes that all edits were applied", async () => {
+    const cwd = await workspace();
+    // 350 lines x ~110 chars ≈ 40KB per file: the full read's 50KB budget
+    // keeps every line in details, while the two whole-file diffs (~83KB
+    // each) combine past the 100KB result cap.
+    const big = (n: number) =>
+      Array.from({ length: n }, (_, i) => `orig-${i}: ${"x".repeat(100)}`).join("\n");
+    const fresh = (n: number) =>
+      Array.from({ length: n }, (_, i) => `new-${i}: ${"y".repeat(100)}`).join("\n");
+    await writeFile(join(cwd, "a.txt"), big(350), "utf8");
+    await writeFile(join(cwd, "b.txt"), big(350), "utf8");
+    const tools = await loadTools();
+    const a = await readAnchored(tools, cwd, "a.txt");
+    const b = await readAnchored(tools, cwd, "b.txt");
+
+    const linesOf = (
+      lines: Array<{ anchor: string; text: string }>,
+      first: string,
+      last: string,
+    ) => {
+      const firstLine = lines.find((l) => l.text.startsWith(first))!;
+      const lastLine = lines.find((l) => l.text.startsWith(last))!;
+      return { firstLine, lastLine };
+    };
+    const aLines = linesOf(a.lines, "orig-0", "orig-349");
+    const bLines = linesOf(b.lines, "orig-0", "orig-349");
+
+    const result = await tools.get("edit_anchored")!.execute(
+      "1",
+      {
+        edits: [
+          {
+            type: "replace",
+            path: "a.txt",
+            startAnchor: aLines.firstLine.anchor,
+            startAnchorLine: aLines.firstLine.text,
+            endAnchor: aLines.lastLine.anchor,
+            endAnchorLine: aLines.lastLine.text,
+            replacement: fresh(600),
+          },
+          {
+            type: "replace",
+            path: "b.txt",
+            startAnchor: bLines.firstLine.anchor,
+            startAnchorLine: bLines.firstLine.text,
+            endAnchor: bLines.lastLine.anchor,
+            endAnchorLine: bLines.lastLine.text,
+            replacement: fresh(600),
+          },
+        ],
+      },
+      undefined,
+      undefined,
+      { cwd },
+    );
+
+    const text = result.content[0].text as string;
+    expect(text).toContain("result truncated at 100KB");
+    expect(text).toContain("all edits were applied");
+    expect(text.length).toBeLessThan(110_000);
+    // Every edit really was applied, capped text notwithstanding.
+    const aAfter = await readFile(join(cwd, "a.txt"), "utf8");
+    const bAfter = await readFile(join(cwd, "b.txt"), "utf8");
+    expect(aAfter).toContain("new-0:");
+    expect(bAfter).toContain("new-349:");
+  });
+
   it("inserts between adjacent lines with zero-width replace (both anchors excluded)", async () => {
     const cwd = await workspace();
     const file = join(cwd, "sample.txt");

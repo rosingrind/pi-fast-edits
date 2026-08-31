@@ -260,6 +260,12 @@ function buildItems(
       "Maximum lines returned by a range read (longer windows are clamped)",
       config.maxRangeReadLines,
     ),
+    numeric(
+      "maxReadLines",
+      "Max full-read lines",
+      "Maximum lines returned by a full read (longer files are truncated with a continuation notice)",
+      config.maxReadLines,
+    ),
     {
       id: "protectedPaths",
       label: "Protected paths",
@@ -307,6 +313,9 @@ export async function showConfigMenu(
           break;
         case "maxRangeReadLines":
           config.maxRangeReadLines = toPositiveInt(newValue, config.maxRangeReadLines);
+          break;
+        case "maxReadLines":
+          config.maxReadLines = toPositiveInt(newValue, config.maxReadLines);
           break;
         // "protectedPaths" is handled by its own submenu; no main-list change.
       }

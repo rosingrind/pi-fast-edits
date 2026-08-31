@@ -2,6 +2,10 @@
 
 Fast file editing tools with word anchors for the Pi coding agent.
 
+## About this fork
+
+This extension began as a fork of `arnaugomez/pi-fast-edits` and has since diverged into an independently maintained extension — the upstream is no longer maintained. The anchored-tools architecture follows the **dirac way** (host-sanctioned trust roots, hash-guarded revisions, single-token anchors, batch-atomic edits), reworked for pi's extension model.
+
 ## Attribution
 
 All credit for the core idea behind this extension goes to [Max Trivedi](https://www.linkedin.com/in/max-trivedi-49993aab/), creator of the Dirac agent. This package is an independent Pi extension inspired by his post: [Hash anchors + Myers diff + single-token anchors: 60% cheaper AI code edits](https://dirac.run/posts/hash-anchors-myers-diff-single-token).
@@ -28,17 +32,13 @@ The agent can then replace the `Cider..Eagle` range with new code. The extension
 - The `§` marker shown in file output is internal metadata only — it is NOT part of the actual file content
 - When providing `replacement` or `content`, use raw text only — anchor-marked text (`Word§...`, i.e. a rendered anchored line) is rejected by default; if the `§` is genuine content, pass `allowAnchoredLines: true`
 
-## Install
-
-```bash
-pi install npm:pi-fast-edits
-```
-
 ## Install from GitHub
 
 ```bash
-pi install git:github.com/arnaugomez/pi-fast-edits
+pi install git:github.com/rosingrind/pi-fast-edits
 ```
+
+> An npm release is pending; until then install from this repository (the npm `pi-fast-edits` package is the unmaintained upstream).
 
 ## Development
 
@@ -174,6 +174,7 @@ If the safety check fails (e.g. pi redesigns a built-in), the extension falls ba
   "confirmation": "protected-paths",
   "requireAnchorLines": true,
   "maxRangeReadLines": 400,
+  "maxReadLines": 400,
   "protectedPaths": [
     ".env",
     ".env.*",

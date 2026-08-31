@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_CONFIG } from "../src/config.js";
@@ -32,5 +32,61 @@ describe("config persistence round-trip", () => {
 
     await saveConfig(mutated);
     expect(await loadConfig()).toEqual(mutated);
+  });
+});
+
+describe("config sanitization", () => {
+  let dir: string;
+  const ORIG = process.env.PI_CODING_AGENT_DIR;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "pi-fast-edits-sanitize-"));
+    process.env.PI_CODING_AGENT_DIR = dir;
+  });
+
+  afterEach(() => {
+    process.env.PI_CODING_AGENT_DIR = ORIG;
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("wrong-typed fields fall back to defaults instead of reaching runtime", async () => {
+    writeFileSync(
+      join(dir, "pi-fast-edits.json"),
+      JSON.stringify({
+        overrideBuiltInEditTools: "yes",
+        confirmation: 42,
+        requireAnchorLines: "true",
+        maxRangeReadLines: "400",
+        maxReadLines: -5,
+        protectedPaths: [".env", 123, null, ""],
+      }),
+      "utf8",
+    );
+    const config = await loadConfig();
+    // Scalar junk falls back to defaults; a present, well-typed array keeps
+    // its valid entries (preserving user intent) with junk entries dropped.
+    expect(config).toEqual({ ...DEFAULT_CONFIG, protectedPaths: [".env"] });
+  });
+
+  it("well-typed fields survive sanitization", async () => {
+    writeFileSync(
+      join(dir, "pi-fast-edits.json"),
+      JSON.stringify({
+        overrideBuiltInEditTools: true,
+        confirmation: "always",
+        requireAnchorLines: false,
+        maxRangeReadLines: 120.9,
+        maxReadLines: 500,
+        protectedPaths: [".env", "secrets/**", ""],
+      }),
+      "utf8",
+    );
+    const config = await loadConfig();
+    expect(config.overrideBuiltInEditTools).toBe(true);
+    expect(config.confirmation).toBe("always");
+    expect(config.requireAnchorLines).toBe(false);
+    expect(config.maxRangeReadLines).toBe(120); // floored
+    expect(config.maxReadLines).toBe(500);
+    expect(config.protectedPaths).toEqual([".env", "secrets/**"]);
   });
 });

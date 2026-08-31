@@ -52,21 +52,29 @@ describe("large file end-to-end (10k+ lines)", () => {
     expect(text).toContain("Lines: 100-199 of 10000");
   });
 
-  it("full mode returns all 10k anchors, all unique", async () => {
+  it("range mode returns all 10k anchors, all unique", async () => {
     const cwd = await workspace();
     const lines = Array.from({ length: 10_000 }, (_, i) => `const value${i} = ${i};`);
     await writeFile(join(cwd, "full.ts"), lines.join("\n") + "\n", "utf8");
-    const tools = await loadTools();
+    // Full reads are capped (context-bomb guard); explicit range windows with
+    // a raised maxRangeReadLines are the sanctioned path to whole-file reads.
+    const tools = await loadTools({ maxRangeReadLines: 10_000 });
 
     const result = await tools
       .get("read_anchored")!
-      .execute("1", { path: "full.ts", mode: "full" }, undefined, undefined, { cwd });
+      .execute(
+        "1",
+        { path: "full.ts", mode: "range", startLine: 1, endLine: 10_000 },
+        undefined,
+        undefined,
+        { cwd },
+      );
 
-    expect(result.details.mode).toBe("full");
+    expect(result.details.mode).toBe("range");
     const anchors = (result.details.lines as Array<{ anchor: string }>).map((l) => l.anchor);
     expect(anchors.length).toBe(10_000);
     expect(new Set(anchors).size).toBe(10_000);
     const text = result.content[0].text as string;
-    expect(text).toContain("Lines: 10000");
+    expect(text).toContain("Lines: 1-10000 of 10000");
   });
 });

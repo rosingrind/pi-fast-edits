@@ -6,6 +6,8 @@ export type PiFastEditsConfig = {
   /** When true (default), edit tools require the exact anchor line content (startAnchorLine/endAnchorLine/anchorLine) on every edit. */
   requireAnchorLines: boolean;
   maxRangeReadLines: number;
+  /** Cap on lines returned by a full read; longer files are truncated with a continuation notice. */
+  maxReadLines: number;
   protectedPaths: string[];
 };
 
