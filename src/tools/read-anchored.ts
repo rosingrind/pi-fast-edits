@@ -1,4 +1,5 @@
 import { Text, type Component } from "@earendil-works/pi-tui";
+import { basename } from "node:path";
 import type { PiFastEditsConfig, ReadMode, SessionState } from "../types.js";
 import { Type, type Static } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -177,9 +178,21 @@ export function renderReadAnchoredResult(
     }
     cleaned.push(stripAnchorPrefix(lines[i]));
   }
-  // Match built-in read: empty body when collapsed, full body when expanded.
+  // Match pi's built-in read: skill-classified reads collapse to nothing
+  // (the [skill] call box carries the identity); regular files show a
+  // short preview with pi's "more lines" hint.
   if (!options.expanded) {
-    return new Text("", 0, 0);
+    const argsPath = (context.args as { path?: string } | undefined)?.path;
+    if (argsPath && basename(argsPath) === "SKILL.md") {
+      return new Text("", 0, 0);
+    }
+    const shown = cleaned.slice(0, 10);
+    let text = shown.join("\n");
+    const remaining = cleaned.length - shown.length;
+    if (remaining > 0) {
+      text += theme.fg("muted", `\n... (${remaining} more lines, ctrl+o to expand)`);
+    }
+    return new Text(text, 0, 0);
   }
   // Match built-in read's spacing convention: a leading newline separates the
   // title line from the body.

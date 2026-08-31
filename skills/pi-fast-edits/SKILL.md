@@ -26,15 +26,15 @@ Every file read/edited carries a `Revision:` hash — the first 16 hex chars of 
 
 ## Choosing the tool
 
-| Need                                                      | Tool                                                                                          |
-| --------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Find anchors for target lines                             | `grep_anchored` (edit-ready output)                                                           |
-| Big file, only a region matters                           | `read_anchored` mode `range`                                                                  |
-| Orientation in an unknown file                            | `grep_anchored` a declaration regex — the on-demand skeleton                                  |
-| Verbatim lines without anchors                            | `read_anchored` with `anchored: false`                                                        |
-| One change                                                | `edit_anchored` with a single edit — range replace; same anchor for start + end = single line |
-| Several changes (same or **multiple files**)              | `edit_anchored` with a batch — atomic: any failure rejects everything, zero partial writes    |
-| Insert between two adjacent lines without touching either | zero-width `replace`: adjacent anchors, `includeStart`/`includeEnd` both `false`              |
+| Need                                                      | Tool                                                                                                                                                      |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Find anchors for target lines                             | `grep_anchored` (edit-ready output)                                                                                                                       |
+| Big file, only a region matters                           | `read_anchored` mode `range`                                                                                                                              |
+| Orientation in an unknown file                            | `grep_anchored` a declaration regex — the on-demand skeleton                                                                                              |
+| Verbatim lines without anchors                            | `read_anchored` with `anchored: false`                                                                                                                    |
+| One change                                                | `edit_anchored` with a single edit — range replace; same anchor for start + end = single line                                                             |
+| Several changes (same or **multiple files**)              | `edit_anchored` with a batch — validation failures reject everything, zero partial writes; a mid-batch I/O error or abort is reported as partial progress |
+| Insert between two adjacent lines without touching either | zero-width `replace`: adjacent anchors, `includeStart`/`includeEnd` both `false`                                                                          |
 
 `write_anchored` seeds anchors and returns the revision + preview, so a fresh write is editable with no read.
 

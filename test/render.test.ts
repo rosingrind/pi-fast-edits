@@ -47,23 +47,35 @@ describe("renderReadAnchoredResult", () => {
     expect(textOf(component)).toBe('\nimport fs from "node:fs"\nconst x = 1');
   });
 
-  it("shows nothing when not expanded", () => {
+  it("collapsed: regular files show pi's 10-line preview with a hint", () => {
     const component = renderReadAnchoredResult(
       { content: [{ type: "text", text: "File: a.ts\n\nApple§ one" }] },
       { expanded: false, isPartial: false },
       theme,
       noContext,
     );
-    expect(textOf(component)).toBe("");
-  });
+    expect(textOf(component)).toBe("one");
 
-  it("shows nothing when collapsed regardless of body size", () => {
     const body = Array.from({ length: 25 }, (_, i) => `Apple§ line ${i + 1}`).join("\n");
-    const component = renderReadAnchoredResult(
+    const preview = renderReadAnchoredResult(
       { content: [{ type: "text", text: `File: a.txt\n\n${body}` }] },
       { expanded: false, isPartial: false },
       theme,
       noContext,
+    );
+    const lines = textOf(preview).split("\n");
+    expect(lines.length).toBe(11); // 10 shown + hint
+    expect(lines[0]).toBe("line 1");
+    expect(lines[10]).toContain("... (15 more lines");
+    expect(lines[10]).toContain("ctrl+o to expand");
+  });
+
+  it("collapsed: skill reads stay empty (the [skill] call box carries identity)", () => {
+    const component = renderReadAnchoredResult(
+      { content: [{ type: "text", text: "File: skills/x/SKILL.md\n\nApple§ body" }] },
+      { expanded: false, isPartial: false },
+      theme,
+      { ...noContext, args: { path: "skills/x/SKILL.md" } },
     );
     expect(textOf(component)).toBe("");
   });
@@ -355,12 +367,13 @@ describe("renderGrepResult", () => {
     );
     const text = textOf(component);
     const outLines = text.split("\n");
-    expect(outLines.length).toBe(16); // 15 cleaned lines shown + hint
-    expect(outLines[0]).toBe("summary line");
-    expect(outLines[1]).toBe("File: a.ts");
-    expect(outLines[14]).toBe("line 13");
-    expect(outLines[15]).toContain("... (7 more lines");
-    expect(outLines[15]).toContain("ctrl+o to expand");
+    expect(outLines.length).toBe(17); // leading blank + 15 cleaned lines + hint
+    expect(outLines[0]).toBe("");
+    expect(outLines[1]).toBe("summary line");
+    expect(outLines[2]).toBe("File: a.ts");
+    expect(outLines[15]).toBe("line 13");
+    expect(outLines[16]).toContain("... (7 more lines");
+    expect(outLines[16]).toContain("ctrl+o to expand");
     expect(text).not.toContain("Apple§");
     expect(text).not.toContain("Revision:");
     expect(text).not.toContain("line 20");
@@ -373,7 +386,7 @@ describe("renderGrepResult", () => {
       theme,
       noContext,
     );
-    expect(textOf(component)).toBe("1 file matched, 1 line shown.\nFile: a.ts\none");
+    expect(textOf(component)).toBe("\n1 file matched, 1 line shown.\nFile: a.ts\none");
   });
 
   it("drops the model-facing cap note (... showing N of M matches) in both modes", () => {

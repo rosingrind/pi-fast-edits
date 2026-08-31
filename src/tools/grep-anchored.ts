@@ -231,10 +231,17 @@ async function grepWithRg(
 
     // Directory searches skip the same trees as the JS walker. rg honors
     // gitignore natively, but non-git workspaces still surface dependency
-    // and protected files, so re-apply our own filters.
-    if (!singleFile) {
-      if (SKIPPED_DIRS.has(relativePath.split("/")[0] ?? "")) continue;
-      if (isProtectedPath(relativePath, [...DEFAULT_PROTECTED_SKIP, ...protectedPaths])) continue;
+    // and protected files, so re-apply our own filters. An explicitly
+    // targeted single file gets the same protection — as a loud refusal
+    // rather than a silent skip (skipping would report a bogus "No matches"
+    // for a file the caller named explicitly).
+    if (SKIPPED_DIRS.has(relativePath.split("/")[0] ?? "")) {
+      if (singleFile) throw new Error(`Refusing to search protected path: ${relativePath}.`);
+      continue;
+    }
+    if (isProtectedPath(relativePath, [...DEFAULT_PROTECTED_SKIP, ...protectedPaths])) {
+      if (singleFile) throw new Error(`Refusing to search protected path: ${relativePath}.`);
+      continue;
     }
 
     // Skip files too large to index: same cap as the JS scanner, so the rg
@@ -402,7 +409,8 @@ export function renderGrepResult(
       if (remaining > 0) {
         text += theme.fg("muted", `\n... (${remaining} more lines, ctrl+o to expand)`);
       }
-      return new Text(text, 0, 0);
+      // pi's collapsed grep prepends the same blank line as expanded.
+      return new Text("\n" + text, 0, 0);
     }
     // Expanded: everything the model got, presentation-clean, with pi's
     // leading-newline spacing convention.

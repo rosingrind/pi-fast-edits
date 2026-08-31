@@ -10,7 +10,8 @@ import type * as writeAnchoredModule from "./write-anchored.js";
  * Structural fingerprint of a tool definition for the override safety check.
  *
  * pi's `getAllTools()` returns `ToolInfo` (name, description, parameters,
- * promptGuidelines, sourceInfo) and never exposes `execute` or
+ * sourceInfo; `promptGuidelines` only joins it in newer pi versions) and
+ * never exposes `execute` or
  * `constrainedSampling` — only our own definitions carry the full handler. The
  * built-in `execute` presence rule from the design spec (D6) is therefore only
  * enforceable when the passed object actually carries the field; against real

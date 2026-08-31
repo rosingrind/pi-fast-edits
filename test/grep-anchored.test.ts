@@ -101,6 +101,17 @@ describe("grep_anchored", () => {
     expect(text).not.toContain("notes.md");
   });
 
+  itWithRg("refuses an explicitly targeted protected file", async () => {
+    const cwd = await sampleWorkspace();
+    await writeFile(join(cwd, ".env"), "SECRET=1\n", "utf8");
+    const tools = await loadTools();
+    await expect(
+      tools
+        .get("grep_anchored")!
+        .execute("1", { pattern: "SECRET", path: ".env" }, undefined, undefined, { cwd }),
+    ).rejects.toThrow(/protected path/i);
+  });
+
   itWithRg("supports case-insensitive search", async () => {
     const cwd = await sampleWorkspace();
     const tools = await loadTools();

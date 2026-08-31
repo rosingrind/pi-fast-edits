@@ -111,7 +111,7 @@ Searches file contents with a regex and returns matching lines with the same anc
 - `context` — anchored context lines around each match (default 0, max 10)
 - `maxMatches` — maximum matching lines shown per file (default 50)
 
-Searches skip `.git`, `node_modules`, protected paths, and binary files. Results are capped at 100KB with an explicit truncation note, and files that change during the search are omitted with a drift notice instead of returning stale coordinates. The search always runs through ripgrep, resolved from pi's tool cache (`~/.pi/agent/bin/rg`) or PATH; if ripgrep is missing the tool errors out rather than degrading.
+Searches skip `.git`, `node_modules`, protected paths, and binary files; explicitly targeting a protected file (e.g. `path: ".env"`) is refused with an error rather than searched. Results are capped at 100KB with an explicit truncation note, and files that change during the search are omitted with a drift notice instead of returning stale coordinates. The search always runs through ripgrep, resolved from pi's tool cache (`~/.pi/agent/bin/rg`) or PATH; if ripgrep is missing the tool errors out rather than degrading.
 
 Batches multiple edits. This is the preferred tool for multi-file or multi-region changes.
 

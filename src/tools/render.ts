@@ -38,6 +38,8 @@ export type RenderOptions = {
 
 /** Shared context shape for renderer functions (subset of pi's ToolRenderContext). */
 export type RenderContext = {
+  /** pi passes the tool call's arguments in its render context. */
+  args?: Record<string, unknown>;
   lastComponent: Component | undefined;
   isError: boolean;
   /** pi renders tool calls collapsed by default; true when the user expanded. */

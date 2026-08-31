@@ -540,6 +540,38 @@ describe("anchored tools", () => {
 
     await expect(readFile(file, "utf8")).resolves.toBe("ALPHA\nINSERTED\nbeta\n");
   });
+
+  it("inserts between adjacent lines with zero-width replace (both anchors excluded)", async () => {
+    const cwd = await workspace();
+    const file = join(cwd, "sample.txt");
+    await writeFile(file, "alpha\nbeta\ngamma\n", "utf8");
+    const tools = await loadTools();
+    const { lines } = await readAnchored(tools, cwd, "sample.txt");
+
+    await tools.get("edit_anchored")!.execute(
+      "1",
+      {
+        edits: [
+          {
+            type: "replace",
+            path: "sample.txt",
+            startAnchor: lines[0].anchor,
+            startAnchorLine: lines[0].text,
+            endAnchor: lines[1].anchor,
+            endAnchorLine: lines[1].text,
+            includeStart: false,
+            includeEnd: false,
+            replacement: "INSERTED",
+          },
+        ],
+      },
+      undefined,
+      undefined,
+      { cwd },
+    );
+
+    await expect(readFile(file, "utf8")).resolves.toBe("alpha\nINSERTED\nbeta\ngamma\n");
+  });
 });
 
 describe("error paths", () => {
