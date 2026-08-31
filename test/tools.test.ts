@@ -216,6 +216,18 @@ describe("anchored tools", () => {
     ).rejects.toThrow(/outside workspace/);
   });
 
+  it("teaches the skill-dirs escape on outside-workspace reads", async () => {
+    const cwd = await workspace();
+    const outside = join(await workspace(), "outside.txt");
+    await writeFile(outside, "secret\n", "utf8");
+    const tools = await loadTools();
+
+    await expect(
+      tools.get("read_anchored")!.execute("1", { path: outside }, undefined, undefined, { cwd }),
+    ).rejects.toThrow(
+      /Outside-workspace reads are limited to loaded skill directories and pi's docs/,
+    );
+  });
   it("rejects likely binary files", async () => {
     const cwd = await workspace();
     const file = join(cwd, "binary.dat");

@@ -184,6 +184,24 @@ describe("grep_anchored", () => {
     expect(text).toContain("showing 2 of 3");
   });
 
+  itWithRg("stops at 500 total matches with a note", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "pi-fast-edits-grep-"));
+    // 10 files x 50 matching lines = 500 raw hits, exactly runRg's
+    // MAX_TOTAL_HITS cap — every hit survives, and the per-file cap (50)
+    // shows all of them, tripping the MAX_TOTAL_MATCHES note at the last file.
+    for (let i = 0; i < 10; i++) {
+      const lines = Array.from({ length: 50 }, (_, j) => `marker-${i} line ${j}`);
+      await writeFile(join(cwd, `file${i}.ts`), lines.join("\n") + "\n", "utf8");
+    }
+    const tools = await loadTools();
+    const result = await tools
+      .get("grep_anchored")!
+      .execute("1", { pattern: "marker-" }, undefined, undefined, { cwd });
+    const text = result.content[0].text as string;
+    expect(text).toContain("10 files matched, 500 lines shown.");
+    expect(text).toContain("stopped at 500 total matches.");
+  });
+
   itWithRg("returns a no-matches message", async () => {
     const cwd = await sampleWorkspace();
     const tools = await loadTools();

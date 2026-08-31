@@ -1,7 +1,13 @@
 import { Text, type Component } from "@earendil-works/pi-tui";
 import { basename } from "node:path";
 import { experimentalToolSampling } from "./experimental-sampling.js";
-import type { AnchoredLine, PiFastEditsConfig, ReadMode, SessionState } from "../types.js";
+import type {
+  AnchoredLine,
+  FileAnchorState,
+  PiFastEditsConfig,
+  ReadMode,
+  SessionState,
+} from "../types.js";
 import { Type, type Static } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { renderAnchoredLines, stripAnchorPrefix } from "../anchor/anchor-renderer.js";
@@ -92,20 +98,7 @@ export function registerReadAnchored(
     ) {
       if (_signal?.aborted) return textResult("Read cancelled (aborted).");
       const cwd = getCwd(ctx);
-      let loaded;
-      try {
-        loaded = await loadStateForPath(session, cwd, params.path, {
-          extraReadRoots: session.readRoots,
-        });
-      } catch (error) {
-        if (error instanceof Error && /outside workspace/.test(error.message)) {
-          throw new Error(
-            `${error.message} Outside-workspace reads are limited to loaded skill directories and pi's docs — use bash cat for anything else.`,
-          );
-        }
-        throw error;
-      }
-      const { displayPath, state } = loaded;
+      const { displayPath, state } = await loadReadState(session, cwd, params.path);
       const anchored = params.anchored ?? true;
       const requestedMode = (params.mode ?? "auto") as ReadMode;
       const hasRange = typeof params.startLine === "number" || typeof params.endLine === "number";
@@ -114,92 +107,16 @@ export function registerReadAnchored(
         mode = hasRange ? "range" : "full";
       }
 
-      if (mode === "range") {
-        const start = Math.max(1, Math.floor(params.startLine ?? 1));
-        const end = Math.min(
-          state.lines.length,
-          Math.floor(
-            params.endLine ?? Math.min(state.lines.length, start + config.maxRangeReadLines - 1),
-          ),
-        );
-        if (start > end) {
-          throw new Error(`Invalid range: start line ${start} is greater than end line ${end}.`);
-        }
-        const selected = state.lines.slice(start - 1, end);
-        return textResult(
-          `File: ${displayPath}\nLines: ${start}-${end} of ${state.lines.length}${revisionLine(state, anchored)}\n\n${renderLines(selected, anchored)}`,
-          {
-            path: displayPath,
-            mode,
-            startLine: start,
-            endLine: end,
-            revision: state.revisionHash,
-            lines: selected.map((line) => ({
-              anchor: line.anchor,
-              text: line.text,
-              lineNo: line.lineNo,
-            })),
-          },
-        );
-      }
-
-      // Full mode: cap lines (maxReadLines) and bytes (MAX_READ_BYTES) so a
-      // huge or minified file cannot dump megabytes into context — pi's
-      // built-in read applies the same 2000-line/50KB convention. The
-      // continuation notice teaches our range args for the rest.
-      // Byte budget scales proportionally when maxReadLines is raised above
-      // the 2000-line default (an explicit larger window implies a larger
-      // allowance); at the default it stays at pi's 50KB parity.
-      const byteBudget = Math.max(
-        MAX_READ_BYTES,
-        Math.ceil((MAX_READ_BYTES * config.maxReadLines) / 2000),
-      );
-      const shown: AnchoredLine[] = [];
-      let bytes = 0;
-      let truncated = false;
-      for (const line of state.lines) {
-        // Plain mode carries the full verbatim line (no 300-char cap), so its
-        // budget cost is the real length; anchored mode is display-capped.
-        const renderedLength = anchored
-          ? `${line.anchor}§ ${truncateForDisplay(line.text)}`.length + 1
-          : `${line.lineNo}: ${line.text}`.length + 1;
-        if (shown.length >= config.maxReadLines || bytes + renderedLength > byteBudget) {
-          truncated = true;
-          break;
-        }
-        bytes += renderedLength;
-        shown.push(line);
-      }
-      if (shown.length === 0 && state.lines.length > 0) {
-        // A single line larger than the whole budget (e.g. a minified 2MB
-        // line read with anchored:false): show its head rather than an empty
-        // result with a nonsensical continuation.
-        const first = state.lines[0];
-        const head = first.text.slice(0, byteBudget);
-        shown.push({ ...first, text: anchored ? truncateForDisplay(first.text) : head });
-        truncated = true;
-      }
-      const header = truncated
-        ? `File: ${displayPath}\nLines: 1-${shown.length} of ${state.lines.length}${revisionLine(state, anchored)}`
-        : `File: ${displayPath}\nLines: ${state.lines.length}${revisionLine(state, anchored)}`;
-      const remaining = state.lines.length - shown.length;
-      let notice = "";
-      if (truncated && remaining > 0) {
-        notice = `\n[${remaining} more lines in file. Use startLine=${shown.length + 1} to continue.]`;
-      } else if (truncated) {
-        notice =
-          "\n[line 1 exceeds the result budget and was truncated — use bash (sed/cut) to extract the exact text.]";
-      }
-      return textResult(`${header}\n\n${renderLines(shown, anchored)}${notice}`, {
-        path: displayPath,
-        mode: "full",
-        revision: state.revisionHash,
-        lines: shown.map((line) => ({
-          anchor: line.anchor,
-          text: anchored ? truncateForDisplay(line.text) : line.text,
-          lineNo: line.lineNo,
-        })),
-      });
+      return mode === "range"
+        ? readRange(
+            displayPath,
+            state,
+            params.startLine,
+            params.endLine,
+            config.maxRangeReadLines,
+            anchored,
+          )
+        : readFull(displayPath, state, config.maxReadLines, anchored);
     },
   };
   pi.registerTool(tool);
@@ -265,4 +182,126 @@ function renderLines(
   }
   const display = lines.map((l) => ({ ...l, text: truncateForDisplay(l.text) }));
   return renderAnchoredLines(display);
+}
+
+/**
+ * Load anchor state for a path, rewriting the outside-workspace error to teach
+ * the sanctioned skill/docs escape hatch (and the bash cat fallback for
+ * anything else).
+ */
+async function loadReadState(
+  session: SessionState,
+  cwd: string,
+  path: string,
+): Promise<Awaited<ReturnType<typeof loadStateForPath>>> {
+  try {
+    return await loadStateForPath(session, cwd, path, {
+      extraReadRoots: session.readRoots,
+    });
+  } catch (error) {
+    if (error instanceof Error && /outside workspace/.test(error.message)) {
+      throw new Error(
+        `${error.message} Outside-workspace reads are limited to loaded skill directories and pi's docs — use bash cat for anything else.`,
+      );
+    }
+    throw error;
+  }
+}
+
+/** Render a ranged read: clamp to the file's line span, reject inverted ranges. */
+function readRange(
+  displayPath: string,
+  state: FileAnchorState,
+  startLine: number | undefined,
+  endLine: number | undefined,
+  maxRangeReadLines: number,
+  anchored: boolean,
+): ReturnType<typeof textResult> {
+  const start = Math.max(1, Math.floor(startLine ?? 1));
+  const end = Math.min(
+    state.lines.length,
+    Math.floor(endLine ?? Math.min(state.lines.length, start + maxRangeReadLines - 1)),
+  );
+  if (start > end) {
+    throw new Error(`Invalid range: start line ${start} is greater than end line ${end}.`);
+  }
+  const selected = state.lines.slice(start - 1, end);
+  return textResult(
+    `File: ${displayPath}\nLines: ${start}-${end} of ${state.lines.length}${revisionLine(state, anchored)}\n\n${renderLines(selected, anchored)}`,
+    {
+      path: displayPath,
+      mode: "range",
+      startLine: start,
+      endLine: end,
+      revision: state.revisionHash,
+      lines: selected.map((line) => ({
+        anchor: line.anchor,
+        text: line.text,
+        lineNo: line.lineNo,
+      })),
+    },
+  );
+}
+
+/** Render a full read, capped by lines and bytes with a continuation notice. */
+function readFull(
+  displayPath: string,
+  state: FileAnchorState,
+  maxReadLines: number,
+  anchored: boolean,
+): ReturnType<typeof textResult> {
+  // Full mode: cap lines (maxReadLines) and bytes (MAX_READ_BYTES) so a
+  // huge or minified file cannot dump megabytes into context — pi's
+  // built-in read applies the same 2000-line/50KB convention. The
+  // continuation notice teaches our range args for the rest.
+  // Byte budget scales proportionally when maxReadLines is raised above
+  // the 2000-line default (an explicit larger window implies a larger
+  // allowance); at the default it stays at pi's 50KB parity.
+  const byteBudget = Math.max(MAX_READ_BYTES, Math.ceil((MAX_READ_BYTES * maxReadLines) / 2000));
+  const shown: AnchoredLine[] = [];
+  let bytes = 0;
+  let truncated = false;
+  for (const line of state.lines) {
+    // Plain mode carries the full verbatim line (no 300-char cap), so its
+    // budget cost is the real length; anchored mode is display-capped.
+    const renderedLength = anchored
+      ? `${line.anchor}§ ${truncateForDisplay(line.text)}`.length + 1
+      : `${line.lineNo}: ${line.text}`.length + 1;
+    if (shown.length >= maxReadLines || bytes + renderedLength > byteBudget) {
+      truncated = true;
+      break;
+    }
+    bytes += renderedLength;
+    shown.push(line);
+  }
+  if (shown.length === 0 && state.lines.length > 0) {
+    // A single line larger than the whole budget (e.g. a minified 2MB
+    // line read with anchored:false): show its head rather than an empty
+    // result with a nonsensical continuation.
+    const first = state.lines[0];
+    const head = first.text.slice(0, byteBudget);
+    shown.push({ ...first, text: anchored ? truncateForDisplay(first.text) : head });
+    truncated = true;
+  }
+  const header = truncated
+    ? `File: ${displayPath}\nLines: 1-${shown.length} of ${state.lines.length}${revisionLine(state, anchored)}`
+    : `File: ${displayPath}\nLines: ${state.lines.length}${revisionLine(state, anchored)}`;
+  const remaining = state.lines.length - shown.length;
+  let notice = "";
+  if (truncated && remaining > 0) {
+    notice = `\n[${remaining} more lines in file. Use startLine=${shown.length + 1} to continue.]`;
+  } else if (truncated) {
+    notice =
+      "\n[line 1 exceeds the result budget and was truncated — use bash (sed/cut) to extract the exact text.]";
+  }
+  return textResult(`${header}\n\n${renderLines(shown, anchored)}${notice}`, {
+    path: displayPath,
+    mode: "full",
+    revision: state.revisionHash,
+    lines: shown.map((line) => ({
+      anchor: line.anchor,
+      text: anchored ? truncateForDisplay(line.text) : line.text,
+      lineNo: line.lineNo,
+    })),
+  });
 }
