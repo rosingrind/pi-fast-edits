@@ -17,13 +17,7 @@ import {
   type PiContext,
 } from "./shared.js";
 import { applyPlansToLines, assertNoOverlaps, planEdit, type PlannedEdit } from "./edit-core.js";
-import {
-  renderToolCall,
-  type ToolResult,
-  type RenderOptions,
-  type RenderContext,
-} from "./render.js";
-import type { Component } from "@earendil-works/pi-tui";
+import { renderToolCall } from "./render.js";
 import { experimentalToolSampling } from "./experimental-sampling.js";
 import { renderEditResult } from "./render-edit-result.js";
 import { batchEditsSchema, type BatchEditsParams } from "./schemas.js";

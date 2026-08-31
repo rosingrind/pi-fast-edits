@@ -169,7 +169,7 @@ describe("renderEditResult", () => {
   });
 });
 
-describe("renderEditResult", () => {
+describe("renderEditResult (diff coloring)", () => {
   it("colors diff lines with theme tokens", () => {
     const component = renderEditResult(
       {
