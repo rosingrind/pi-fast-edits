@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import piFastEdits from "../src/index.js";
-import { LRUMap, type PiFastEditsConfig, type SessionState } from "../src/types.js";
+import type { PiFastEditsConfig, SessionState } from "../src/types.js";
 
 type ToolDef = {
   name: string;

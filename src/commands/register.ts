@@ -30,6 +30,9 @@ export function registerCommands(
           `Confirmation mode: ${config.confirmation}`,
           `Tracked files: ${session.files.size}`,
           `Tracked anchors: ${trackedAnchors}`,
+          `Require anchor lines: ${config.requireAnchorLines ? "on" : "off"}`,
+          `Range read limit: ${config.maxRangeReadLines} lines`,
+          `Full read limit: ${config.maxReadLines} lines`,
         ];
         if (ctx.hasUI) {
           // notify() renders inline in the chat transcript (dim text), not a modal.

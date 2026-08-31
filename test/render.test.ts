@@ -3,7 +3,6 @@ import { initTheme } from "@earendil-works/pi-coding-agent";
 import { Container, Text } from "@earendil-works/pi-tui";
 import { renderReadAnchoredResult } from "../src/tools/read-anchored.js";
 import { renderGrepResult } from "../src/tools/grep-anchored.js";
-import { renderBatchResult } from "../src/tools/edit-anchored.js";
 import { renderEditResult } from "../src/tools/render-edit-result.js";
 import { renderToolCall } from "../src/tools/render.js";
 import type { Theme } from "../src/tools/theme.js";
@@ -108,9 +107,9 @@ describe("renderReadAnchoredResult", () => {
   });
 });
 
-describe("renderBatchResult", () => {
+describe("renderEditResult", () => {
   it("renders the content diff even when collapsed", () => {
-    const component = renderBatchResult(
+    const component = renderEditResult(
       { content: [{ type: "text", text: "-1 alpha\n+1 ALPHA" }] },
       { expanded: false, isPartial: false },
       theme,
@@ -122,7 +121,7 @@ describe("renderBatchResult", () => {
   });
 
   it("renders the content diff when expanded", () => {
-    const component = renderBatchResult(
+    const component = renderEditResult(
       { content: [{ type: "text", text: "-1 alpha\n+1 ALPHA\n 2 beta" }] },
       { expanded: true, isPartial: false },
       theme,
@@ -135,7 +134,7 @@ describe("renderBatchResult", () => {
   });
 
   it("renders a plain message as-is when content is not a diff", () => {
-    const component = renderBatchResult(
+    const component = renderEditResult(
       {
         content: [{ type: "text", text: "Edit cancelled. No files were changed." }],
       },
@@ -147,7 +146,7 @@ describe("renderBatchResult", () => {
   });
 
   it("shows error text", () => {
-    const component = renderBatchResult(
+    const component = renderEditResult(
       { content: [{ type: "text", text: "boom" }] },
       { expanded: false, isPartial: false },
       theme,
@@ -157,7 +156,7 @@ describe("renderBatchResult", () => {
   });
 
   it("shows error text even with non-string details", () => {
-    const component = renderBatchResult(
+    const component = renderEditResult(
       {
         content: [{ type: "text", text: "boom" }],
         details: [{ path: "a.ts", diff: 123 } as any],

@@ -94,7 +94,7 @@ describe("override wiring follows non-override config changes", () => {
 
     // Simulate the menu's requireAnchorLines toggle (mutate → notify).
     captured.config!.requireAnchorLines = false;
-    await captured.onConfigChanged!("requireAnchorLines", { hasUI: true });
+    captured.onConfigChanged!("requireAnchorLines", { hasUI: true });
 
     // The overridden `edit` must be re-registered with the lenient schema —
     // no stale strict defs.

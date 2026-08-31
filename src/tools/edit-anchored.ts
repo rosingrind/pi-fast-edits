@@ -17,17 +17,15 @@ import {
   type PiContext,
 } from "./shared.js";
 import { applyPlansToLines, assertNoOverlaps, planEdit, type PlannedEdit } from "./edit-core.js";
-import { renderDiff } from "@earendil-works/pi-coding-agent";
 import {
   renderToolCall,
   type ToolResult,
   type RenderOptions,
   type RenderContext,
 } from "./render.js";
-import { Container, Spacer, Text, type Component } from "@earendil-works/pi-tui";
+import type { Component } from "@earendil-works/pi-tui";
 import { experimentalToolSampling } from "./experimental-sampling.js";
-import { toolResultText, errorResultComponent } from "./render.js";
-import type { Theme } from "./theme.js";
+import { renderEditResult } from "./render-edit-result.js";
 import { batchEditsSchema, type BatchEditsParams } from "./schemas.js";
 import type { Static } from "typebox";
 
@@ -124,7 +122,7 @@ export function registerEditAnchored(
           : `${paths[0]} (+${paths.length - 1} more file${paths.length > 2 ? "s" : ""})`;
       return theme.fg("warning", ` ${display}`);
     }),
-    renderResult: renderBatchResult,
+    renderResult: renderEditResult,
     parameters: batchEditsSchema(config.requireAnchorLines),
     async execute(
       _toolCallId: string,
@@ -375,30 +373,4 @@ function _computePerEditChanges(
     });
   }
   return result;
-}
-
-export function renderBatchResult(
-  result: ToolResult,
-  _options: RenderOptions,
-  theme: Theme,
-  context: RenderContext,
-): Component {
-  const errorComponent = errorResultComponent(result, theme, context);
-  if (errorComponent) return errorComponent;
-  // The diff is always visible regardless of collapse state, matching the
-  // built-in edit tool's rendering. Batch results carry a unified diff in
-  // their content text; non-diff messages (e.g. a cancellation notice) render
-  // as plain text.
-  const raw = toolResultText(result);
-  const isDiff = raw.split("\n").some((line) => /^[+-]/.test(line));
-  if (!isDiff) {
-    return new Text(raw, 0, 0);
-  }
-  // Match the built-in edit tool's rendering: a blank line spacer, then the
-  // diff colored (with intra-line change highlighting) via pi's renderDiff,
-  // indented one column. renderDiff uses pi's global theme singleton.
-  const container = new Container();
-  container.addChild(new Spacer(1));
-  container.addChild(new Text(renderDiff(raw), 1, 0));
-  return container;
 }

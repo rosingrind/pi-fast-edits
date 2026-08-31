@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 
 describe("resolveRg", () => {
-  const realProbe = (cmd: string) => Promise.resolve(cmd === "PATH_RG");
   let origDir: string | undefined;
   let dir: string;
 

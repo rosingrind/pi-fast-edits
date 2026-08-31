@@ -36,7 +36,7 @@ Every file read/edited carries a `Revision:` hash — the first 16 hex chars of 
 | Several changes (same or **multiple files**)              | `edit_anchored` with a batch — validation failures reject everything, zero partial writes; a mid-batch I/O error or abort is reported as partial progress |
 | Insert between two adjacent lines without touching either | zero-width `replace`: adjacent anchors, `includeStart`/`includeEnd` both `false`                                                                          |
 
-`write_anchored` seeds anchors and returns the revision + preview, so a fresh write is editable with no read.
+`write_anchored` seeds anchors and returns the revision + preview, so a fresh write is editable with no read. Full reads are capped (`maxReadLines`, default 2000, + a 50KB budget) and end with a `[N more lines... Use startLine=X to continue.]` notice — continue with `startLine`; lines over 300 chars render truncated, so re-read them with `anchored: false` before editing.
 
 ## Batch rules
 

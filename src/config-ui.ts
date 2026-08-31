@@ -318,6 +318,8 @@ export async function showConfigMenu(
           config.maxReadLines = toPositiveInt(newValue, config.maxReadLines);
           break;
         // "protectedPaths" is handled by its own submenu; no main-list change.
+        default:
+          break;
       }
       // Re-register the edit tools so their schemas follow the new setting;
       // when the setting is overrideBuiltInEditTools itself, the callback
