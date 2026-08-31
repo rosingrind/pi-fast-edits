@@ -321,13 +321,15 @@ it("keeps a target-name suffix's own single leading space (edit a.ts)", () => {
 describe("renderGrepResult", () => {
   const result = (text: string) => ({ content: [{ type: "text", text }] });
 
-  it("expanded: keeps summary, strips headers/anchors, preserves indentation, drops the line-N suffix, leading newline", () => {
+  it("expanded: cleans the whole result — summary + File: kept, Revision:/cap-note/anchors/line-N dropped", () => {
     const raw = [
       "1 file matched, 2 lines shown.",
+      "",
       "File: src/x.ts",
       "Revision: abc123",
       "Quartz§     return foo(    line 12",
       "Robin§       bar,    line 13",
+      "... showing 2 of 41 matches",
     ].join("\n");
     const component = renderGrepResult(
       result(raw),
@@ -335,10 +337,12 @@ describe("renderGrepResult", () => {
       theme,
       noContext,
     );
-    expect(textOf(component)).toBe("\n1 file matched, 2 lines shown.\n    return foo(\n      bar,");
+    expect(textOf(component)).toBe(
+      "\n1 file matched, 2 lines shown.\n\nFile: src/x.ts\n    return foo(\n      bar,",
+    );
   });
 
-  it("collapsed: shows the first 15 lines plus a remaining-lines hint", () => {
+  it("collapsed: cleans BEFORE capping — no anchors/headers in preview, hint counts cleaned lines", () => {
     const body = Array.from({ length: 20 }, (_, i) => `Apple§ line ${i + 1}    line ${i + 1}`).join(
       "\n",
     );
@@ -349,13 +353,17 @@ describe("renderGrepResult", () => {
       theme,
       noContext,
     );
-    const out = textOf(component);
-    const outLines = out.split("\n");
-    expect(outLines.length).toBe(16); // 15 shown + hint
+    const text = textOf(component);
+    const outLines = text.split("\n");
+    expect(outLines.length).toBe(16); // 15 cleaned lines shown + hint
     expect(outLines[0]).toBe("summary line");
-    expect(outLines[14]).toBe("Apple§ line 12    line 12"); // 15 slots include summary + headers
-    expect(outLines[15]).toContain("... (8 more lines");
+    expect(outLines[1]).toBe("File: a.ts");
+    expect(outLines[14]).toBe("line 13");
+    expect(outLines[15]).toContain("... (7 more lines");
     expect(outLines[15]).toContain("ctrl+o to expand");
+    expect(text).not.toContain("Apple§");
+    expect(text).not.toContain("Revision:");
+    expect(text).not.toContain("line 20");
   });
 
   it("collapsed: no hint when everything fits", () => {
@@ -365,6 +373,32 @@ describe("renderGrepResult", () => {
       theme,
       noContext,
     );
-    expect(textOf(component)).not.toContain("more lines");
+    expect(textOf(component)).toBe("1 file matched, 1 line shown.\nFile: a.ts\none");
+  });
+
+  it("drops the model-facing cap note (... showing N of M matches) in both modes", () => {
+    const raw = "summary\nFile: a.ts\nApple§ one    line 1\n... showing 1 of 41 matches";
+    for (const expanded of [false, true]) {
+      const text = textOf(
+        renderGrepResult(result(raw), { expanded, isPartial: false }, theme, noContext),
+      );
+      expect(text).not.toContain("showing 1 of 41");
+    }
+  });
+
+  it("never throws: a malformed result degrades to the raw text instead of the TUI's raw fallback", () => {
+    const component = renderGrepResult(
+      result("summary\nFile: a.ts\nApple§ one    line 1"),
+      { expanded: true, isPartial: false },
+      {
+        // Hostile theme: fg throws, as some third-party theme might.
+        fg: () => {
+          throw new Error("boom");
+        },
+        bold: (s: string) => s,
+      } as any,
+      noContext,
+    );
+    expect(textOf(component)).toBe("summary\nFile: a.ts\nApple§ one    line 1");
   });
 });

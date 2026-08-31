@@ -376,6 +376,9 @@ function renderHitLine(line: { anchor: string; text: string }, lineNo: number): 
 /** Collapsed preview cap, matching pi's built-in grep rendering. */
 const MAX_COLLAPSED_LINES = 15;
 
+/** Model-facing cap bookkeeping — redundant with the summary line; hidden from the UI. */
+const MODEL_CAP_NOTE_RE = /^\.\.\. showing \d+ of \d+ matches$/;
+
 export function renderGrepResult(
   result: ToolResult,
   options: RenderOptions,
@@ -386,28 +389,49 @@ export function renderGrepResult(
   if (context.isError) {
     return new Text(theme.fg("error", raw), 0, 0);
   }
-  if (!options.expanded) {
-    // Collapsed: the first 15 lines of the raw output (the summary line comes
-    // first), then pi's "more lines" hint — matching built-in grep's preview.
-    const lines = raw.split("\n");
-    const shown = lines.slice(0, MAX_COLLAPSED_LINES);
-    let text = shown.join("\n");
-    const remaining = lines.length - shown.length;
-    if (remaining > 0) {
-      text += theme.fg("muted", `\n... (${remaining} more lines, ctrl+o to expand)`);
+  try {
+    const cleaned = cleanDisplayLines(raw, theme);
+    if (!options.expanded) {
+      // Collapsed: first 15 presentation-clean lines plus pi's "more lines"
+      // hint. Cleaning happens BEFORE capping — the raw model text carries
+      // anchor prefixes, hashes, and positional suffixes the UI must never
+      // show, and capping raw would both leak them and under-count.
+      const shown = cleaned.slice(0, MAX_COLLAPSED_LINES);
+      let text = shown.join("\n");
+      const remaining = cleaned.length - shown.length;
+      if (remaining > 0) {
+        text += theme.fg("muted", `\n... (${remaining} more lines, ctrl+o to expand)`);
+      }
+      return new Text(text, 0, 0);
     }
-    return new Text(text, 0, 0);
+    // Expanded: everything the model got, presentation-clean, with pi's
+    // leading-newline spacing convention.
+    return new Text("\n" + cleaned.join("\n"), 0, 0);
+  } catch {
+    // The TUI silently replaces a throwing renderer with an unstyled raw
+    // fallback; prefer a degraded-but-intentional rendering instead.
+    return new Text(raw, 0, 0);
   }
-  // Expanded: leading newline (pi's spacing convention), File:/Revision:
-  // headers dropped, anchor prefixes stripped with indentation preserved
-  // (shared helper), and the model-facing `    line N` positional suffix
-  // removed for display. Model-facing text is untouched — presentation only.
+}
+
+/**
+ * Model text → UI lines. Drops `Revision:` hashes and the `... showing N of M
+ * matches` cap note (model bookkeeping); dims `File:` section headers (kept —
+ * they group multi-file results); strips anchor prefixes (indentation
+ * preserved) and the positional `    line N` suffix from every content line.
+ */
+function cleanDisplayLines(raw: string, theme: Theme): string[] {
   const cleaned: string[] = [];
   for (const line of raw.split("\n")) {
-    if (line.startsWith("File:") || line.startsWith("Revision:")) continue;
+    if (line.startsWith("Revision:")) continue;
+    if (MODEL_CAP_NOTE_RE.test(line)) continue;
+    if (line.startsWith("File:")) {
+      cleaned.push(theme.fg("muted", line));
+      continue;
+    }
     cleaned.push(theme.fg("toolOutput", stripLineDisplay(stripAnchorPrefix(line))));
   }
-  return new Text("\n" + cleaned.join("\n"), 0, 0);
+  return cleaned;
 }
 
 /** Drop the trailing positional `    line N` suffix for UI display only. */
