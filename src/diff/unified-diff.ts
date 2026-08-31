@@ -10,6 +10,45 @@ import { myersDiff, type DiffOp } from "./myers.js";
  * When `ops` is supplied (already computed for `before`/`after`), it is reused
  * instead of re-running the Myers diff.
  */
+/** One rendered diff line: prefix, padded number, content. */
+function formatDiffLine(prefix: string, lineNo: number, width: number, text: string): string {
+  return `${prefix}${String(lineNo).padStart(width, " ")} ${text}`;
+}
+
+/** Collapse marker for skipped context runs. */
+function collapseLine(width: number): string {
+  return ` ${"".padStart(width, " ")} ...`;
+}
+
+/**
+ * Visible [from, to) index windows for one equal run, with "collapse"
+ * markers where skipped context is abbreviated. Context adjacent to no
+ * change produces an empty plan (skipped entirely).
+ */
+function contextPlan(
+  count: number,
+  hasLeading: boolean,
+  hasTrailing: boolean,
+  context: number,
+): Array<{ from: number; to: number } | "collapse"> {
+  if (!hasLeading && !hasTrailing) return [];
+  if (hasLeading && hasTrailing) {
+    if (count <= context * 2) return [{ from: 0, to: count }];
+    return [{ from: 0, to: context }, "collapse", { from: count - context, to: count }];
+  }
+  if (hasLeading) {
+    const shown = Math.min(count, context);
+    const plan: Array<{ from: number; to: number } | "collapse"> = [{ from: 0, to: shown }];
+    if (count - shown > 0) plan.push("collapse");
+    return plan;
+  }
+  const skipped = Math.max(0, count - context);
+  const plan: Array<{ from: number; to: number } | "collapse"> = [];
+  if (skipped > 0) plan.push("collapse");
+  plan.push({ from: skipped, to: count });
+  return plan;
+}
+
 export function unifiedDiff(
   before: string[],
   after: string[],
@@ -34,7 +73,7 @@ export function unifiedDiff(
     const op = diffOps[i];
     if (op.type === "insert") {
       for (let k = 0; k < op.count; k++) {
-        out.push(`+${String(insertNumber).padStart(width, " ")} ${after[op.newStart + k]}`);
+        out.push(formatDiffLine("+", insertNumber, width, after[op.newStart + k]));
         insertNumber++;
         newLine++;
       }
@@ -42,7 +81,7 @@ export function unifiedDiff(
     } else if (op.type === "delete") {
       insertNumber = op.oldStart + 1;
       for (let k = 0; k < op.count; k++) {
-        out.push(`-${String(oldLine).padStart(width, " ")} ${before[op.oldStart + k]}`);
+        out.push(formatDiffLine("-", oldLine, width, before[op.oldStart + k]));
         oldLine++;
       }
       lastWasChange = true;
@@ -52,30 +91,16 @@ export function unifiedDiff(
       const hasTrailing =
         i + 1 < diffOps.length &&
         (diffOps[i + 1].type === "insert" || diffOps[i + 1].type === "delete");
-      const emit = (k: number) => {
-        out.push(` ${String(oldLine + k).padStart(width, " ")} ${before[op.oldStart + k]}`);
-      };
-      const collapse = () => {
-        out.push(` ${"".padStart(width, " ")} ...`);
-      };
-      if (hasLeading && hasTrailing) {
-        if (count <= context * 2) {
-          for (let k = 0; k < count; k++) emit(k);
-        } else {
-          for (let k = 0; k < context; k++) emit(k);
-          collapse();
-          for (let k = count - context; k < count; k++) emit(k);
+      const plan = contextPlan(count, hasLeading, hasTrailing, context);
+      for (const part of plan) {
+        if (part === "collapse") {
+          out.push(collapseLine(width));
+          continue;
         }
-      } else if (hasLeading) {
-        const shown = Math.min(count, context);
-        for (let k = 0; k < shown; k++) emit(k);
-        if (count - shown > 0) collapse();
-      } else if (hasTrailing) {
-        const skipped = Math.max(0, count - context);
-        if (skipped > 0) collapse();
-        for (let k = skipped; k < count; k++) emit(k);
+        for (let k = part.from; k < part.to; k++) {
+          out.push(formatDiffLine(" ", oldLine + k, width, before[op.oldStart + k]));
+        }
       }
-      // Else: context not adjacent to any change, skip entirely.
       oldLine += count;
       newLine += count;
       insertNumber = oldLine;
