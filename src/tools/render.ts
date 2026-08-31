@@ -17,6 +17,33 @@ export function clearToolNameOverrides(): void {
   toolNameOverrides.clear();
 }
 
+/** Raw text of a tool result's first content block ("" when absent). */
+export function toolResultText(result: ToolResult): string {
+  return result.content?.[0]?.text ?? "";
+}
+
+/** Standard error rendering for result renderers; undefined when not an error. */
+export function errorResultComponent(
+  result: ToolResult,
+  theme: Theme,
+  context: RenderContext,
+): Component | undefined {
+  if (!context.isError) return undefined;
+  const text = toolResultText(result) || "error";
+  return new Text(theme.fg("error", text), 0, 0);
+}
+
+/** Cleaned lines → collapsed preview: first `cap` lines + pi's expand hint. */
+export function collapsedPreview(cleaned: string[], cap: number, theme: Theme): string {
+  const shown = cleaned.slice(0, cap);
+  let text = shown.join("\n");
+  const remaining = cleaned.length - shown.length;
+  if (remaining > 0) {
+    text += theme.fg("muted", `\n... (${remaining} more lines, ctrl+o to expand)`);
+  }
+  return text;
+}
+
 /** Resolve a registration name to its override-mode display name (if any). */
 export function resolveToolDisplayName(toolName: string): string {
   return toolNameOverrides.get(toolName) ?? toolName;

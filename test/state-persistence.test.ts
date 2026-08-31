@@ -4,7 +4,7 @@ import { LRUMap, type SessionState } from "../src/types.js";
 import { exportAnchorState, hydrateAnchorState } from "../src/anchor/state-persistence.js";
 
 function makeSession(): SessionState {
-  return { files: new LRUMap() };
+  return { files: new LRUMap(), readRoots: [] };
 }
 
 describe("anchor state persistence", () => {

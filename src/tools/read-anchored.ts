@@ -1,11 +1,15 @@
 import { Text, type Component } from "@earendil-works/pi-tui";
 import { basename } from "node:path";
+import { experimentalToolSampling } from "./experimental-sampling.js";
 import type { PiFastEditsConfig, ReadMode, SessionState } from "../types.js";
 import { Type, type Static } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { renderAnchoredLines, stripAnchorPrefix } from "../anchor/anchor-renderer.js";
 import {
   renderToolCall,
+  toolResultText,
+  errorResultComponent,
+  collapsedPreview,
   type ToolResult,
   type RenderOptions,
   type RenderContext,
@@ -45,6 +49,7 @@ export function registerReadAnchored(
   const tool = {
     name: "read_anchored",
     label: "Read Anchored File",
+    constrainedSampling: experimentalToolSampling(),
     description:
       "Read a text file with stable word anchors for fast subsequent edits. Use mode:'range' for windows of large files. Set anchored:false to read plain line-numbered output.",
     renderCall: renderToolCall(
@@ -91,7 +96,7 @@ export function registerReadAnchored(
         }
         throw error;
       }
-      const { displayPath, state, snapshot } = loaded;
+      const { displayPath, state } = loaded;
       const anchored = params.anchored ?? true;
       const requestedMode = (params.mode ?? "auto") as ReadMode;
       const hasRange = typeof params.startLine === "number" || typeof params.endLine === "number";
@@ -154,11 +159,9 @@ export function renderReadAnchoredResult(
   theme: Theme,
   context: RenderContext,
 ): Component {
-  if (context.isError) {
-    const text = result.content?.[0]?.text ?? "error";
-    return new Text(theme.fg("error", text), 0, 0);
-  }
-  const raw = result.content?.[0]?.text ?? "";
+  const errorComponent = errorResultComponent(result, theme, context);
+  if (errorComponent) return errorComponent;
+  const raw = toolResultText(result);
   // Strip only the leading header block, the blank separator after it, and
   // anchor prefixes. Content lines that merely start with a header prefix
   // (e.g. `Apple§ Lines: 5`) are preserved.
@@ -186,13 +189,7 @@ export function renderReadAnchoredResult(
     if (argsPath && basename(argsPath) === "SKILL.md") {
       return new Text("", 0, 0);
     }
-    const shown = cleaned.slice(0, 10);
-    let text = shown.join("\n");
-    const remaining = cleaned.length - shown.length;
-    if (remaining > 0) {
-      text += theme.fg("muted", `\n... (${remaining} more lines, ctrl+o to expand)`);
-    }
-    return new Text(text, 0, 0);
+    return new Text(collapsedPreview(cleaned, 10, theme), 0, 0);
   }
   // Match built-in read's spacing convention: a leading newline separates the
   // title line from the body.

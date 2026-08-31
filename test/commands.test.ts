@@ -15,7 +15,7 @@ describe("command handlers", () => {
       },
       on() {},
     };
-    const session: SessionState = { files: new LRUMap() };
+    const session: SessionState = { files: new LRUMap(), readRoots: [] };
     const config: PiFastEditsConfig = {
       ...DEFAULT_CONFIG,
       protectedPaths: [...DEFAULT_CONFIG.protectedPaths],

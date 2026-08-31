@@ -6,10 +6,7 @@ import { collectReadRoots, displayPathFor, piDocsRoot } from "../src/fs/read-roo
 describe("collectReadRoots", () => {
   it("collects skill baseDirs and the pi package root", () => {
     const roots = collectReadRoots(
-      [
-        { name: "a", baseDir: "/agents/skills/a" },
-        { name: "b", baseDir: "/agents/skills/b" },
-      ],
+      [{ baseDir: "/agents/skills/a" }, { baseDir: "/agents/skills/b" }],
       "/pi-package",
     );
     expect(roots).toContain("/agents/skills/a");
@@ -18,18 +15,12 @@ describe("collectReadRoots", () => {
   });
 
   it("dedupes roots", () => {
-    const roots = collectReadRoots(
-      [
-        { name: "a", baseDir: "/dup" },
-        { name: "b", baseDir: "/dup" },
-      ],
-      "/dup",
-    );
+    const roots = collectReadRoots([{ baseDir: "/dup" }, { baseDir: "/dup" }], "/dup");
     expect(roots).toEqual(["/dup"]);
   });
 
   it("drops skills without a baseDir and tolerates a missing package root", () => {
-    const roots = collectReadRoots([{ name: "a" }, { name: "b", baseDir: "/kept" }], undefined);
+    const roots = collectReadRoots([{ baseDir: undefined }, { baseDir: "/kept" }], undefined);
     expect(roots).toEqual(["/kept"]);
   });
 });

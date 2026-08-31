@@ -1,4 +1,6 @@
 import { Text, type Component } from "@earendil-works/pi-tui";
+import { toolResultText, errorResultComponent } from "./render.js";
+import { experimentalToolSampling } from "./experimental-sampling.js";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "typebox";
 import type { PiFastEditsConfig, SessionState } from "../types.js";
@@ -42,6 +44,7 @@ export function registerWriteAnchored(
   const tool = {
     name: "write_anchored",
     label: "Write Anchored File",
+    constrainedSampling: experimentalToolSampling(),
     description:
       "Write a full file and seed its anchor state, returning the revision hash and an anchored preview so subsequent edits need no separate read to obtain anchors.",
     renderCall: renderToolCall("write_anchored"),
@@ -107,16 +110,15 @@ export function registerWriteAnchored(
   return tool;
 }
 
-export function renderWriteResult(
+function renderWriteResult(
   result: ToolResult,
   options: RenderOptions,
   theme: Theme,
   context: RenderContext,
 ): Component {
-  const raw = result.content?.[0]?.text ?? "";
-  if (context.isError) {
-    return new Text(theme.fg("error", raw), 0, 0);
-  }
+  const errorComponent = errorResultComponent(result, theme, context);
+  if (errorComponent) return errorComponent;
+  const raw = toolResultText(result);
   if (!options.expanded) {
     // Collapsed shows just the summary line, matching the built-in tools.
     return new Text(theme.fg("muted", raw.split("\n")[0]), 0, 0);

@@ -15,9 +15,9 @@ import {
   SUFFIXED_TOOL_NAMES,
   type OverrideDeps,
 } from "../src/tools/override.js";
-import { registerReadAnchoredFile } from "../src/tools/read-anchored.js";
-import { registerApplyAnchoredEdits } from "../src/tools/edit-anchored.js";
-import { registerGrepAnchoredFiles } from "../src/tools/grep-anchored.js";
+import { registerReadAnchored } from "../src/tools/read-anchored.js";
+import { registerEditAnchored } from "../src/tools/edit-anchored.js";
+import { registerGrepAnchored } from "../src/tools/grep-anchored.js";
 import { registerWriteAnchored } from "../src/tools/write-anchored.js";
 
 function makeConfig(overrideBuiltInEditTools: boolean): PiFastEditsConfig {
@@ -165,9 +165,9 @@ describe("interception fallback reads the live config flag", () => {
 
 describe("applyOverrideMode disable path (menu toggle-off)", () => {
   const deps: OverrideDeps = {
-    registerRead: registerReadAnchoredFile,
-    registerEdit: registerApplyAnchoredEdits,
-    registerGrep: registerGrepAnchoredFiles,
+    registerRead: registerReadAnchored,
+    registerEdit: registerEditAnchored,
+    registerGrep: registerGrepAnchored,
     registerWrite: registerWriteAnchored,
     installInterception: installInterceptionFallback,
   };
@@ -193,7 +193,7 @@ describe("applyOverrideMode disable path (menu toggle-off)", () => {
     // Post-override state: the four built-in names (our defs) + bash; the
     // suffixed names were deactivated when override was enabled.
     const { pi, setActiveToolsCalls } = fakePi(["read", "edit", "write", "grep", "bash"]);
-    applyOverrideMode(pi as any, { files: new LRUMap() }, makeConfig(false), deps);
+    applyOverrideMode(pi as any, { files: new LRUMap(), readRoots: [] }, makeConfig(false), deps);
 
     expect(setActiveToolsCalls).toHaveLength(1);
     const last = setActiveToolsCalls[0];

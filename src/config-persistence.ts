@@ -25,10 +25,13 @@ export async function loadConfig(): Promise<PiFastEditsConfig> {
   }
 }
 
-export async function saveConfig(config: PiFastEditsConfig): Promise<void> {
+/** Persist the config; resolves false (with a logged reason) when the write fails. */
+export async function saveConfig(config: PiFastEditsConfig): Promise<boolean> {
   try {
     await atomicWriteFile(getConfigPath(), JSON.stringify(config, null, 2));
+    return true;
   } catch (error) {
     console.error("Failed to save pi-fast-edits config:", error);
+    return false;
   }
 }

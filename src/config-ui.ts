@@ -314,7 +314,9 @@ export async function showConfigMenu(
       // when the setting is overrideBuiltInEditTools itself, the callback
       // also re-runs the override wiring (both directions).
       onConfigChanged(id, ctx);
-      void saveConfig(config);
+      void saveConfig(config).then((ok) => {
+        if (!ok) ctx?.ui?.notify?.("pi-fast-edits: failed to save settings to disk", "warning");
+      });
     };
     return new ConfigMenuComponent(buildItems(config, theme, onChange), theme, onChange, () =>
       done(),

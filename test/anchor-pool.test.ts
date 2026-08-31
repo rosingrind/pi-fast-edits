@@ -79,7 +79,13 @@ describe("AnchorPool", () => {
       state.lines.map((line) => line.text),
       [plan],
     );
-    const newState = reconcileState(state, newLines, state.lineEnding, state.hadFinalNewline);
+    const newState = reconcileState(
+      state,
+      newLines,
+      state.lineEnding,
+      state.hadFinalNewline,
+      state.hadBom,
+    );
 
     // "b"'s anchor should be retired.
     expect(newState.retiredAnchors.has(originalBAnchor)).toBe(true);

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import piFastEdits from "../src/index.js";
 import { hydrateAnchorState, stateFilePath } from "../src/anchor/state-persistence.js";
-import { LRUMap } from "../src/types.js";
+import { LRUMap, type SessionState } from "../src/types.js";
 
 type ToolDef = {
   name: string;
@@ -54,7 +54,7 @@ describe("session event wiring (e2e)", () => {
     expect(existsSync(path)).toBe(true);
 
     // Persisted payload round-trips the anchor strings verbatim.
-    const restored = { files: new LRUMap() };
+    const restored: SessionState = { files: new LRUMap(), readRoots: [] };
     hydrateAnchorState(restored, JSON.parse(readFileSync(path, "utf-8")));
     const state = restored.files.get(file)!;
     expect(state.lines.map((l) => l.anchor)).toEqual([

@@ -1,4 +1,5 @@
 import { stat, writeFile } from "node:fs/promises";
+import { experimentalToolSampling } from "./experimental-sampling.js";
 import { tmpdir } from "node:os";
 import { randomBytes } from "node:crypto";
 import { isAbsolute, relative, resolve } from "node:path";
@@ -12,7 +13,9 @@ import { DEFAULT_PROTECTED_SKIP, isProtectedPath } from "../fs/path-safety.js";
 import { resolveRg } from "../fs/rg-resolver.js";
 import { runRg, type RgHit } from "../fs/rg-search.js";
 import {
-  renderToolCall,
+  toolResultText,
+  errorResultComponent,
+  collapsedPreview,
   type ToolResult,
   type RenderOptions,
   type RenderContext,
@@ -57,6 +60,12 @@ const grepSchema = Type.Object({
       description: "Anchored context lines around each match (default 0, max 10).",
     }),
   ),
+  literal: Type.Optional(
+    Type.Boolean({
+      description:
+        "Treat pattern as a literal string instead of a regular expression (rg -F). Default: false.",
+    }),
+  ),
   maxMatches: Type.Optional(
     Type.Number({
       description: `Maximum matching lines shown per file (default ${DEFAULT_MAX_MATCHES_PER_FILE}).`,
@@ -73,6 +82,7 @@ export function registerGrepAnchored(
   const tool = {
     name: "grep_anchored",
     label: "Grep Anchored Files",
+    constrainedSampling: experimentalToolSampling(),
     description:
       "Search file contents with a regex and get matching lines back with stable word anchors and revision hashes, " +
       "exactly as read_anchored renders them. Results can be fed straight into the anchored edit tools " +
@@ -114,16 +124,6 @@ export function registerGrepAnchored(
     ) {
       if (signal?.aborted) return textResult("Search cancelled (aborted).");
       const cwd = getCwd(ctx);
-
-      // Validate the pattern up front with a friendly message; the real scan
-      // is done by rg (Rust regex syntax), which re-validates on its own.
-      try {
-        new RegExp(params.pattern, params.ignoreCase ? "i" : "");
-      } catch (error) {
-        throw new Error(
-          `Invalid regex pattern: ${params.pattern}. ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
 
       // Resolve the search root: a single file short-circuits the directory walk.
       let rootAbs = cwd;
@@ -180,13 +180,17 @@ async function grepWithRg(
   const args = ["--json", "-e", params.pattern];
   if (params.ignoreCase) args.push("-i");
   if (params.glob) args.push("--glob", params.glob);
+  // Literal search (rg -F): the pattern is a fixed string, so regex
+  // metacharacters match themselves — parity with pi's built-in grep.
+  if (params.literal) args.push("-F");
   if (context > 0) args.push("--context", String(context));
   // rg has no built-in knowledge of dependency trees: in non-git workspaces
   // it surfaces node_modules and .git dirs at any depth (only top-level
   // segments were filtered before), so exclude them at the source.
   args.push("--glob", "!**/node_modules/**", "--glob", "!**/.git/**");
   // Always pass the absolute root so rg searches the right directory even when
-  // the host process cwd differs from the workspace being searched.
+  // the host process cwd differs from the workspace being searched. baseArgs
+  // (without the root) is reused for single-file drift re-scans.
   args.push(rootAbs);
 
   let hits: RgHit[];
@@ -262,18 +266,35 @@ async function grepWithRg(
     ({ relativePath, state: loaded.state } = loaded);
     const state = loaded.state;
 
-    const { kept, drifted } = filterDrifted(byFile.get(file)!, state.lines);
-    if (drifted) {
-      omittedFiles++;
-      sections.push(`${relativePath}\n${DRIFT_MESSAGE}`);
-      outputLength += relativePath.length;
-      continue;
+    let kept = filterDrifted(byFile.get(file)!, state.lines);
+    if (kept.drifted) {
+      // The file changed between rg's scan and our anchor-state read. Re-scan
+      // just this file once (bounded) so the model gets fresh, re-verified
+      // coordinates instead of a dead-end drift notice — mirroring the read
+      // tool's reconcile-on-drift behavior. If it drifts again (still being
+      // written, say), fall back to the notice.
+      let freshHits: RgHit[] = [];
+      try {
+        freshHits = await runRg(rgPath, [...args.slice(0, -1), absPath], signal);
+      } catch {
+        // rg failure during the recovery scan — keep the drift notice.
+      }
+      const refiltered = filterDrifted(freshHits, state.lines);
+      if (!refiltered.drifted && refiltered.kept.length > 0) {
+        kept = refiltered;
+      } else {
+        omittedFiles++;
+        sections.push(`${relativePath}\n${DRIFT_MESSAGE}`);
+        outputLength += relativePath.length;
+        continue;
+      }
     }
+    const { kept: verifiedHits } = kept;
 
     // Context events can duplicate line numbers (overlapping match windows);
     // render each line once, preferring match hits over context.
     const deduped = new Map<number, RgHit>();
-    for (const hit of kept) {
+    for (const hit of verifiedHits) {
       const existing = deduped.get(hit.lineNo);
       if (existing === undefined || (!existing.isMatch && hit.isMatch)) {
         deduped.set(hit.lineNo, hit);
@@ -392,10 +413,9 @@ export function renderGrepResult(
   theme: Theme,
   context: RenderContext,
 ): Component {
-  const raw = result.content?.[0]?.text ?? "";
-  if (context.isError) {
-    return new Text(theme.fg("error", raw), 0, 0);
-  }
+  const errorComponent = errorResultComponent(result, theme, context);
+  if (errorComponent) return errorComponent;
+  const raw = toolResultText(result);
   try {
     const cleaned = cleanDisplayLines(raw, theme);
     if (!options.expanded) {
@@ -403,14 +423,8 @@ export function renderGrepResult(
       // hint. Cleaning happens BEFORE capping — the raw model text carries
       // anchor prefixes, hashes, and positional suffixes the UI must never
       // show, and capping raw would both leak them and under-count.
-      const shown = cleaned.slice(0, MAX_COLLAPSED_LINES);
-      let text = shown.join("\n");
-      const remaining = cleaned.length - shown.length;
-      if (remaining > 0) {
-        text += theme.fg("muted", `\n... (${remaining} more lines, ctrl+o to expand)`);
-      }
       // pi's collapsed grep prepends the same blank line as expanded.
-      return new Text("\n" + text, 0, 0);
+      return new Text("\n" + collapsedPreview(cleaned, MAX_COLLAPSED_LINES, theme), 0, 0);
     }
     // Expanded: everything the model got, presentation-clean, with pi's
     // leading-newline spacing convention.

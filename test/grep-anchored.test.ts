@@ -101,6 +101,30 @@ describe("grep_anchored", () => {
     expect(text).not.toContain("notes.md");
   });
 
+  itWithRg("literal search treats regex metacharacters as fixed strings", async () => {
+    const cwd = await sampleWorkspace();
+    await writeFile(join(cwd, "meta.txt"), "foo.bar\nfooxbar\n", "utf8");
+    const tools = await loadTools();
+
+    // Regex default: `foo.bar` matches both lines (the dot is a wildcard).
+    const regex = await tools
+      .get("grep_anchored")!
+      .execute("1", { pattern: "foo.bar", path: "meta.txt" }, undefined, undefined, { cwd });
+    const regexText = regex.content[0].text as string;
+    expect(regexText).toContain("foo.bar");
+    expect(regexText).toContain("fooxbar");
+
+    // Literal: the dot matches only itself.
+    const literal = await tools
+      .get("grep_anchored")!
+      .execute("1", { pattern: "foo.bar", path: "meta.txt", literal: true }, undefined, undefined, {
+        cwd,
+      });
+    const literalText = literal.content[0].text as string;
+    expect(literalText).toContain("foo.bar");
+    expect(literalText).not.toContain("fooxbar");
+  });
+
   itWithRg("refuses an explicitly targeted protected file", async () => {
     const cwd = await sampleWorkspace();
     await writeFile(join(cwd, ".env"), "SECRET=1\n", "utf8");
@@ -169,12 +193,12 @@ describe("grep_anchored", () => {
     expect(result.content[0].text).toContain("No matches");
   });
 
-  it("rejects invalid regex patterns", async () => {
+  itWithRg("rejects invalid regex patterns via rg (no main-thread JS compilation)", async () => {
     const cwd = await sampleWorkspace();
     const tools = await loadTools();
     await expect(
       tools.get("grep_anchored")!.execute("1", { pattern: "(bad" }, undefined, undefined, { cwd }),
-    ).rejects.toThrow(/Invalid regex/);
+    ).rejects.toThrow(/ripgrep search failed/i);
   });
 
   itWithRg("anchors from grep results are valid for subsequent edits", async () => {

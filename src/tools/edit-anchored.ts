@@ -25,6 +25,7 @@ import {
   type RenderContext,
 } from "./render.js";
 import { Container, Spacer, Text, type Component } from "@earendil-works/pi-tui";
+import { experimentalToolSampling } from "./experimental-sampling.js";
 import type { Theme } from "./theme.js";
 import { batchEditsSchema, type BatchEditsParams } from "./schemas.js";
 import type { Static } from "typebox";
@@ -49,6 +50,7 @@ export function registerEditAnchored(
   const tool = {
     name: "edit_anchored",
     label: "Apply Anchored Edits",
+    constrainedSampling: experimentalToolSampling(),
     description:
       "Apply multiple anchored edits in a single batch, validating all anchors before writing and reconciling lazily with Myers diff.",
     promptSnippet: "Apply multiple anchored edits in a single batch operation",

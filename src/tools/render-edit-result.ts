@@ -1,7 +1,13 @@
 import { renderDiff } from "@earendil-works/pi-coding-agent";
 import { Container, Spacer, Text } from "@earendil-works/pi-tui";
 import type { Component } from "@earendil-works/pi-tui";
-import type { ToolResult, RenderOptions, RenderContext } from "./render.js";
+import {
+  toolResultText,
+  errorResultComponent,
+  type ToolResult,
+  type RenderOptions,
+  type RenderContext,
+} from "./render.js";
 import type { Theme } from "./theme.js";
 
 /**
@@ -12,15 +18,13 @@ import type { Theme } from "./theme.js";
  */
 export function renderEditResult(
   result: ToolResult,
-  options: RenderOptions,
+  _options: RenderOptions,
   theme: Theme,
   context: RenderContext,
 ): Component {
-  if (context.isError) {
-    const text = result.content?.[0]?.text ?? "error";
-    return new Text(theme.fg("error", text), 0, 0);
-  }
-  const raw = result.content?.[0]?.text ?? "";
+  const errorComponent = errorResultComponent(result, theme, context);
+  if (errorComponent) return errorComponent;
+  const raw = toolResultText(result);
   // A diff has at least one `+`/`-` change line; a plain success message never
   // starts with one. Detect on the change marker so indented message lines or
   // space-prefixed context lines do not false-positive into diff rendering.

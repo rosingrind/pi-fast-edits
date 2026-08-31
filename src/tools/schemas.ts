@@ -11,7 +11,7 @@ import { Type } from "typebox";
  * would require picking the schema variant.
  */
 
-export type ReplaceEditParams = {
+type ReplaceEditParams = {
   path: string;
   startAnchor: string;
   endAnchor: string;
@@ -24,7 +24,7 @@ export type ReplaceEditParams = {
   expectedRevision?: string;
 };
 
-export type InsertEditParams = {
+type InsertEditParams = {
   path: string;
   anchor: string;
   position: "before" | "after";
@@ -34,7 +34,7 @@ export type InsertEditParams = {
   expectedRevision?: string;
 };
 
-export type DeleteEditParams = {
+type DeleteEditParams = {
   path: string;
   startAnchor: string;
   endAnchor: string;
@@ -43,7 +43,7 @@ export type DeleteEditParams = {
   expectedRevision?: string;
 };
 
-export type BatchEditParams =
+type BatchEditParams =
   | ({ type: "replace" } & ReplaceEditParams)
   | ({ type: "insert" } & InsertEditParams)
   | ({ type: "delete" } & DeleteEditParams);
@@ -153,7 +153,7 @@ function taggedDelete(requireAnchorLines: boolean) {
   ]);
 }
 
-export function editSchema(requireAnchorLines: boolean) {
+function editSchema(requireAnchorLines: boolean) {
   return Type.Union([
     taggedReplace(requireAnchorLines),
     taggedInsert(requireAnchorLines),

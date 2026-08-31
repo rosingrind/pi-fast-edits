@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 
-export const MAX_TOTAL_HITS = 500;
+const MAX_TOTAL_HITS = 500;
 
 export type RgHit = {
   file: string;
