@@ -26,7 +26,7 @@ The agent can then replace the `Cider..Eagle` range with new code. The extension
 
 - Anchor names (e.g., `Cider`) are used in tool parameters to reference lines
 - Anchor parameters take the bare anchor word copied from `read_anchored`/`grep_anchored` output
-- With `requireAnchorLines` on (the default), every edit must also pass the exact current source line at each anchor — `startAnchorLine`/`endAnchorLine` (or `anchorLine` for inserts) — copied verbatim from read/grep output. The line is verified against the file before editing; a mismatch rejects the edit with a corrective message
+- With `requireAnchorLines` on (the default), every edit must also pass the exact current source line at each anchor — `startAnchorLine`/`endAnchorLine` (or `anchorLine` for inserts) — copied verbatim from read/grep output. The line is verified against the file before editing; a mismatch rejects the edit with a corrective message. Revision mismatches additionally carry fresh coordinates (current text + line) for every named anchor, so a stale batch can be retried without re-reading; re-read only when the error reports missing anchors
 - Rendered `grep_anchored` lines end with a `line N` positional suffix — it is metadata, not part of the line, and must NOT be copied into `startAnchorLine`/`endAnchorLine`/`anchorLine` values
 - When `requireAnchorLines` is off, the line args are optional but still verified whenever they are provided
 - The `§` marker shown in file output is internal metadata only — it is NOT part of the actual file content

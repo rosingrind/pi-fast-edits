@@ -221,7 +221,7 @@ function planEditsForFile(
             `Then retry this batch with expectedRevision ${loaded.state.revisionHash}.`,
         );
       }
-      throw error;
+      throw new Error(`${(error as Error).message} Re-read the file before editing.`);
     }
   }
   // One index per file: O(1) anchor lookups for the whole batch (a linear

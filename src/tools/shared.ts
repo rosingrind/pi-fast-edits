@@ -121,7 +121,7 @@ export function assertExpectedRevision(
 ): void {
   if (expected && expected !== actual) {
     throw new Error(
-      `Revision mismatch for ${relativePath}: expected ${expected}, current ${actual}. Re-read the file before editing.`,
+      `Revision mismatch for ${relativePath}: expected ${expected}, current ${actual}.`,
     );
   }
 }
