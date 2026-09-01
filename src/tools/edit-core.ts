@@ -1,5 +1,5 @@
 import type { AnchoredEdit, FileAnchorState } from "../types.js";
-import { findAnchorIndex } from "../anchor/anchor-state.js";
+import { AnchorIndex } from "../anchor/anchor-state.js";
 import { splitTextPreserveFinal } from "../fs/text-file.js";
 
 /**
@@ -29,6 +29,7 @@ function verifyAnchorLines(
   state: FileAnchorState,
   edit: AnchoredEdit,
   requireAnchorLines: boolean,
+  index: AnchorIndex,
 ): void {
   const anchors: Array<{ anchor: string; expected: string | undefined; label: string }> =
     edit.type === "insert"
@@ -38,7 +39,7 @@ function verifyAnchorLines(
           { anchor: edit.endAnchor, expected: edit.endAnchorLine, label: "endAnchor" },
         ];
   for (const { anchor, expected, label } of anchors) {
-    const anchorIndex = findAnchorIndex(state, anchor);
+    const anchorIndex = index.find(anchor);
     if (anchorIndex === -1) continue; // planEdit reports the missing anchor itself
     if (expected === undefined) {
       if (requireAnchorLines) {
@@ -101,8 +102,10 @@ export function planEdit(
   state: FileAnchorState,
   edit: AnchoredEdit,
   requireAnchorLines: boolean,
+  index?: AnchorIndex,
 ): PlannedEdit {
-  verifyAnchorLines(state, edit, requireAnchorLines);
+  const idx = index ?? new AnchorIndex(state);
+  verifyAnchorLines(state, edit, requireAnchorLines, idx);
   rejectAnchorMarkedText(edit);
 
   // Empty files have no anchors — any edit creates the file content from scratch.
@@ -118,8 +121,8 @@ export function planEdit(
   }
 
   if (edit.type === "replace") {
-    const startAnchor = findAnchorIndex(state, edit.startAnchor);
-    const endAnchor = findAnchorIndex(state, edit.endAnchor);
+    const startAnchor = idx.find(edit.startAnchor);
+    const endAnchor = idx.find(edit.endAnchor);
     if (startAnchor === -1)
       throw new Error(`Could not find start anchor ${edit.startAnchor} in ${state.path}.`);
     if (endAnchor === -1)
@@ -142,7 +145,7 @@ export function planEdit(
   }
 
   if (edit.type === "insert") {
-    const index = findAnchorIndex(state, edit.anchor);
+    const index = idx.find(edit.anchor);
     if (index === -1) throw new Error(`Could not find anchor ${edit.anchor} in ${state.path}.`);
     const start = edit.position === "before" ? index : index + 1;
     return {
@@ -153,8 +156,8 @@ export function planEdit(
     };
   }
 
-  const start = findAnchorIndex(state, edit.startAnchor);
-  const end = findAnchorIndex(state, edit.endAnchor);
+  const start = idx.find(edit.startAnchor);
+  const end = idx.find(edit.endAnchor);
   if (start === -1)
     throw new Error(`Could not find start anchor ${edit.startAnchor} in ${state.path}.`);
   if (end === -1) throw new Error(`Could not find end anchor ${edit.endAnchor} in ${state.path}.`);

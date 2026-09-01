@@ -1,3 +1,4 @@
+import { AnchorIndex } from "../../src/anchor/anchor-state.js";
 import { describe, expect, it } from "vitest";
 import { writeFile, rm, mkdtemp, readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -113,5 +114,44 @@ describe("AnchorPool Performance", () => {
       expect(a3).not.toBe(a1);
       expect(a3).not.toBe(a2);
     });
+  });
+});
+
+describe("AnchorIndex (batch verification lookups)", () => {
+  it("keeps worst-case batch lookups fast at 10k lines (anchor at file end)", () => {
+    const lines = Array.from({ length: 10_000 }, (_, i) => ({
+      anchor: `word${i % 200}${Math.floor(i / 200) || ""}`,
+      text: `line ${i}`,
+      lineNo: i + 1,
+    }));
+    const state = {
+      path: "/tmp/perf.txt",
+      lines,
+      retiredAnchors: new Set<string>(),
+      revisionHash: "x",
+      lineEnding: "\n" as const,
+      hadFinalNewline: true,
+      hadBom: false,
+    };
+
+    const index = new AnchorIndex(state as never);
+    // Worst case: all 50 batch anchors resolve at the END of the file.
+    const targets = Array.from({ length: 50 }, (_, k) => lines[9_999 - k].anchor);
+    // Expected indices precomputed UNTIMED — findIndex is the linear scan
+    // this test exists to beat; including it in the timed loop would
+    // measure the oracle, not the index.
+    const expected = new Map(targets.map((a) => [a, lines.findIndex((l) => l.anchor === a)]));
+
+    const start = performance.now();
+    for (let rep = 0; rep < 20; rep++) {
+      for (const anchor of targets) {
+        if (index.find(anchor) !== expected.get(anchor)) {
+          throw new Error(`AnchorIndex returned a wrong index for ${anchor}`);
+        }
+      }
+    }
+    const elapsed = performance.now() - start;
+    // The previous linear scan measured ~205ms for the identical workload.
+    expect(elapsed).toBeLessThan(20);
   });
 });

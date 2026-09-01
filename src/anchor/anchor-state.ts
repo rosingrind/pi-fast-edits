@@ -27,8 +27,26 @@ export function createFileAnchorState(
   };
 }
 
-export function findAnchorIndex(state: FileAnchorState, anchor: string): number {
-  return state.lines.findIndex((line) => line.anchor === normalizeAnchor(anchor));
+/**
+ * O(1) anchor→line-index lookups for batch verification. Built fresh from the
+ * state's current lines — never cached across calls — so it cannot go stale
+ * when lines change. Duplicate anchors cannot occur within a file (the pool
+ * guarantees uniqueness via suffixing), and first-wins matches findIndex.
+ */
+export class AnchorIndex {
+  private readonly byAnchor: Map<string, number>;
+
+  constructor(state: FileAnchorState) {
+    this.byAnchor = new Map();
+    state.lines.forEach((line, i) => {
+      if (!this.byAnchor.has(line.anchor)) this.byAnchor.set(line.anchor, i);
+    });
+  }
+
+  /** Line index for `anchor`, or -1 when not found (mirrors findIndex). */
+  find(anchor: string): number {
+    return this.byAnchor.get(normalizeAnchor(anchor)) ?? -1;
+  }
 }
 
 function normalizeAnchor(anchor: string): string {
