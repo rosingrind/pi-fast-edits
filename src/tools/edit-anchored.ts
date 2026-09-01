@@ -16,7 +16,13 @@ import {
   type AnchorChangeSet,
   type PiContext,
 } from "./shared.js";
-import { applyPlansToLines, assertNoOverlaps, planEdit, type PlannedEdit } from "./edit-core.js";
+import {
+  applyPlansToLines,
+  assertNoOverlaps,
+  freshAnchorHint,
+  planEdit,
+  type PlannedEdit,
+} from "./edit-core.js";
 import { AnchorIndex } from "../anchor/anchor-state.js";
 import { renderToolCall } from "./render.js";
 import { experimentalToolSampling } from "./experimental-sampling.js";
@@ -202,7 +208,21 @@ function planEditsForFile(
   requireAnchorLines: boolean,
 ): PlannedFile {
   for (const edit of pathEdits) {
-    assertExpectedRevision(loaded.relativePath, loaded.state.revisionHash, edit.expectedRevision);
+    try {
+      assertExpectedRevision(loaded.relativePath, loaded.state.revisionHash, edit.expectedRevision);
+    } catch (error) {
+      // The state was just reconciled, so it carries fresh verified anchors —
+      // attach them (bounded) to turn the dead-end rejection into a one-turn
+      // retry with full visibility of what changed.
+      const hint = freshAnchorHint(loaded.state, pathEdits);
+      if (hint) {
+        throw new Error(
+          `${(error as Error).message}${hint}\n\n` +
+            `Then retry this batch with expectedRevision ${loaded.state.revisionHash}.`,
+        );
+      }
+      throw error;
+    }
   }
   // One index per file: O(1) anchor lookups for the whole batch (a linear
   // scan per anchor measured ~205ms for 50 edits on a 10k-line file).

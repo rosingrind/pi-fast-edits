@@ -1394,3 +1394,145 @@ describe("read empty file", () => {
     expect(text).not.toContain("§");
   });
 });
+
+describe("revision mismatch fresh-coordinates recovery", () => {
+  async function staleEdit(
+    tools: Map<string, ToolDef>,
+    cwd: string,
+    edits: Record<string, unknown>[],
+  ): Promise<Error> {
+    let caught: Error | undefined;
+    try {
+      await tools.get("edit_anchored")!.execute("1", { edits }, undefined, undefined, { cwd });
+    } catch (error) {
+      caught = error as Error;
+    }
+    if (!caught) throw new Error("expected a revision mismatch");
+    return caught;
+  }
+
+  it("carries fresh coordinates and retries in one turn after an external append", async () => {
+    const cwd = await workspace();
+    const file = join(cwd, "rev.txt");
+    await writeFile(file, "alpha\nbeta\ngamma\ndelta\n", "utf8");
+    const tools = await loadTools();
+    const first = await readAnchored(tools, cwd, "rev.txt");
+    const gamma = first.lines.find((l) => l.text === "gamma")!;
+    const delta = first.lines.find((l) => l.text === "delta")!;
+
+    // External append after the read — the read's revision is now stale.
+    await writeFile(file, "alpha\nbeta\ngamma\ndelta\nepsilon\nzeta\neta\n", "utf8");
+
+    const staleEdits = [
+      {
+        type: "replace",
+        path: "rev.txt",
+        startAnchor: gamma.anchor,
+        startAnchorLine: gamma.text,
+        endAnchor: delta.anchor,
+        endAnchorLine: delta.text,
+        replacement: "GAMMA\nDELTA",
+        expectedRevision: first.revision,
+      },
+    ];
+    const error = await staleEdit(tools, cwd, staleEdits);
+
+    expect(error.message).toContain("Revision mismatch");
+    expect(error.message).toContain("Fresh coordinates in the current file");
+    expect(error.message).toContain("(content unchanged)");
+    expect(error.message).toMatch(/Then retry this batch with expectedRevision [a-f0-9]{16}\./);
+
+    // One-turn retry: same anchors, same lines, fresh revision.
+    const fresh = /expectedRevision ([a-f0-9]{16})\./.exec(error.message)![1];
+    const retryEdits = staleEdits.map((e) => ({ ...e, expectedRevision: fresh }));
+    await tools.get("edit_anchored")!.execute("2", { edits: retryEdits }, undefined, undefined, {
+      cwd,
+    });
+    expect(await readFile(file, "utf8")).toBe("alpha\nbeta\nGAMMA\nDELTA\nepsilon\nzeta\neta\n");
+  });
+
+  it("shows shifted line numbers when the external change inserts at the top", async () => {
+    const cwd = await workspace();
+    const file = join(cwd, "rev.txt");
+    await writeFile(file, "one\ntwo\n", "utf8");
+    const tools = await loadTools();
+    const first = await readAnchored(tools, cwd, "rev.txt");
+    const one = first.lines.find((l) => l.text === "one")!;
+
+    // External change inserts a line at the top — "one" shifts to line 2.
+    await writeFile(file, "zero\none\ntwo\n", "utf8");
+
+    const error = await staleEdit(tools, cwd, [
+      {
+        type: "replace",
+        path: "rev.txt",
+        startAnchor: one.anchor,
+        startAnchorLine: one.text,
+        endAnchor: one.anchor,
+        endAnchorLine: one.text,
+        replacement: "ONE",
+        expectedRevision: first.revision,
+      },
+    ]);
+
+    expect(error.message).toContain("Fresh coordinates in the current file");
+    expect(error.message).toContain(`${one.anchor}§ one    line 2 (content unchanged)`);
+  });
+
+  it("reports named anchors that no longer exist instead of inventing coordinates", async () => {
+    const cwd = await workspace();
+    const file = join(cwd, "rev.txt");
+    await writeFile(file, "keep\ntarget\n", "utf8");
+    const tools = await loadTools();
+    const first = await readAnchored(tools, cwd, "rev.txt");
+    const target = first.lines.find((l) => l.text === "target")!;
+
+    // External change deletes the target line entirely.
+    await writeFile(file, "keep\n", "utf8");
+
+    const error = await staleEdit(tools, cwd, [
+      {
+        type: "replace",
+        path: "rev.txt",
+        startAnchor: target.anchor,
+        startAnchorLine: target.text,
+        endAnchor: target.anchor,
+        endAnchorLine: target.text,
+        replacement: "X",
+        expectedRevision: first.revision,
+      },
+    ]);
+
+    expect(error.message).toContain("no longer exist");
+    expect(error.message).not.toContain("Fresh coordinates in the current file");
+  });
+
+  it("caps the fresh-coordinate block at 8 rows", async () => {
+    const cwd = await workspace();
+    const file = join(cwd, "rev.txt");
+    const lineCount = 12;
+    await writeFile(
+      file,
+      Array.from({ length: lineCount }, (_, i) => `L${i + 1}`).join("\n") + "\n",
+      "utf8",
+    );
+    const tools = await loadTools();
+    const first = await readAnchored(tools, cwd, "rev.txt");
+    const edits = first.lines.map((l, i) => ({
+      type: "replace" as const,
+      path: "rev.txt",
+      startAnchor: l.anchor,
+      startAnchorLine: l.text,
+      endAnchor: l.anchor,
+      endAnchorLine: l.text,
+      replacement: `N${i + 1}`,
+      expectedRevision: "0123456789abcdef", // deliberately wrong → guaranteed mismatch
+    }));
+
+    const error = await staleEdit(tools, cwd, edits);
+
+    expect(error.message).toContain("Fresh coordinates in the current file");
+    expect(error.message).toContain("4 more named anchors omitted");
+    expect(error.message.match(/line \d+/g)?.length).toBe(8);
+  });
+});

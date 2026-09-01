@@ -116,6 +116,79 @@ function anchorNotFoundError(label: string, anchor: string, state: FileAnchorSta
   );
 }
 
+/**
+ * Compact fresh-coordinates block for a revision-mismatch rejection: resolves
+ * every anchor named by the batch against the CURRENT (reconciled) state so
+ * the model can retry in one turn instead of a dead-end re-read. Rows carry
+ * the fresh anchor word, current text, and line number; rows whose content
+ * matches what the edit expected are marked "(content unchanged)" — the
+ * lost-update safety valve: changed content is shown, never hidden. Bounded
+ * to 8 rows; anchors whose lines no longer exist are counted, not invented.
+ */
+const FRESH_HINT_MAX_ROWS = 8;
+const FRESH_HINT_TEXT_CAP = 160;
+
+export function freshAnchorHint(state: FileAnchorState, edits: AnchoredEdit[]): string | undefined {
+  const index = new AnchorIndex(state);
+  const expectedText = new Map<string, string | undefined>();
+  const names: string[] = [];
+  for (const edit of edits) {
+    const named =
+      edit.type === "insert"
+        ? [[edit.anchor, edit.anchorLine] as const]
+        : [
+            [edit.startAnchor, edit.startAnchorLine] as const,
+            [edit.endAnchor, edit.endAnchorLine] as const,
+          ];
+    for (const [name, line] of named) {
+      if (!expectedText.has(name)) {
+        names.push(name);
+        expectedText.set(name, line);
+      }
+    }
+  }
+
+  const rows: string[] = [];
+  let missing = 0;
+  let overflow = 0;
+  for (const name of names) {
+    const i = index.find(name);
+    if (i === -1) {
+      missing++;
+      continue;
+    }
+    if (rows.length >= FRESH_HINT_MAX_ROWS) {
+      overflow++;
+      continue;
+    }
+    const line = state.lines[i];
+    const text =
+      line.text.length > FRESH_HINT_TEXT_CAP
+        ? `${line.text.slice(0, FRESH_HINT_TEXT_CAP)}…`
+        : line.text;
+    const unchanged = expectedText.get(name) === line.text ? " (content unchanged)" : "";
+    rows.push(`${line.anchor}§ ${text}    line ${line.lineNo}${unchanged}`);
+  }
+
+  if (rows.length === 0) {
+    if (missing === 0) return undefined;
+    return `\nAll named anchors no longer exist in the current file — re-read it before retrying.`;
+  }
+  const parts: string[] = [
+    "Fresh coordinates in the current file (verify the content before retrying):",
+  ];
+  parts.push(...rows);
+  if (overflow > 0) parts.push(`... ${overflow} more named anchors omitted.`);
+  if (missing > 0) {
+    parts.push(
+      missing === 1
+        ? "1 named anchor no longer exists (its line changed or was deleted) — re-read that region before retrying."
+        : `${missing} named anchors no longer exist (their lines changed or were deleted) — re-read those regions before retrying.`,
+    );
+  }
+  return `\n${parts.join("\n")}`;
+}
+
 export function planEdit(
   state: FileAnchorState,
   edit: AnchoredEdit,
