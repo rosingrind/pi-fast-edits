@@ -37,7 +37,7 @@ describe("override toggle notice", () => {
       `Tool override enabled: read/edit/write/grep now use anchor-line contracts (see each tool's schema). Previous anchored tool names (${ANCHORED_LIST}) are deactivated.`,
     );
     expect(OVERRIDE_DISABLED_NOTICE).toBe(
-      `Tool override disabled: the anchored tools (${ANCHORED_LIST}) are active again; read/edit/write/grep keep their anchored definitions until pi reloads the extension (fully native restore requires a reload).`,
+      `Tool override disabled: the anchored tools (${ANCHORED_LIST}) are active again; read/edit/write/grep keep their anchored definitions until pi reloads the extension (fully native restore requires a reload). Prefer the anchored tools for all file work.`,
     );
   });
 
@@ -90,7 +90,8 @@ describe("override toggle notice", () => {
     expect(track("anchored-only")?.message.content).toContain(
       "Native read/edit/write/grep are hidden",
     );
-    expect(track("native")).toBeUndefined();
+    // anchored-only -> native is also a surface change: disabled notice fires
+    expect(track("native")?.message.content).toBe(OVERRIDE_DISABLED_NOTICE);
     // steady state back at native: no further notice
     expect(track("native")).toBeUndefined();
   });

@@ -1288,7 +1288,7 @@ describe("override", () => {
     expect(notifications[0].type).toBe("warning");
   });
 
-  it("installs nothing when override is disabled (default)", async () => {
+  it("disabled (default): restores the suffixed tools, installs nothing else", async () => {
     let toolCallHandler:
       ((event: { toolName?: string }, ctx: unknown) => Promise<unknown> | undefined) | undefined;
     const pi = {
