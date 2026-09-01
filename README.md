@@ -195,7 +195,9 @@ If the safety check fails (e.g. pi redesigns a built-in), the extension falls ba
 
 ## Troubleshooting
 
-**`edit` crashes with `Cannot read properties of undefined (reading 'replace')`** — pi's **built-in** edit executed anchored-shaped arguments. The built-in edit requires `edits[].oldText`/`newText`; anchored edits carry `startAnchor`/`anchorLine` instead, so the built-in's `normalizeToLF(edit.oldText)` crashes on `undefined`. This means the override's renamed registration supplied the schema/prompt but **execution dispatched to the built-in edit body** — a pi↔extension dispatch divergence (typically a pi upgrade with the pi process started before it, or mixed pi/extension versions). Fix: fully restart pi (not just `/reload`) so registry and execution bindings agree; if it persists on a fresh process, it's an upstream dispatch bug — report it with an anchored-args repro. Workaround meanwhile: set `overrideBuiltInEditTools: false` (the model then uses `edit_anchored` directly — no name shadowing, no crash).
+**`edit` crashes with `Cannot read properties of undefined (reading 'replace')`** — on newer pi versions, a tool registered over the built-in name `edit` gets its **schema/prompt from the extension but its execution from pi's built-in edit body**, which requires `edits[].oldText`/`newText`. Anchored edits carry `startAnchor`/`anchorLine` instead, so the built-in's `normalizeToLF(edit.oldText)` crashes on `undefined`. Verified behaviorally: anchored-shaped args validate against the extension schema then crash; built-in-shaped args (`oldText`/`newText`) are rejected by the extension schema — the name is split at dispatch. A pi restart does **not** fix it.
+
+Workaround: set `overrideBuiltInEditTools: false` — the model then drives `edit_anchored` directly (full anchored workflow, no name shadowing, no crash). Long-term: this is an upstream pi dispatch issue (extension def supplies validation, built-in supplies execution for shadowed built-in names) — report to `earendil-works/pi` with an anchored-args repro.
 
 ## Safety
 
