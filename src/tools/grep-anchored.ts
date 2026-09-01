@@ -548,7 +548,9 @@ export function filterDrifted(
 /** Render one anchored line, truncating overlong content but keeping the anchor prefix. */
 function renderHitLine(line: { anchor: string; text: string }, lineNo: number): string {
   const text =
-    line.text.length > MAX_LINE_LENGTH ? `${line.text.slice(0, MAX_LINE_LENGTH)}...` : line.text;
+    line.text.length > MAX_LINE_LENGTH
+      ? `${line.text.slice(0, MAX_LINE_LENGTH)}...(truncated at ${MAX_LINE_LENGTH} chars — re-read with anchored: false for the full line)`
+      : line.text;
   return `${line.anchor}${ANCHOR_DELIMITER} ${text}    line ${lineNo}`;
 }
 

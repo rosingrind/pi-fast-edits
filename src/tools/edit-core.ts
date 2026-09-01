@@ -99,20 +99,28 @@ function rejectAnchorMarkedText(edit: AnchoredEdit): void {
 }
 
 /** Not-found error with a best-effort "did you mean" hint for near-miss anchors. */
-function anchorNotFoundError(label: string, anchor: string, state: FileAnchorState): Error {
+function anchorNotFoundError(
+  label: string,
+  anchor: string,
+  state: FileAnchorState,
+  lineField: string,
+): Error {
   const name = label ? `${label} anchor` : "anchor";
   const suggestion = suggestAnchor(state, anchor);
   if (!suggestion) return new Error(`Could not find ${name} ${anchor} in ${state.path}.`);
-  const lineHint = `line ${suggestion.lineNo}: ${JSON.stringify(suggestion.text)}`;
+  const shown =
+    suggestion.text.length > DISPLAY_LINE_CAP
+      ? `${suggestion.text.slice(0, DISPLAY_LINE_CAP)}…`
+      : suggestion.text;
+  const lineHint = `line ${suggestion.lineNo}: ${JSON.stringify(shown)}`;
+  const retry = `Retry with that anchor and ${lineField} '${shown}'.`;
   if (suggestion.caseOnly) {
     return new Error(
-      `Could not find ${name} ${anchor} in ${state.path}. Anchors are case-sensitive — did you mean '${suggestion.suggestion}' (${lineHint})? ` +
-        `Retry with that anchor and startAnchorLine/endAnchorLine '${suggestion.text}'.`,
+      `Could not find ${name} ${anchor} in ${state.path}. Anchors are case-sensitive — did you mean '${suggestion.suggestion}' (${lineHint})? ${retry}`,
     );
   }
   return new Error(
-    `Could not find ${name} ${anchor} in ${state.path}. Did you mean '${suggestion.suggestion}' (${lineHint})? ` +
-      `Retry with that anchor and startAnchorLine/endAnchorLine '${suggestion.text}'.`,
+    `Could not find ${name} ${anchor} in ${state.path}. Did you mean '${suggestion.suggestion}' (${lineHint})? ${retry}`,
   );
 }
 
@@ -162,12 +170,13 @@ export function freshAnchorHint(state: FileAnchorState, edits: AnchoredEdit[]): 
       continue;
     }
     const line = state.lines[i];
-    const text =
-      line.text.length > FRESH_HINT_TEXT_CAP
-        ? `${line.text.slice(0, FRESH_HINT_TEXT_CAP)}…`
-        : line.text;
+    const truncated = line.text.length > FRESH_HINT_TEXT_CAP;
+    const text = truncated ? `${line.text.slice(0, FRESH_HINT_TEXT_CAP)}…` : line.text;
     const unchanged = expectedText.get(name) === line.text ? " (content unchanged)" : "";
-    rows.push(`${line.anchor}§ ${text}    line ${line.lineNo}${unchanged}`);
+    const truncatedNote = truncated
+      ? " (truncated — re-read with `anchored: false` to copy verbatim)"
+      : "";
+    rows.push(`${line.anchor}§ ${text}    line ${line.lineNo}${unchanged}${truncatedNote}`);
   }
 
   if (rows.length === 0) {
@@ -214,8 +223,10 @@ export function planEdit(
   if (edit.type === "replace") {
     const startAnchor = idx.find(edit.startAnchor);
     const endAnchor = idx.find(edit.endAnchor);
-    if (startAnchor === -1) throw anchorNotFoundError("start", edit.startAnchor, state);
-    if (endAnchor === -1) throw anchorNotFoundError("end", edit.endAnchor, state);
+    if (startAnchor === -1)
+      throw anchorNotFoundError("start", edit.startAnchor, state, "startAnchorLine/endAnchorLine");
+    if (endAnchor === -1)
+      throw anchorNotFoundError("end", edit.endAnchor, state, "startAnchorLine/endAnchorLine");
     const includeStart = edit.includeStart ?? true;
     const includeEnd = edit.includeEnd ?? true;
     const start = includeStart ? startAnchor : startAnchor + 1;
@@ -235,7 +246,7 @@ export function planEdit(
 
   if (edit.type === "insert") {
     const index = idx.find(edit.anchor);
-    if (index === -1) throw anchorNotFoundError("", edit.anchor, state);
+    if (index === -1) throw anchorNotFoundError("", edit.anchor, state, "anchorLine");
     const start = edit.position === "before" ? index : index + 1;
     return {
       edit,
@@ -247,8 +258,8 @@ export function planEdit(
 
   const start = idx.find(edit.startAnchor);
   const end = idx.find(edit.endAnchor);
-  if (start === -1) throw anchorNotFoundError("start", edit.startAnchor, state);
-  if (end === -1) throw anchorNotFoundError("end", edit.endAnchor, state);
+  if (start === -1) throw anchorNotFoundError("start", edit.startAnchor, state, "startAnchorLine/endAnchorLine");
+  if (end === -1) throw anchorNotFoundError("end", edit.endAnchor, state, "startAnchorLine/endAnchorLine");
   if (start > end) throw new Error(`Invalid delete range ${edit.startAnchor}..${edit.endAnchor}.`);
   return { edit, start, end, replacementLines: [] };
 }

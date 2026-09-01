@@ -20,7 +20,7 @@ Tool output renders lines as `Tunnel§ target alpha one` — `grep` appends `lin
 
 Every file read/edited carries a `Revision:` hash — the first 16 hex chars of the file content's SHA-256, so it changes only when content changes. On every successful edit **and** every external modification (formatter, lint autofix, another agent, `bash`), the revision rotates and surviving anchors are re-pointed lazily. Consequences:
 
-- Pass the current hash as `expectedRevision`; a mismatch rejects the batch with the current hash **plus fresh coordinates for every anchor you named** (current text + line) — retry in one turn with those and the new hash. Re-read only when the error says an anchor no longer exists. Never guess or reuse an old hash.
+- Pass the current hash as `expectedRevision`; a mismatch rejects the batch with the current hash **plus fresh coordinates for every anchor you named** (current text + line) — retry in one turn with those and the new hash. The fresh rows' anchor words **supersede your originals** — use the words the error shows, not your earlier read's. Rows whose text is truncated say so — re-read them with `anchored: false` to copy verbatim. Re-read only when the error says an anchor no longer exists. Never guess or reuse an old hash.
 - Every successful edit rotates the hash — fetch the fresh revision (read/grep) before the **next** edit's `expectedRevision`, not only after a failure.
 - A revision returned by `write` can already be stale if a hook/autofix touched the file afterward. When a tool notice says content was modified, **re-read before the first edit**.
 
