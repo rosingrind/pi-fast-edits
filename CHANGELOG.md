@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Anchor not-found errors now teach recovery** — a typo'd or case-flipped anchor ("Goldn", "golden") no longer dead-ends: the error suggests the nearest existing anchor by edit distance, flags case-only mismatches explicitly, and names the suggested anchor's line number + text so the edit can be retried correctly in one turn. Unrelated anchors keep the plain error (no invented suggestions)
+
 ## [0.3.0] - 2026-08-31
 
 ### Added

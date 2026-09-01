@@ -162,3 +162,88 @@ describe("path-seeded rng (eviction durability)", () => {
     expect(rederived.lines.map((l) => l.anchor)).toEqual(first.lines.map((l) => l.anchor));
   });
 });
+
+describe("anchor not-found suggestions", () => {
+  function setup(content: string) {
+    return createFileAnchorState(
+      "/tmp/suggest.txt",
+      content.split("\n").filter((line) => line !== ""),
+      "\n",
+      true,
+      false,
+      content,
+    );
+  }
+
+  function planError(state: ReturnType<typeof setup>, edit: Record<string, unknown>): string {
+    let message = "";
+    try {
+      planEdit(state, edit as never, false);
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    return message;
+  }
+
+  it("suggests the nearest existing anchor for a typo, with its line", () => {
+    const state = setup("alpha\nbeta\nGolden\n");
+    const real = state.lines[2].anchor; // allocated pool word on line 3
+    const typo = real.slice(0, -1); // distance-1 miss
+    const message = planError(state, {
+      type: "replace",
+      path: "/tmp/suggest.txt",
+      startAnchor: typo,
+      startAnchorLine: "Golden",
+      endAnchor: typo,
+      endAnchorLine: "Golden",
+      replacement: "x",
+    });
+    expect(message).toContain(`Did you mean '${real}' (line 3: "Golden")`);
+    expect(message).toContain(`startAnchorLine/endAnchorLine 'Golden'`);
+  });
+
+  it("flags case-only mismatches as case-sensitive", () => {
+    const state = setup("alpha\nbeta\nGolden\n");
+    const real = state.lines[1].anchor;
+    const message = planError(state, {
+      type: "replace",
+      path: "/tmp/suggest.txt",
+      startAnchor: real.toLowerCase(),
+      startAnchorLine: "beta",
+      endAnchor: real.toLowerCase(),
+      endAnchorLine: "beta",
+      replacement: "x",
+    });
+    expect(message).toContain("Anchors are case-sensitive");
+    expect(message).toContain(`'${real}'`);
+    expect(message).toContain(`line 2: "beta"`);
+  });
+
+  it("offers no suggestion for unrelated anchors", () => {
+    const state = setup("alpha\nbeta\n");
+    const message = planError(state, {
+      type: "replace",
+      path: "/tmp/suggest.txt",
+      startAnchor: "Qqzzzzq",
+      startAnchorLine: "zz",
+      endAnchor: "Qqzzzzq",
+      endAnchorLine: "zz",
+      replacement: "x",
+    });
+    expect(message).toBe("Could not find start anchor Qqzzzzq in /tmp/suggest.txt.");
+  });
+
+  it("suggests for insert-type anchors too", () => {
+    const state = setup("alpha\nbeta\nGolden\n");
+    const real = state.lines[2].anchor;
+    const message = planError(state, {
+      type: "insert",
+      path: "/tmp/suggest.txt",
+      anchor: real.slice(0, -1),
+      anchorLine: "Golden",
+      position: "before",
+      content: "x",
+    });
+    expect(message).toContain(`Did you mean '${real}'`);
+  });
+});

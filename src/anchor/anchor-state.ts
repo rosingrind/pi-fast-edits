@@ -27,6 +27,63 @@ export function createFileAnchorState(
   };
 }
 
+export type AnchorSuggestion = {
+  suggestion: string;
+  caseOnly: boolean;
+  lineNo: number;
+  text: string;
+};
+
+/** Levenshtein distance with a band cutoff — anchor words are short, so this is cheap. */
+function boundedEditDistance(a: string, b: string, max: number): number {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    let rowMin = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+      rowMin = Math.min(rowMin, cur[j]);
+    }
+    if (rowMin > max) return max + 1;
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+/**
+ * Best-effort recovery hint for a rejected anchor: an existing anchor that
+ * matches case-insensitively (definitely intended — anchors are TitleCase)
+ * or sits within a small edit distance (likely typo). Undefined when nothing
+ * is close; invented suggestions would just add a confusing hop.
+ */
+export function suggestAnchor(state: FileAnchorState, bad: string): AnchorSuggestion | undefined {
+  const wanted = normalizeAnchor(bad);
+  if (!wanted) return undefined;
+  const lower = wanted.toLowerCase();
+  let best: AnchoredLine | undefined;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const line of state.lines) {
+    if (line.anchor.toLowerCase() === lower) {
+      return {
+        suggestion: line.anchor,
+        caseOnly: line.anchor !== wanted,
+        lineNo: line.lineNo,
+        text: line.text,
+      };
+    }
+    const d = boundedEditDistance(wanted, line.anchor, 2);
+    if (d <= 2 && d < bestDistance) {
+      bestDistance = d;
+      best = line;
+    }
+  }
+  return best
+    ? { suggestion: best.anchor, caseOnly: false, lineNo: best.lineNo, text: best.text }
+    : undefined;
+}
+
 /**
  * O(1) anchor→line-index lookups for batch verification. Built fresh from the
  * state's current lines — never cached across calls — so it cannot go stale

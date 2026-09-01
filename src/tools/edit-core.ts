@@ -1,5 +1,5 @@
 import type { AnchoredEdit, FileAnchorState } from "../types.js";
-import { AnchorIndex } from "../anchor/anchor-state.js";
+import { AnchorIndex, suggestAnchor } from "../anchor/anchor-state.js";
 import { splitTextPreserveFinal } from "../fs/text-file.js";
 
 /**
@@ -98,6 +98,24 @@ function rejectAnchorMarkedText(edit: AnchoredEdit): void {
   }
 }
 
+/** Not-found error with a best-effort "did you mean" hint for near-miss anchors. */
+function anchorNotFoundError(label: string, anchor: string, state: FileAnchorState): Error {
+  const name = label ? `${label} anchor` : "anchor";
+  const suggestion = suggestAnchor(state, anchor);
+  if (!suggestion) return new Error(`Could not find ${name} ${anchor} in ${state.path}.`);
+  const lineHint = `line ${suggestion.lineNo}: ${JSON.stringify(suggestion.text)}`;
+  if (suggestion.caseOnly) {
+    return new Error(
+      `Could not find ${name} ${anchor} in ${state.path}. Anchors are case-sensitive — did you mean '${suggestion.suggestion}' (${lineHint})? ` +
+        `Retry with that anchor and startAnchorLine/endAnchorLine '${suggestion.text}'.`,
+    );
+  }
+  return new Error(
+    `Could not find ${name} ${anchor} in ${state.path}. Did you mean '${suggestion.suggestion}' (${lineHint})? ` +
+      `Retry with that anchor and startAnchorLine/endAnchorLine '${suggestion.text}'.`,
+  );
+}
+
 export function planEdit(
   state: FileAnchorState,
   edit: AnchoredEdit,
@@ -123,10 +141,8 @@ export function planEdit(
   if (edit.type === "replace") {
     const startAnchor = idx.find(edit.startAnchor);
     const endAnchor = idx.find(edit.endAnchor);
-    if (startAnchor === -1)
-      throw new Error(`Could not find start anchor ${edit.startAnchor} in ${state.path}.`);
-    if (endAnchor === -1)
-      throw new Error(`Could not find end anchor ${edit.endAnchor} in ${state.path}.`);
+    if (startAnchor === -1) throw anchorNotFoundError("start", edit.startAnchor, state);
+    if (endAnchor === -1) throw anchorNotFoundError("end", edit.endAnchor, state);
     const includeStart = edit.includeStart ?? true;
     const includeEnd = edit.includeEnd ?? true;
     const start = includeStart ? startAnchor : startAnchor + 1;
@@ -146,7 +162,7 @@ export function planEdit(
 
   if (edit.type === "insert") {
     const index = idx.find(edit.anchor);
-    if (index === -1) throw new Error(`Could not find anchor ${edit.anchor} in ${state.path}.`);
+    if (index === -1) throw anchorNotFoundError("", edit.anchor, state);
     const start = edit.position === "before" ? index : index + 1;
     return {
       edit,
@@ -158,9 +174,8 @@ export function planEdit(
 
   const start = idx.find(edit.startAnchor);
   const end = idx.find(edit.endAnchor);
-  if (start === -1)
-    throw new Error(`Could not find start anchor ${edit.startAnchor} in ${state.path}.`);
-  if (end === -1) throw new Error(`Could not find end anchor ${edit.endAnchor} in ${state.path}.`);
+  if (start === -1) throw anchorNotFoundError("start", edit.startAnchor, state);
+  if (end === -1) throw anchorNotFoundError("end", edit.endAnchor, state);
   if (start > end) throw new Error(`Invalid delete range ${edit.startAnchor}..${edit.endAnchor}.`);
   return { edit, start, end, replacementLines: [] };
 }
