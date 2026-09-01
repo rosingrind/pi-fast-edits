@@ -258,8 +258,10 @@ export function planEdit(
 
   const start = idx.find(edit.startAnchor);
   const end = idx.find(edit.endAnchor);
-  if (start === -1) throw anchorNotFoundError("start", edit.startAnchor, state, "startAnchorLine/endAnchorLine");
-  if (end === -1) throw anchorNotFoundError("end", edit.endAnchor, state, "startAnchorLine/endAnchorLine");
+  if (start === -1)
+    throw anchorNotFoundError("start", edit.startAnchor, state, "startAnchorLine/endAnchorLine");
+  if (end === -1)
+    throw anchorNotFoundError("end", edit.endAnchor, state, "startAnchorLine/endAnchorLine");
   if (start > end) throw new Error(`Invalid delete range ${edit.startAnchor}..${edit.endAnchor}.`);
   return { edit, start, end, replacementLines: [] };
 }

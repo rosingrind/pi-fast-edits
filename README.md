@@ -193,6 +193,10 @@ If the safety check fails (e.g. pi redesigns a built-in), the extension falls ba
 - `overrideBuiltInEditTools` (default `false`) — replace pi's built-in `read`/`edit`/`write`/`grep` with the anchored implementations under the same names (see [Override mode](#override-mode))
 - `requireAnchorLines` (default `true`) — require the exact anchor line content (`startAnchorLine`/`endAnchorLine`/`anchorLine`) on every edit; set to `false` to make them optional (still verified when provided)
 
+## Troubleshooting
+
+**`edit` crashes with `Cannot read properties of undefined (reading 'replace')`** — pi is executing its **built-in** edit against anchored-shaped arguments (the built-in expects `edits[].oldText`/`newText`; anchored edits carry `startAnchor`/`anchorLine` instead, so the built-in's line-ending normalization crashes on `undefined`). This means the override did not claim the `edit` name in the running pi process — typically a stale extension load: the pi process started before the extension (re-)registered the override, or an upgrade left mixed pi/extension versions. Fix: restart pi (or `/reload`) so the current extension loads; if it persists after a restart, the pi version and the extension's pi pin (`^0.74`) have diverged — check the pi changelog for extension-`edit` dispatch changes.
+
 ## Safety
 
 - Rejects paths outside the workspace, with one evidence-based exception: reads (never writes or greps) may target host-sanctioned roots — the skill directories pi has loaded and pi's package docs, i.e. exactly the outside paths pi itself already sanctions.
