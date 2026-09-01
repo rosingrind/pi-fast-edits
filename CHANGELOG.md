@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **O(1) anchor lookups for batch edits** — Anchor verification no longer linearly scans the file per anchor: each batch builds an `AnchorIndex` (first-wins anchor→line map, rebuilt fresh per call so it can never go stale). Worst case measured ~205ms → <20ms for a 50-edit batch on a 10k-line file; pinned by a perf regression test
+- **`/pi-fast-edits status` shows read limits** — surfaces `Require anchor lines`, the range-read limit, and the full-read limit alongside override and anchor-state counts
 - **Anchor not-found errors now teach recovery** — a typo'd or case-flipped anchor ("Goldn", "golden") no longer dead-ends: the error suggests the nearest existing anchor by edit distance, flags case-only mismatches explicitly, and names the suggested anchor's line number + text so the edit can be retried correctly in one turn. Unrelated anchors keep the plain error (no invented suggestions)
 
 ## [0.3.0] - 2026-08-31
