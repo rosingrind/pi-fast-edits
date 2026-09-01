@@ -298,14 +298,18 @@ describe("applyOverrideMode wiring", () => {
     expect(write?.block).toBe(true);
   });
 
-  it("disabled (default): no interception, no override names, no setActiveTools call", async () => {
+  it("disabled (default): restores the suffixed tools, installs nothing else", async () => {
     const { registered, handlers, setActiveToolsCalls } = await loadOverride();
     await handlers.session_start!({}, {});
 
     expect(handlers.tool_call).toBeUndefined();
     expect(registered.has("read")).toBe(false);
     expect(registered.has("edit")).toBe(false);
-    expect(setActiveToolsCalls).toHaveLength(0);
+    // The disabled path re-activates the suffixed anchored tools (restore).
+    expect(setActiveToolsCalls).toHaveLength(1);
+    for (const name of SUFFIXED_TOOL_NAMES) {
+      expect(setActiveToolsCalls[0]).toContain(name);
+    }
   });
 
   it("partial child surface: replaces only present built-ins, no interception for absent ones", async () => {
