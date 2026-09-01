@@ -1,0 +1,6 @@
+# typos CLI configuration (https://github.com/crate-ci/typos)
+# "O(ND)" is the standard Myers-diff notation (N = sequence length,
+# D = edit distance) — not a typo of "AND".
+
+[default.extend-words]
+ND = "ND"
