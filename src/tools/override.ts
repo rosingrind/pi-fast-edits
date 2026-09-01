@@ -1,4 +1,5 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-agent";
+import type { TSchema } from "typebox";
 import { clearToolNameOverrides, setToolNameOverrides } from "./render.js";
 import type { PiFastEditsConfig, SessionState } from "../types.js";
 import type * as readAnchoredFileModule from "./read-anchored.js";
@@ -219,17 +220,37 @@ export function applyOverrideMode(
   ctx?: OverrideContext,
 ): void {
   if (!config.overrideBuiltInEditTools) {
-    // Disable path (mid-session toggle-off): the suffixed names are still in
-    // the registry, just deactivated — re-add them to the active set.
-    clearToolNameOverrides();
-    const keepActive = new Set(pi.getActiveTools());
-    for (const name of SUFFIXED_TOOL_NAMES) {
-      keepActive.add(name);
-    }
-    pi.setActiveTools([...keepActive]);
+    disableOverride(pi);
     return;
   }
+  enableOverride(pi, session, config, deps, ctx);
+}
 
+/**
+ * Disable path (mid-session toggle-off): the suffixed names are still in the
+ * registry, just deactivated — re-add them to the active set.
+ */
+function disableOverride(pi: ExtensionAPI): void {
+  clearToolNameOverrides();
+  const keepActive = new Set(pi.getActiveTools());
+  for (const name of SUFFIXED_TOOL_NAMES) {
+    keepActive.add(name);
+  }
+  pi.setActiveTools([...keepActive]);
+}
+
+/**
+ * Enabled path: build fresh definitions, fingerprint, then claim exactly the
+ * eligible built-ins (renamed registrations, active-set membership, rendered
+ * titles). Genuine fingerprint failures fall back to interception.
+ */
+function enableOverride(
+  pi: ExtensionAPI,
+  session: SessionState,
+  config: PiFastEditsConfig,
+  deps: OverrideDeps,
+  ctx?: OverrideContext,
+): void {
   // Build fresh definitions (re-callable registrations; re-registering a
   // suffixed name under its own name is idempotent replacement in pi).
   const readDef = deps.registerRead(pi, session, config);
@@ -270,32 +291,16 @@ export function applyOverrideMode(
     // instantiates per call, exactly as in the unconditional version.
     switch (name) {
       case "read":
-        pi.registerTool({
-          ...readDef,
-          name: "read",
-          description: OVERRIDE_DESCRIPTIONS[0].prefix + readDef.description,
-        });
+        registerRenamed(pi, readDef, name, OVERRIDE_DESCRIPTIONS[0].prefix);
         break;
       case "edit":
-        pi.registerTool({
-          ...editDef,
-          name: "edit",
-          description: OVERRIDE_DESCRIPTIONS[1].prefix + editDef.description,
-        });
+        registerRenamed(pi, editDef, name, OVERRIDE_DESCRIPTIONS[1].prefix);
         break;
       case "grep":
-        pi.registerTool({
-          ...grepDef,
-          name: "grep",
-          description: OVERRIDE_DESCRIPTIONS[2].prefix + grepDef.description,
-        });
+        registerRenamed(pi, grepDef, name, OVERRIDE_DESCRIPTIONS[2].prefix);
         break;
       case "write":
-        pi.registerTool({
-          ...writeDef,
-          name: "write",
-          description: OVERRIDE_DESCRIPTIONS[3].prefix + writeDef.description,
-        });
+        registerRenamed(pi, writeDef, name, OVERRIDE_DESCRIPTIONS[3].prefix);
         break;
       default:
         // Unreachable: eligible names are validated by checkOverrideCompatibility.
@@ -303,18 +308,33 @@ export function applyOverrideMode(
     }
   }
 
-  // setActiveTools replaces the whole active set: keep everything pi
-  // considers active today except the suffixed names whose built-in we now
-  // override, and force the eligible built-in names active. The union
-  // matters: pi's default active set is [read, bash, edit, write] — grep is
-  // registered-but-inactive, so without forcing the override names the model
-  // would have no search tool. Suffixed tools for absent built-ins (e.g.
-  // edit_anchored in a read-only child session) stay as the allowlist left
-  // them.
+  activateEligible(pi, check.eligible);
+}
+
+/** Register one of our definitions under a built-in name with a prefixed description. */
+function registerRenamed<TParams extends TSchema>(
+  pi: ExtensionAPI,
+  def: ToolDefinition<TParams, unknown, any>,
+  name: string,
+  prefix: string,
+): void {
+  pi.registerTool({ ...def, name, description: prefix + def.description });
+}
+
+/**
+ * setActiveTools replaces the whole active set: keep everything pi considers
+ * active today except the suffixed names whose built-in we now override, and
+ * force the eligible built-in names active. The union matters: pi's default
+ * active set is [read, bash, edit, write] — grep is registered-but-inactive,
+ * so without forcing the override names the model would have no search tool.
+ * Suffixed tools for absent built-ins (e.g. edit_anchored in a read-only
+ * child session) stay as the allowlist left them.
+ */
+function activateEligible(pi: ExtensionAPI, eligible: string[]): void {
   const suffixedToBuiltin = new Map<string, string>(
     OVERRIDE_SPECS.map((s) => [s.suffixed, s.name] as const),
   );
-  const overridden = new Set<string>(check.eligible);
+  const overridden = new Set<string>(eligible);
   const keepActive = new Set(
     pi
       .getActiveTools()
@@ -322,7 +342,7 @@ export function applyOverrideMode(
         (name) => !(suffixedToBuiltin.has(name) && overridden.has(suffixedToBuiltin.get(name)!)),
       ),
   );
-  for (const name of check.eligible) {
+  for (const name of eligible) {
     keepActive.add(name);
   }
   pi.setActiveTools([...keepActive]);
