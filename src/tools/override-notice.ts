@@ -19,7 +19,20 @@ const ANCHORED_LIST = ANCHORED_TOOL_NAMES.join(", ");
 
 export const OVERRIDE_ENABLED_NOTICE = `Tool override enabled: read/edit/write/grep now use anchor-line contracts (see each tool's schema). Previous anchored tool names (${ANCHORED_LIST}) are deactivated.`;
 
-export const OVERRIDE_DISABLED_NOTICE = `Tool override disabled: the anchored tools (${ANCHORED_LIST}) are active again; read/edit/write/grep keep their anchored definitions until pi reloads the extension (fully native restore requires a reload).`;
+export const OVERRIDE_DISABLED_NOTICE = `Tool override disabled: the anchored tools (${ANCHORED_LIST}) are active again; read/edit/write/grep keep their anchored definitions until pi reloads the extension (fully native restore requires a reload). Prefer the anchored tools for all file work.`;
+
+export const SUPPRESS_NOTICE = `Native read/edit/write/grep are hidden — use the anchored tools (${ANCHORED_LIST}) for all file work.`;
+
+/** The effective tool-surface mode: which names the model can call. */
+export type ToolSurfaceMode = "override" | "anchored-only" | "native";
+
+export function toolSurfaceMode(
+  config: Pick<PiFastEditsConfig, "overrideBuiltInEditTools" | "suppressNativeTools">,
+): ToolSurfaceMode {
+  if (config.overrideBuiltInEditTools) return "override";
+  if (config.suppressNativeTools) return "anchored-only";
+  return "native";
+}
 
 export type OverrideToggleNotice = {
   message: {
@@ -29,7 +42,7 @@ export type OverrideToggleNotice = {
   };
 };
 
-export type OverrideToggleTracker = (current: boolean) => OverrideToggleNotice | undefined;
+export type OverrideToggleTracker = (current: ToolSurfaceMode) => OverrideToggleNotice | undefined;
 
 /**
  * Tracks the last-seen override mode across turns. The first call establishes
@@ -39,8 +52,13 @@ export type OverrideToggleTracker = (current: boolean) => OverrideToggleNotice |
  * boolean read + compare per turn, no allocation on the steady-state path.
  */
 export function createOverrideToggleTracker(): OverrideToggleTracker {
-  let lastSeen: boolean | undefined;
-  return (current: boolean): OverrideToggleNotice | undefined => {
+  let lastSeen: ToolSurfaceMode | undefined;
+  const noticeByMode: Record<ToolSurfaceMode, string> = {
+    override: OVERRIDE_ENABLED_NOTICE,
+    "anchored-only": SUPPRESS_NOTICE,
+    native: OVERRIDE_DISABLED_NOTICE,
+  };
+  return (current: ToolSurfaceMode): OverrideToggleNotice | undefined => {
     if (lastSeen === undefined) {
       lastSeen = current;
       return undefined;
@@ -52,7 +70,7 @@ export function createOverrideToggleTracker(): OverrideToggleTracker {
     return {
       message: {
         customType: "pi-fast-edits",
-        content: current ? OVERRIDE_ENABLED_NOTICE : OVERRIDE_DISABLED_NOTICE,
+        content: noticeByMode[current],
         display: true,
       },
     };
@@ -65,8 +83,8 @@ export function createOverrideToggleTracker(): OverrideToggleTracker {
  * a mid-session menu toggle surfaces as a notice on the next turn.
  */
 export function createOverrideNoticeHandler(
-  config: Pick<PiFastEditsConfig, "overrideBuiltInEditTools">,
+  config: Pick<PiFastEditsConfig, "overrideBuiltInEditTools" | "suppressNativeTools">,
   tracker: OverrideToggleTracker = createOverrideToggleTracker(),
 ): () => OverrideToggleNotice | undefined {
-  return () => tracker(config.overrideBuiltInEditTools);
+  return () => tracker(toolSurfaceMode(config));
 }

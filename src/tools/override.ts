@@ -51,6 +51,9 @@ export const SUFFIXED_TOOL_NAMES = [
   "write_anchored",
   "edit_anchored",
 ] as const;
+
+/** The native built-in tool names override mode claims and suppress mode hides. */
+const NATIVE_TOOL_NAMES = ["read", "edit", "write", "grep"] as const;
 /**
  * Per-behavior override spec: the built-in name we claim, the suffixed tool
  * that provides the behavior, and the built-in parameter properties whose
@@ -219,22 +222,30 @@ export function applyOverrideMode(
   deps: OverrideDeps,
   ctx?: OverrideContext,
 ): void {
-  if (!config.overrideBuiltInEditTools) {
-    disableOverride(pi);
+  if (config.overrideBuiltInEditTools) {
+    enableOverride(pi, session, config, deps, ctx);
     return;
   }
-  enableOverride(pi, session, config, deps, ctx);
+  disableOverride(pi, config.suppressNativeTools);
 }
 
 /**
  * Disable path (mid-session toggle-off): the suffixed names are still in the
  * registry, just deactivated — re-add them to the active set.
  */
-function disableOverride(pi: ExtensionAPI): void {
+function disableOverride(pi: ExtensionAPI, suppressNativeTools: boolean): void {
   clearToolNameOverrides();
   const keepActive = new Set(pi.getActiveTools());
   for (const name of SUFFIXED_TOOL_NAMES) {
     keepActive.add(name);
+  }
+  if (suppressNativeTools) {
+    // Hide the native names entirely: the model can only call the anchored
+    // tools, so no name-shadowed dispatch (built-in edit body vs extension
+    // def) can occur at all.
+    for (const name of NATIVE_TOOL_NAMES) {
+      keepActive.delete(name);
+    }
   }
   pi.setActiveTools([...keepActive]);
 }

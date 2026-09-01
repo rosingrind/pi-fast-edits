@@ -48,40 +48,51 @@ describe("override toggle notice", () => {
     }
   });
 
-  it("primes the baseline on the first turn: no notice, in either mode", () => {
-    expect(createOverrideToggleTracker()(false)).toBeUndefined();
-    expect(createOverrideToggleTracker()(true)).toBeUndefined();
+  it("primes the baseline on the first turn: no notice, in any surface mode", () => {
+    for (const mode of ["native", "override", "anchored-only"] as const) {
+      expect(createOverrideToggleTracker()(mode)).toBeUndefined();
+    }
   });
 
-  it("injects the enabled notice exactly once on an off→on change, then stays silent", () => {
+  it("injects the enabled notice exactly once on an native→override change, then stays silent", () => {
     const track = createOverrideToggleTracker();
-    track(false); // first turn primes the stored previous mode
-    const notice = track(true);
+    track("native"); // first turn primes the stored previous mode
+    const notice = track("override");
     expect(notice).toEqual({
       message: { customType: "pi-fast-edits", content: OVERRIDE_ENABLED_NOTICE, display: true },
     });
-    expect(track(true)).toBeUndefined();
-    expect(track(true)).toBeUndefined();
+    expect(track("override")).toBeUndefined();
+    expect(track("override")).toBeUndefined();
   });
 
-  it("injects the disabled notice exactly once on an on→off change, then stays silent", () => {
+  it("injects the disabled notice exactly once on an override→native change, then stays silent", () => {
     const track = createOverrideToggleTracker();
-    track(true);
-    expect(track(false)).toEqual({
+    track("override");
+    expect(track("native")).toEqual({
       message: { customType: "pi-fast-edits", content: OVERRIDE_DISABLED_NOTICE, display: true },
     });
-    expect(track(false)).toBeUndefined();
+    expect(track("native")).toBeUndefined();
   });
 
-  it("fires exactly once per change across alternating toggles", () => {
+  it("injects the suppress notice on a native→anchored-only change, then stays silent", () => {
     const track = createOverrideToggleTracker();
-    track(false);
-    expect(track(true)?.message.content).toBe(OVERRIDE_ENABLED_NOTICE);
-    expect(track(false)?.message.content).toBe(OVERRIDE_DISABLED_NOTICE);
-    expect(track(true)?.message.content).toBe(OVERRIDE_ENABLED_NOTICE);
-    expect(track(false)?.message.content).toBe(OVERRIDE_DISABLED_NOTICE);
-    // steady state back at off: no further notice
-    expect(track(false)).toBeUndefined();
+    track("native");
+    const notice = track("anchored-only");
+    expect(notice?.message.content).toContain("Native read/edit/write/grep are hidden");
+    expect(track("anchored-only")).toBeUndefined();
+  });
+
+  it("fires exactly once per change across alternating surface modes", () => {
+    const track = createOverrideToggleTracker();
+    track("native");
+    expect(track("override")?.message.content).toBe(OVERRIDE_ENABLED_NOTICE);
+    expect(track("native")?.message.content).toBe(OVERRIDE_DISABLED_NOTICE);
+    expect(track("anchored-only")?.message.content).toContain(
+      "Native read/edit/write/grep are hidden",
+    );
+    expect(track("native")).toBeUndefined();
+    // steady state back at native: no further notice
+    expect(track("native")).toBeUndefined();
   });
 });
 

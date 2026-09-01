@@ -6,6 +6,7 @@ export const DEFAULT_CONFIG: PiFastEditsConfig = {
   requireAnchorLines: true,
   maxRangeReadLines: 400,
   maxReadLines: 2000,
+  suppressNativeTools: false,
   protectedPaths: [
     ".env",
     ".env.*",

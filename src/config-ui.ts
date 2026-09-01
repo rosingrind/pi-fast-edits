@@ -254,6 +254,14 @@ function buildItems(
       currentValue: config.requireAnchorLines ? "on" : "off",
       values: ["on", "off"],
     },
+    {
+      id: "suppressNativeTools",
+      label: "Hide native read/edit/write/grep",
+      description:
+        "Remove the native tool names from the model's active set — only the anchored tools are callable",
+      currentValue: config.suppressNativeTools ? "on" : "off",
+      values: ["on", "off"],
+    },
     numeric(
       "maxRangeReadLines",
       "Max range-read lines",
@@ -310,6 +318,9 @@ export async function showConfigMenu(
           break;
         case "requireAnchorLines":
           config.requireAnchorLines = newValue === "on";
+          break;
+        case "suppressNativeTools":
+          config.suppressNativeTools = newValue === "on";
           break;
         case "maxRangeReadLines":
           config.maxRangeReadLines = toPositiveInt(newValue, config.maxRangeReadLines);

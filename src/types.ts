@@ -8,6 +8,8 @@ export type PiFastEditsConfig = {
   maxRangeReadLines: number;
   /** Cap on lines returned by a full read; longer files are truncated with a continuation notice. */
   maxReadLines: number;
+  /** When true, native read/edit/write/grep are removed from the active tool set — the model can only use the anchored tools. */
+  suppressNativeTools: boolean;
   protectedPaths: string[];
 };
 

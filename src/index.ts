@@ -65,11 +65,9 @@ export default async function piFastEdits(
   // wiring: the overridden definitions embed schema choices (e.g.
   // requireAnchorLines) that must follow the live settings, so rebuilding
   // them on every change keeps the built-in-name surface fresh (spec D8).
-  const onConfigChanged = (id: string, ctx?: ExtensionCommandContext) => {
+  const onConfigChanged = (_id: string, ctx?: ExtensionCommandContext) => {
     registerAnchoredEditTools();
-    if (id === "override" || config.overrideBuiltInEditTools) {
-      applyOverrideMode(pi, session, config, overrideDeps, ctx);
-    }
+    applyOverrideMode(pi, session, config, overrideDeps, ctx);
   };
   registerCommands(pi, session, config, onConfigChanged);
 
@@ -96,9 +94,7 @@ export default async function piFastEdits(
     } catch {
       // Corrupt state — start fresh.
     }
-    if (config.overrideBuiltInEditTools) {
-      applyOverrideMode(pi, session, config, overrideDeps, ctx);
-    }
+    applyOverrideMode(pi, session, config, overrideDeps, ctx);
   });
   pi.on("session_shutdown", async () => {
     try {

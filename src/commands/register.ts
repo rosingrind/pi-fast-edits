@@ -31,6 +31,7 @@ export function registerCommands(
           `Tracked files: ${session.files.size}`,
           `Tracked anchors: ${trackedAnchors}`,
           `Require anchor lines: ${config.requireAnchorLines ? "on" : "off"}`,
+          `Native read/edit/write/grep: ${config.suppressNativeTools ? "hidden" : "active"}`,
           `Range read limit: ${config.maxRangeReadLines} lines`,
           `Full read limit: ${config.maxReadLines} lines`,
         ];

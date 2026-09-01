@@ -38,6 +38,9 @@ function sanitizeConfig(parsed: Record<string, unknown>): PiFastEditsConfig {
   if (typeof parsed.requireAnchorLines === "boolean") {
     config.requireAnchorLines = parsed.requireAnchorLines;
   }
+  if (typeof parsed.suppressNativeTools === "boolean") {
+    config.suppressNativeTools = parsed.suppressNativeTools;
+  }
   for (const key of ["maxRangeReadLines", "maxReadLines"] as const) {
     const value = parsed[key];
     if (typeof value === "number" && Number.isFinite(value) && value > 0) {
