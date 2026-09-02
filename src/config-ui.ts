@@ -6,24 +6,13 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Container, Input, SelectList, SettingsList, Spacer, Text } from "@earendil-works/pi-tui";
 import type { SettingItem } from "@earendil-works/pi-tui";
-import { parseConfirmationMode } from "./config.js";
+import { SETTINGS, applySetting, parsePositiveInt, toPositiveInt } from "./config-settings.js";
 import { saveConfig } from "./config-persistence.js";
 import type { PiFastEditsConfig } from "./types.js";
 
 const MAX_VISIBLE = 10;
 const SUBMENU_LAYOUT = { minPrimaryColumnWidth: 12, maxPrimaryColumnWidth: 40 };
 const ADD_PATTERN = "__add__";
-
-/** Parse a positive integer. Returns undefined for empty, zero, negative, or non-integer input.
- * Zero breaks read tools (invalid range, or returns 1 line). */
-function parsePositiveInt(value: string): number | undefined {
-  const n = Number(value.trim());
-  return Number.isInteger(n) && n > 0 ? n : undefined;
-}
-
-function toPositiveInt(value: string, fallback: number): number {
-  return parsePositiveInt(value) ?? fallback;
-}
 
 /**
  * Submenu for entering a bounded numeric setting via a single-line input.
@@ -202,7 +191,7 @@ class ConfigMenuComponent extends Container {
   }
 }
 
-function buildItems(
+export function buildItems(
   config: PiFastEditsConfig,
   theme: Theme,
   onChange: (id: string, newValue: string) => void,
@@ -231,59 +220,52 @@ function buildItems(
       ),
   });
 
-  return [
-    {
-      id: "confirmation",
-      label: "Confirmation mode",
-      description: "When to ask before editing: always, only for protected paths, or never",
-      currentValue: config.confirmation,
-      values: ["always", "protected-paths", "never"],
-    },
-    {
-      id: "requireAnchorLines",
-      label: "Require anchor line args",
-      description:
-        "Edit tools require the exact anchor line content (startAnchorLine/endAnchorLine/anchorLine) on every edit",
-      currentValue: config.requireAnchorLines ? "on" : "off",
-      values: ["on", "off"],
-    },
-    {
-      id: "suppressNativeTools",
-      label: "Hide native read/edit/write/grep",
-      description:
-        "Remove the native tool names from the model's active set — only the anchored tools are callable",
-      currentValue: config.suppressNativeTools ? "on" : "off",
-      values: ["on", "off"],
-    },
-    numeric(
-      "maxRangeReadLines",
-      "Max range-read lines",
-      "Maximum lines returned by a range read (longer windows are clamped)",
-      config.maxRangeReadLines,
-    ),
-    numeric(
-      "maxReadLines",
-      "Max full-read lines",
-      "Maximum lines returned by a full read (longer files are truncated with a continuation notice)",
-      config.maxReadLines,
-    ),
-    {
-      id: "protectedPaths",
-      label: "Protected paths",
-      description: "Glob patterns that require confirmation before edits",
-      currentValue: `${config.protectedPaths.length} pattern${config.protectedPaths.length === 1 ? "" : "s"}`,
-      submenu: (_currentValue, done) =>
-        new ProtectedPathsSubmenu(
-          config.protectedPaths,
-          theme,
-          (paths) => {
-            config.protectedPaths = paths;
-            void saveConfig(config);
-          },
-          (countText) => done(countText),
-        ),
-    },
-  ];
+  // One row per registry descriptor — adding a setting to SETTINGS (and to
+  // the config type) is all it takes for it to appear here automatically.
+  return SETTINGS.map((descriptor) => {
+    switch (descriptor.kind.type) {
+      case "boolean":
+        return {
+          id: descriptor.id,
+          label: descriptor.label,
+          description: descriptor.description,
+          currentValue: config[descriptor.id] ? "on" : "off",
+          values: ["on", "off"],
+        };
+      case "enum":
+        return {
+          id: descriptor.id,
+          label: descriptor.label,
+          description: descriptor.description,
+          currentValue: config[descriptor.id] as string,
+          values: [...descriptor.kind.values],
+        };
+      case "number":
+        return numeric(
+          descriptor.id,
+          descriptor.label,
+          descriptor.description,
+          config[descriptor.id] as number,
+        );
+      case "pathList":
+        return {
+          id: descriptor.id,
+          label: descriptor.label,
+          description: descriptor.description,
+          currentValue: `${config.protectedPaths.length} pattern${config.protectedPaths.length === 1 ? "" : "s"}`,
+          submenu: (_currentValue, done) =>
+            new ProtectedPathsSubmenu(
+              config.protectedPaths,
+              theme,
+              (paths) => {
+                config.protectedPaths = paths;
+                void saveConfig(config);
+              },
+              (countText) => done(countText),
+            ),
+        };
+    }
+  });
 }
 
 /**
@@ -302,26 +284,9 @@ export async function showConfigMenu(
   }
   await ctx.ui.custom<void>((_ctx, theme, _keybindings, done) => {
     const onChange = (id: string, newValue: string) => {
-      switch (id) {
-        case "confirmation":
-          config.confirmation = parseConfirmationMode(newValue) ?? config.confirmation;
-          break;
-        case "requireAnchorLines":
-          config.requireAnchorLines = newValue === "on";
-          break;
-        case "suppressNativeTools":
-          config.suppressNativeTools = newValue === "on";
-          break;
-        case "maxRangeReadLines":
-          config.maxRangeReadLines = toPositiveInt(newValue, config.maxRangeReadLines);
-          break;
-        case "maxReadLines":
-          config.maxReadLines = toPositiveInt(newValue, config.maxReadLines);
-          break;
-        // "protectedPaths" is handled by its own submenu; no main-list change.
-        default:
-          break;
-      }
+      // Generic coercion per the descriptor's kind; unknown ids and the
+      // path-list submenu are no-ops.
+      applySetting(config, id, newValue);
       // Re-register the edit tools so their schemas follow the new setting,
       // then re-apply the tool surface (suppress toggles take effect live).
       onConfigChanged(id, ctx);
