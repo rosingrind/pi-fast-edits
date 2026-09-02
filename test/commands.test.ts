@@ -48,12 +48,10 @@ describe("command handlers", () => {
 
   it("status uses notify when UI is available", async () => {
     const { notify, config, notifications, logSpy } = createMock(true);
-    config.overrideBuiltInEditTools = true;
     config.confirmation = "always";
     await notify("status");
     expect(notifications).toHaveLength(1);
     const text = notifications[0];
-    expect(text).toContain("Override built-ins: on");
     expect(text).toContain("Confirmation mode: always");
     expect(text).not.toContain("{");
     expect(logSpy).not.toHaveBeenCalled();
@@ -64,7 +62,6 @@ describe("command handlers", () => {
     const { notify, logCalls, logSpy } = createMock(false);
     await notify("status");
     const text = String(logCalls[0]?.[0] ?? "");
-    expect(text).toContain("Override built-ins: off");
     expect(text).toContain("Confirmation mode:");
     expect(text).not.toContain("{");
     logSpy.mockRestore();
@@ -88,7 +85,7 @@ describe("command handlers", () => {
   it("no argument defaults to status", async () => {
     const { notify, logCalls, logSpy } = createMock(false);
     await notify("");
-    expect(String(logCalls[0]?.[0] ?? "")).toContain("Override built-ins:");
+    expect(String(logCalls[0]?.[0] ?? "")).toContain("Confirmation mode:");
     logSpy.mockRestore();
   });
 });

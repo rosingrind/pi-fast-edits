@@ -1,11 +1,11 @@
 ---
 name: pi-fast-edits
-description: Use when editing files with pi-fast-edits anchored tools (`read_anchored`, `edit_anchored`, `write_anchored`, `grep_anchored`), or when tool output or rejections mention anchor words (like `Tunnel§`), `Revision mismatch`, `anchorLine mismatch`, `Overlapping edits`, `expectedRevision`, `allowAnchoredLines`, or `line N` suffixes — including when plain read/edit/write/grep tools behave this way because override mode is on.
+description: Use when editing files with pi-fast-edits anchored tools (`read_anchored`, `edit_anchored`, `write_anchored`, `grep_anchored`), or when tool output or rejections mention anchor words (like `Tunnel§`), `Revision mismatch`, `anchorLine mismatch`, `Overlapping edits`, `expectedRevision`, `allowAnchoredLines`, or `line N` suffixes.
 ---
 
 # pi-fast-edits — anchored file editing
 
-Anchored tools map every line to a stable random **anchor word** and guard edits with a **revision hash**, so concurrent or stale edits fail loudly instead of corrupting files. Core loop: **`read_anchored` (or `grep_anchored`) → `edit_anchored` with anchors + `expectedRevision` → verify**. These canonical names are used throughout; with `overrideBuiltInEditTools` enabled the same tools appear under pi's plain `read`/`grep`/`edit`/`write` names (the suffixed forms are deactivated) — every rule here applies unchanged. Full parameter reference: the repo README.
+Anchored tools map every line to a stable random **anchor word** and guard edits with a **revision hash**, so concurrent or stale edits fail loudly instead of corrupting files. Core loop: **`read_anchored` (or `grep_anchored`) → `edit_anchored` with anchors + `expectedRevision` → verify**. These canonical names are used throughout; the native `read`/`grep`/`edit`/`write` names coexist unless `suppressNativeTools` hides them — every rule here applies to the suffixed names unchanged. Full parameter reference: the repo README.
 
 ## Decode the rendered form
 
@@ -58,4 +58,4 @@ Every file read/edited carries a `Revision:` hash — the first 16 hex chars of 
 
 ## If your plain tools behave this way
 
-With `overrideBuiltInEditTools` enabled, the extension replaces pi's built-in `read`/`edit`/`write`/`grep` with these anchored implementations under the same names (canonical forms `read_anchored`, `edit_anchored`, `write_anchored`, `grep_anchored`, … are deactivated while overridden). If ordinary-looking tool calls suddenly mention anchors, revisions, or `§`, that is this extension working as designed — the rules above apply unchanged. `/pi-fast-edits status` shows the current mode.
+The anchored tools (`read_anchored`, `edit_anchored`, `write_anchored`, `grep_anchored`) are the canonical surface. With `suppressNativeTools` enabled, pi's native `read`/`edit`/`write`/`grep` are hidden from the model — use the anchored tools for all file work. `/pi-fast-edits status` shows the current surface.

@@ -1,7 +1,6 @@
 export type ConfirmationMode = "always" | "protected-paths" | "never";
 
 export type PiFastEditsConfig = {
-  overrideBuiltInEditTools: boolean;
   confirmation: ConfirmationMode;
   /** When true (default), edit tools require the exact anchor line content (startAnchorLine/endAnchorLine/anchorLine) on every edit. */
   requireAnchorLines: boolean;

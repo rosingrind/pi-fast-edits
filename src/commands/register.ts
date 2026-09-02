@@ -26,7 +26,6 @@ export function registerCommands(
           0,
         );
         const summary = [
-          `Override built-ins: ${config.overrideBuiltInEditTools ? "on" : "off"}`,
           `Confirmation mode: ${config.confirmation}`,
           `Tracked files: ${session.files.size}`,
           `Tracked anchors: ${trackedAnchors}`,

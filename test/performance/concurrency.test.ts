@@ -21,7 +21,7 @@ async function loadTools(overrides?: Partial<PiFastEditsConfig>) {
     on() {},
   };
   await piFastEdits(pi as any, {
-    ...{ confirmation: "never", overrideBuiltInEditTools: false },
+    ...{ confirmation: "never" },
     ...overrides,
   });
   return tools;

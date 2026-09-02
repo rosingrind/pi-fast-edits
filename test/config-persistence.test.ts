@@ -53,7 +53,7 @@ describe("config sanitization", () => {
     writeFileSync(
       join(dir, "pi-fast-edits.json"),
       JSON.stringify({
-        overrideBuiltInEditTools: "yes",
+        suppressNativeTools: "yes",
         confirmation: 42,
         requireAnchorLines: "true",
         maxRangeReadLines: "400",
@@ -72,7 +72,7 @@ describe("config sanitization", () => {
     writeFileSync(
       join(dir, "pi-fast-edits.json"),
       JSON.stringify({
-        overrideBuiltInEditTools: true,
+        suppressNativeTools: true,
         confirmation: "always",
         requireAnchorLines: false,
         maxRangeReadLines: 120.9,
@@ -82,7 +82,7 @@ describe("config sanitization", () => {
       "utf8",
     );
     const config = await loadConfig();
-    expect(config.overrideBuiltInEditTools).toBe(true);
+    expect(config.suppressNativeTools).toBe(true);
     expect(config.confirmation).toBe("always");
     expect(config.requireAnchorLines).toBe(false);
     expect(config.maxRangeReadLines).toBe(120); // floored

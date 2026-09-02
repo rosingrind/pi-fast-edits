@@ -28,9 +28,6 @@ export async function loadConfig(): Promise<PiFastEditsConfig> {
  */
 function sanitizeConfig(parsed: Record<string, unknown>): PiFastEditsConfig {
   const config = structuredClone(DEFAULT_CONFIG);
-  if (typeof parsed.overrideBuiltInEditTools === "boolean") {
-    config.overrideBuiltInEditTools = parsed.overrideBuiltInEditTools;
-  }
   if (typeof parsed.confirmation === "string") {
     const mode = parseConfirmationMode(parsed.confirmation);
     if (mode) config.confirmation = mode;

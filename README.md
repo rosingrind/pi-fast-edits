@@ -87,7 +87,7 @@ Writes a full file and seeds its anchor state in one call, returning the revisio
 - `path` — file to write, inside the workspace (a leading `@` is accepted like the other tools)
 - `content` — full content to write
 
-Rejects protected paths before any write; overwriting an existing file replaces its content and refreshes the revision. This is the same behavior `write` gets in [override mode](#override-mode).
+Rejects protected paths before any write; overwriting an existing file replaces its content and refreshes the revision. The anchored tools are always registered under their suffixed names.
 
 ### `grep_anchored`
 
@@ -132,48 +132,34 @@ Batches multiple edits. This is the preferred tool for multi-file or multi-regio
 }
 ```
 
-## Override mode
+## Tool surface
 
-`overrideBuiltInEditTools` (default `false`) controls whether pi's built-in `read`, `edit`, `write`, and `grep` are **replaced** by the anchored implementations under the same names, instead of coexisting with the suffixed tools.
+The anchored tools are always registered under their suffixed names — `read_anchored`, `grep_anchored`, `write_anchored`, `edit_anchored` — and are the canonical workflow. The only surface control is `suppressNativeTools` (default `false`):
 
-When enabled, a load-time safety check fingerprints pi's built-in tool definitions (`edit` exposes `parameters.properties.edits`; `write` exposes `path`/`content`; `read`/`grep` are registered; our own definitions have non-empty schemas and handlers). The outcome decides the surface the model sees:
+- **`suppressNativeTools: false` (default)** — pi's native `read`/`edit`/`write`/`grep` coexist with the suffixed anchored tools; the model picks per task.
+- **`suppressNativeTools: true`** — the native names are removed from the active tool set via `setActiveTools`. The model can only call the anchored tools, and a hidden tool never executes — which also sidesteps the pi built-in-`edit` dispatch bug below entirely.
 
-| Setting                                     | Tool list the model sees                                                                                                                                             | Failed-call cost                                  |
-| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| `overrideBuiltInEditTools: false` (default) | pi `read`/`edit`/`write`/`grep` (originals) + the suffixed anchored tools                                                                                            | n/a — two surfaces, the model chooses             |
-| override on, safety check passes            | `read` (anchored by default, `anchored: false` escape), `edit` (anchored multi-edit), `write` (anchor-seeding), `grep` (anchored search); suffixed names deactivated | none — the anchored workflow is the only workflow |
-| override on, safety check fails             | originals + suffixed tools, plus a visible warning; `write`/`edit` calls intercepted with a steering message                                                         | one blocked call (teaching message)               |
+Previously the extension could rename its anchored implementations over the built-in names (`overrideBuiltInEditTools`). That mechanism was removed: newer pi versions split dispatch for shadowed built-in names — validation/prompt come from the extension def but execution runs the built-in body, so anchored-shaped arguments crash inside the built-in edit (`Cannot read properties of undefined (reading 'replace')`). Renaming was therefore a dead end; hiding the natives is the working equivalent.
 
-The four replaced names:
+Toggling `suppressNativeTools` from the config menu (or the config file) takes effect immediately — the surface re-applies on the next `session_start`/config change — and injects a one-shot notice into the conversation announcing the change (hide: "use the anchored tools"; restore: "prefer the anchored tools").
 
-- `read` — `read_anchored` under the built-in name, anchored by default. Pass `anchored: false` for plain `lineNo: text` output without anchors or the revision header; schema, caps, and `details` are unchanged. Host-sanctioned skill/pi-docs reads and the collapsed `[skill]` box work identically under the overridden name. Full reads are capped at `maxReadLines` (default 2000) and a 50KB budget with a `[N more lines in file. Use startLine=X to continue.]` continuation notice; lines longer than 300 characters are display-truncated in anchored reads — `anchored: false` is the verbatim path (bounded only by the 50KB budget, with an explicit truncation marker).
-- `edit` — anchored multi-edit (`edit_anchored` behavior) under the built-in name.
-- `write` — anchor-seeding write (`write_anchored`): full-file writes that seed anchor state and return the revision plus an anchored preview, so subsequent edits need no re-read. Protection checks (`protectedPaths`), workspace bounds, and atomic writes apply exactly as elsewhere.
-- `grep` — anchored search (`grep_anchored`) under the built-in name, edit-ready by construction.
-
-While override is on, the four suffixed names (`read_anchored`, `grep_anchored`, `write_anchored`, `edit_anchored`) are deactivated via `setActiveTools` — the same behavior is never exposed under two names. Each overridden description carries a prefix ("Anchored read (default).", "Anchored edit (batch).", etc.) so the model can tell the definitions apart.
-
-Toggling the setting from the config menu re-registers the surface immediately and injects a one-shot notice into the conversation announcing the change in both directions. On the disable direction, the overridden names keep their anchored definitions until pi reloads the extension (pi has no unregister API); the suffixed tools re-activate alongside, so the surface works immediately but is fully native only after a reload.
-
-If the safety check fails (e.g. pi redesigns a built-in), the extension falls back to the interception tier with a visible warning instead of failing silently: built-in `write`/`edit` calls are blocked and steered toward the anchored tools. The former always-on runtime interception is now only this fallback.
-
-## Commands
+## Commands## Commands
 
 ```text
 /pi-fast-edits status
 /pi-fast-edits config
 ```
 
-- `status` shows the current runtime state (override flag, confirmation mode, tracked files/anchors).
+- `status` shows the current runtime state (native tool visibility, confirmation mode, tracked files/anchors).
 - `config` opens an interactive `/settings`-style menu (blue borders, fuzzy-searchable list) to edit the extension's configuration, including the `requireAnchorLines` toggle (see [Defaults](#defaults)). Changes take effect immediately — edit tools re-register so their schemas follow the new setting — and are persisted to `~/.pi/agent/pi-fast-edits.json`, surviving restarts.
 
 ## Defaults
 
 ```json
 {
-  "overrideBuiltInEditTools": false,
   "confirmation": "protected-paths",
   "requireAnchorLines": true,
+  "suppressNativeTools": false,
   "maxRangeReadLines": 400,
   "maxReadLines": 2000,
   "protectedPaths": [
@@ -190,14 +176,14 @@ If the safety check fails (e.g. pi redesigns a built-in), the extension falls ba
 }
 ```
 
-- `overrideBuiltInEditTools` (default `false`) — replace pi's built-in `read`/`edit`/`write`/`grep` with the anchored implementations under the same names (see [Override mode](#override-mode))
+- `suppressNativeTools` (default `false`) — hide pi's native `read`/`edit`/`write`/`grep` from the model's active tool set, leaving only the anchored tools (see [Tool surface](#tool-surface))
 - `requireAnchorLines` (default `true`) — require the exact anchor line content (`startAnchorLine`/`endAnchorLine`/`anchorLine`) on every edit; set to `false` to make them optional (still verified when provided)
 
 ## Troubleshooting
 
 **`edit` crashes with `Cannot read properties of undefined (reading 'replace')`** — on newer pi versions, a tool registered over the built-in name `edit` gets its **schema/prompt from the extension but its execution from pi's built-in edit body**, which requires `edits[].oldText`/`newText`. Anchored edits carry `startAnchor`/`anchorLine` instead, so the built-in's `normalizeToLF(edit.oldText)` crashes on `undefined`. Verified behaviorally: anchored-shaped args validate against the extension schema then crash; built-in-shaped args (`oldText`/`newText`) are rejected by the extension schema — the name is split at dispatch. A pi restart does **not** fix it.
 
-Workaround: set `overrideBuiltInEditTools: false` — the model then drives `edit_anchored` directly (full anchored workflow, no name shadowing, no crash). Long-term: this is an upstream pi dispatch issue (extension def supplies validation, built-in supplies execution for shadowed built-in names) — report to `earendil-works/pi` with an anchored-args repro.
+This mechanism no longer exists in pi-fast-edits: the rename was removed and the anchored tools are always the suffixed names, so a shadowed `edit` can never occur. To keep the model on the anchored tools exclusively, set `suppressNativeTools: true`. Long-term: if a future pi reintroduces name shadowing, report to `earendil-works/pi` with an anchored-args repro.
 
 ## Safety
 

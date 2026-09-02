@@ -13,11 +13,7 @@ import { registerReadAnchored } from "./tools/read-anchored.js";
 import { registerGrepAnchored } from "./tools/grep-anchored.js";
 import { registerWriteAnchored } from "./tools/write-anchored.js";
 import { registerEditAnchored } from "./tools/edit-anchored.js";
-import {
-  applyOverrideMode,
-  installInterceptionFallback,
-  type OverrideDeps,
-} from "./tools/override.js";
+import { applyToolSurface } from "./tools/override.js";
 import { createOverrideNoticeHandler } from "./tools/override-notice.js";
 import { collectReadRoots, piDocsRoot, type SkillRef } from "./fs/read-roots.js";
 
@@ -47,27 +43,12 @@ export default async function piFastEdits(
   };
   registerAnchoredEditTools();
 
-  // Override wiring is applied from session_start, not the factory: pi's
-  // runtime actions (getAllTools/getActiveTools/setActiveTools) are only bound
-  // after extension loading, and re-registering at runtime refreshes the
-  // registry in-session.
-  const overrideDeps: OverrideDeps = {
-    registerRead: registerReadAnchored,
-    registerEdit: registerEditAnchored,
-    registerGrep: registerGrepAnchored,
-    registerWrite: registerWriteAnchored,
-    installInterception: installInterceptionFallback,
-  };
-
-  // Config-menu changes re-register the anchored edit tools (schemas follow
-  // the live settings). When the override toggle itself changed, or while
-  // override mode is active on ANY config change, also re-run the override
-  // wiring: the overridden definitions embed schema choices (e.g.
-  // requireAnchorLines) that must follow the live settings, so rebuilding
-  // them on every change keeps the built-in-name surface fresh (spec D8).
-  const onConfigChanged = (_id: string, ctx?: ExtensionCommandContext) => {
+  // The tool surface (which names the model can call) is applied from
+  // session_start, not the factory: pi's runtime actions
+  // (getActiveTools/setActiveTools) are only bound after extension loading.
+  const onConfigChanged = (_id: string, _ctx?: ExtensionCommandContext) => {
     registerAnchoredEditTools();
-    applyOverrideMode(pi, session, config, overrideDeps, ctx);
+    applyToolSurface(pi, config);
   };
   registerCommands(pi, session, config, onConfigChanged);
 
@@ -94,7 +75,7 @@ export default async function piFastEdits(
     } catch {
       // Corrupt state — start fresh.
     }
-    applyOverrideMode(pi, session, config, overrideDeps, ctx);
+    applyToolSurface(pi, config);
   });
   pi.on("session_shutdown", async () => {
     try {

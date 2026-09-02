@@ -233,13 +233,6 @@ function buildItems(
 
   return [
     {
-      id: "override",
-      label: "Override built-in edit tools",
-      description: "Block pi's native write/edit tools and route edits through anchored tools",
-      currentValue: config.overrideBuiltInEditTools ? "on" : "off",
-      values: ["on", "off"],
-    },
-    {
       id: "confirmation",
       label: "Confirmation mode",
       description: "When to ask before editing: always, only for protected paths, or never",
@@ -310,9 +303,6 @@ export async function showConfigMenu(
   await ctx.ui.custom<void>((_ctx, theme, _keybindings, done) => {
     const onChange = (id: string, newValue: string) => {
       switch (id) {
-        case "override":
-          config.overrideBuiltInEditTools = newValue === "on";
-          break;
         case "confirmation":
           config.confirmation = parseConfirmationMode(newValue) ?? config.confirmation;
           break;
@@ -332,9 +322,8 @@ export async function showConfigMenu(
         default:
           break;
       }
-      // Re-register the edit tools so their schemas follow the new setting;
-      // when the setting is overrideBuiltInEditTools itself, the callback
-      // also re-runs the override wiring (both directions).
+      // Re-register the edit tools so their schemas follow the new setting,
+      // then re-apply the tool surface (suppress toggles take effect live).
       onConfigChanged(id, ctx);
       void saveConfig(config).then((ok) => {
         if (!ok) ctx?.ui?.notify?.("pi-fast-edits: failed to save settings to disk", "warning");

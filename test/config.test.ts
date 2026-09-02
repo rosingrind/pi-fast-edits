@@ -5,7 +5,6 @@ describe("DEFAULT_CONFIG", () => {
   it("has correct defaults", () => {
     expect(DEFAULT_CONFIG.maxRangeReadLines).toBe(400);
     expect(DEFAULT_CONFIG.confirmation).toBe("protected-paths");
-    expect(DEFAULT_CONFIG.overrideBuiltInEditTools).toBe(false);
     expect(DEFAULT_CONFIG.protectedPaths).toContain(".env");
     expect(DEFAULT_CONFIG.protectedPaths).toContain(".env.*");
     expect(DEFAULT_CONFIG.protectedPaths).toContain(".git/**");
