@@ -147,3 +147,16 @@ describe("buildItems (menu rows)", () => {
     expect(paths.currentValue).toContain(String(DEFAULT_CONFIG.protectedPaths.length));
   });
 });
+
+describe("menu search finds settings by config key", () => {
+  it("every row label carries its config key (search matches labels only)", () => {
+    const config = { ...DEFAULT_CONFIG, protectedPaths: [...DEFAULT_CONFIG.protectedPaths] };
+    const items = buildItems(config, stubTheme, () => {});
+    for (const item of items) {
+      expect(
+        item.label.startsWith(`${item.id} — `),
+        `row "${item.label}" must lead with its config key "${item.id}" so the menu search finds it`,
+      ).toBe(true);
+    }
+  });
+});
