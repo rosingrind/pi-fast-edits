@@ -222,15 +222,14 @@ export function buildItems(
 
   // One row per registry descriptor — adding a setting to SETTINGS (and to
   // the config type) is all it takes for it to appear here automatically.
-  // The label leads with the config key: the menu's search matches labels
-  // only, so every setting must be findable by its key name.
+  // Labels are the human-readable strings from the registry; the raw config
+  // keys stay out of the UI.
   return SETTINGS.map((descriptor) => {
-    const keyedLabel = `${descriptor.id} — ${descriptor.label}`;
     switch (descriptor.kind.type) {
       case "boolean":
         return {
           id: descriptor.id,
-          label: keyedLabel,
+          label: descriptor.label,
           description: descriptor.description,
           currentValue: config[descriptor.id] ? "on" : "off",
           values: ["on", "off"],
@@ -238,7 +237,7 @@ export function buildItems(
       case "enum":
         return {
           id: descriptor.id,
-          label: keyedLabel,
+          label: descriptor.label,
           description: descriptor.description,
           currentValue: config[descriptor.id] as string,
           values: [...descriptor.kind.values],
@@ -246,14 +245,14 @@ export function buildItems(
       case "number":
         return numeric(
           descriptor.id,
-          keyedLabel,
+          descriptor.label,
           descriptor.description,
           config[descriptor.id] as number,
         );
       case "pathList":
         return {
           id: descriptor.id,
-          label: keyedLabel,
+          label: descriptor.label,
           description: descriptor.description,
           currentValue: `${config.protectedPaths.length} pattern${config.protectedPaths.length === 1 ? "" : "s"}`,
           submenu: (_currentValue, done) =>

@@ -148,15 +148,16 @@ describe("buildItems (menu rows)", () => {
   });
 });
 
-describe("menu search finds settings by config key", () => {
-  it("every row label carries its config key (search matches labels only)", () => {
+describe("menu rows show human labels, not config keys", () => {
+  it("each row label is the descriptor's human label (no raw config keys in the UI)", () => {
     const config = { ...DEFAULT_CONFIG, protectedPaths: [...DEFAULT_CONFIG.protectedPaths] };
     const items = buildItems(config, stubTheme, () => {});
-    for (const item of items) {
+    for (const descriptor of SETTINGS) {
+      const item = items.find((i) => i.id === descriptor.id)!;
       expect(
-        item.label.startsWith(`${item.id} — `),
-        `row "${item.label}" must lead with its config key "${item.id}" so the menu search finds it`,
-      ).toBe(true);
+        item.label,
+        `row "${descriptor.id}" must use the human label, not the config key`,
+      ).toBe(descriptor.label);
     }
   });
 });

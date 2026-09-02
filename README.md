@@ -151,7 +151,7 @@ Toggling `suppressNativeTools` from the config menu (or the config file) takes e
 ```
 
 - `status` shows the current runtime state (native tool visibility, confirmation mode, tracked files/anchors).
-- `config` opens an interactive `/settings`-style menu (blue borders, fuzzy-searchable list, every row labeled with its config key so settings are findable by name) to edit the extension's configuration, including the `requireAnchorLines` toggle (see [Defaults](#defaults)). Changes take effect immediately — edit tools re-register so their schemas follow the new setting — and are persisted to `~/.pi/agent/pi-fast-edits.json`, surviving restarts.
+- `config` opens an interactive `/settings`-style menu (blue borders, fuzzy-searchable list) to edit the extension's configuration, including the `requireAnchorLines` and `suppressNativeTools` toggles (see [Defaults](#defaults)). Changes take effect immediately — edit tools re-register so their schemas follow the new setting — and are persisted to `~/.pi/agent/pi-fast-edits.json`, surviving restarts.
 
 ## Defaults
 
